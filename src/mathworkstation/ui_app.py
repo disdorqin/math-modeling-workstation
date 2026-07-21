@@ -27,6 +27,7 @@ from mathworkstation.paper_consistency import PaperConsistencyChecker
 from mathworkstation.figure_registry import FigureRegistry
 from mathworkstation.datasets import DatasetRegistry
 from mathworkstation.run_manager import RunManager
+from mathworkstation.session_manager import SessionManager
 from mathworkstation.workflow_service import WorkflowService
 from mathworkstation.cli import _load_env_file
 
@@ -126,7 +127,7 @@ def _render_overview(services: dict[str, Any], case: dict[str, Any]) -> None:
     for column, label in zip(columns, ("已完成", "待审", "运行中", "阻塞", "降级")):
         key = {"已完成": "SUCCEEDED", "待审": "NEEDS_REVIEW", "运行中": "RUNNING", "阻塞": "BLOCKED", "降级": "DEGRADED"}[label]
         column.metric(label, counts.get(key, 0))
-    st.dataframe(_workflow_rows(case["workflow"]), use_container_width=True, hide_index=True)
+    st.dataframe(_workflow_rows(case["workflow"]), width="stretch", hide_index=True)
 
     st.subheader("人工控制")
     rows = _workflow_rows(case["workflow"])
@@ -155,13 +156,13 @@ def _render_overview(services: dict[str, Any], case: dict[str, Any]) -> None:
 
 def _render_evidence(services: dict[str, Any], case: dict[str, Any]) -> None:
     st.subheader("数据、图表与证据")
-    st.dataframe(case["artifacts"], use_container_width=True, hide_index=True)
+    st.dataframe(case["artifacts"], width="stretch", hide_index=True)
     if case["claims"]:
         st.subheader("Claims")
-        st.dataframe(case["claims"], use_container_width=True, hide_index=True)
+        st.dataframe(case["claims"], width="stretch", hide_index=True)
     if case["literature"]:
         st.subheader("Literature")
-        st.dataframe(case["literature"], use_container_width=True, hide_index=True)
+        st.dataframe(case["literature"], width="stretch", hide_index=True)
         bib_path = case["root"] / "paper" / "references" / "references.bib"
         if bib_path.is_file():
             st.download_button(
