@@ -6,7 +6,7 @@ from typing import Any
 
 from .case_manager import CaseManager
 from .io_utils import atomic_write_json, now_iso, read_json
-from .workflow import WorkflowController, default_workflow_graph
+from .workflow import NodeRuntime, NodeStatus, WorkflowController, default_workflow_graph
 
 
 class CheckpointManager:
@@ -34,9 +34,25 @@ class CheckpointManager:
         path = self.cases.case_root(case_id) / ".internal" / "checkpoints" / "current.json"
         if not path.is_file():
             return self.initialize(case_id)
-        return WorkflowController.from_snapshot(read_json(path))
+        controller = WorkflowController.from_snapshot(read_json(path))
+        current_graph = default_workflow_graph()
+        if controller.graph.definitions != current_graph.definitions:
+            runtimes = {
+                node_id: controller.runtimes.get(node_id, NodeRuntime())
+                for node_id in current_graph.definitions
+            }
+            if "refinement_loop" not in controller.runtimes:
+                final_status = controller.runtimes.get("final_review", NodeRuntime()).status
+                export_status = controller.runtimes.get("export", NodeRuntime()).status
+                if final_status in {NodeStatus.SUCCEEDED, NodeStatus.NEEDS_REVIEW} or export_status == NodeStatus.SUCCEEDED:
+                    runtimes["refinement_loop"] = NodeRuntime(
+                        status=NodeStatus.SUCCEEDED,
+                        review={"migration": "legacy completed paper accepted as pre-refinement output"},
+                    )
+            controller = WorkflowController(current_graph, runtimes)
+            self.save(case_id, controller, reason="workflow_graph_migrated")
+        return controller
 
     def snapshot(self, case_id: str) -> dict[str, Any]:
         path = self.cases.case_root(case_id) / ".internal" / "checkpoints" / "current.json"
         return read_json(path)
-

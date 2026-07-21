@@ -182,12 +182,24 @@ def _render_evidence(services: dict[str, Any], case: dict[str, Any]) -> None:
 def _render_paper(case: dict[str, Any]) -> None:
     st.subheader("论文工作区")
     root = case["root"]
-    paper = root / "paper" / "paper.md"
+    paper = root / "paper" / "current.md"
+    if not paper.is_file():
+        paper = root / "paper" / "paper.md"
     consistency = root / "review" / "consistency" / "paper_consistency.json"
+    refinement_state = root / "memory" / "refinement_state.json"
     if consistency.is_file():
         report = json.loads(consistency.read_text(encoding="utf-8"))
         gate = report.get("gate", "UNKNOWN")
         (st.success if gate == "PASS" else st.warning)(f"Consistency gate: {gate}")
+    if refinement_state.is_file():
+        state = json.loads(refinement_state.read_text(encoding="utf-8"))
+        columns = st.columns(4)
+        columns[0].metric("精修轮次", state.get("iteration", 0))
+        columns[1].metric("已接受", len(state.get("accepted_stages", [])))
+        columns[2].metric("已拒绝", len(state.get("rejected_stages", [])))
+        columns[3].metric("停止原因", state.get("stop_reason", state.get("status", "RUNNING")))
+        with st.expander("循环精修质量状态"):
+            st.json(state.get("quality_vector", {}))
     if paper.is_file():
         content = paper.read_text(encoding="utf-8")
         st.download_button("下载论文 Markdown", content, file_name=f"{case['manifest']['manifest']['case_id']}.md", mime="text/markdown")

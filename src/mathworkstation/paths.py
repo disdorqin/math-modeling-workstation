@@ -43,6 +43,9 @@ CASE_DIRECTORIES = (
     "paper/markdown",
     "paper/latex",
     "paper/references",
+    "paper/versions",
+    "paper/patches",
+    "refinement/stages",
     "review/structural",
     "review/statistical",
     "review/reproducibility",
@@ -67,4 +70,3 @@ def resolve_within(root: Path, relative: str | Path) -> Path:
 def create_case_tree(case_root: Path) -> None:
     for directory in CASE_DIRECTORIES:
         resolve_within(case_root, directory).mkdir(parents=True, exist_ok=True)
-

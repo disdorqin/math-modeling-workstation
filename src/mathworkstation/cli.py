@@ -38,6 +38,7 @@ from .paper_outline import PaperOutlineService, default_outline
 from .paper_sections import PaperSectionWorkspace
 from .problem_ingestion import ProblemIngestionService
 from .recovery import RecoveryService
+from .refinement import RefinementConfig
 from .run_manager import RunManager
 from .session_manager import SessionManager
 from .selection import ModelSelectionRegistry
@@ -117,6 +118,18 @@ def build_parser() -> argparse.ArgumentParser:
     auto_pipeline.add_argument("--source-uri")
     auto_pipeline.add_argument("--license")
     auto_pipeline.add_argument("--data-description", default="")
+    auto_pipeline.add_argument("--refinement-max-stages", type=int, default=10)
+    auto_pipeline.add_argument("--refinement-patience", type=int, default=2)
+    auto_pipeline.add_argument("--refinement-min-delta", type=float, default=0.015)
+
+    refine = commands.add_parser("run-refinement", help="run or resume bounded paper refinement")
+    refine.add_argument("--case-id", required=True)
+    refine.add_argument("--session-id", required=True)
+    refine.add_argument("--routes", required=True)
+    refine.add_argument("--max-stages", type=int, default=10)
+    refine.add_argument("--patience", type=int, default=2)
+    refine.add_argument("--min-delta", type=float, default=0.015)
+    refine.add_argument("--restart", action="store_true", help="mark a completed refinement loop stale before a new pass")
 
     start = commands.add_parser("start-node")
     start.add_argument("--case-id", required=True)
@@ -429,6 +442,28 @@ def main(argv: list[str] | None = None) -> int:
                     source_uri=args.source_uri,
                     license_name=args.license,
                     data_description=args.data_description,
+                    refinement_config=RefinementConfig(
+                        max_stages=args.refinement_max_stages,
+                        patience=args.refinement_patience,
+                        min_delta=args.refinement_min_delta,
+                    ),
+                )
+            )
+        elif args.command == "run-refinement":
+            route_config = RouterConfig.model_validate_json(Path(args.routes).read_text(encoding="utf-8-sig"))
+            service = AutoPipelineService(cases, LLMRouter(route_config))
+            if args.restart:
+                workflow.mark_stale(args.case_id, "refinement_loop", "manual refinement restart")
+            _print(
+                service.refinement.run(
+                    args.case_id,
+                    args.session_id,
+                    lambda context: service._propose_refinement(args.case_id, args.session_id, context),
+                    RefinementConfig(
+                        max_stages=args.max_stages,
+                        patience=args.patience,
+                        min_delta=args.min_delta,
+                    ),
                 )
             )
         elif args.command == "start-node":

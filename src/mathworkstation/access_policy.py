@@ -67,4 +67,17 @@ DEFAULT_NODE_POLICIES = {
         writable=("paper/draft/**", "paper/sections/**"),
         tools=("read_artifact", "write_paper_draft", "validate_claims"),
     ),
+    "refinement_loop": NodeAccessPolicy(
+        "refinement_loop",
+        readable=(
+            "paper/current.md",
+            "paper/versions/**",
+            "paper/sections/*/context.json",
+            "memory/frozen_*.json",
+            "memory/refinement_state.json",
+            "refinement/stages/**",
+        ),
+        writable=("paper/versions/**", "paper/patches/**", "refinement/**", "memory/refinement_state.json"),
+        tools=("read_artifact", "propose_section_patch", "validate_claims"),
+    ),
 }

@@ -346,7 +346,8 @@ def default_workflow_graph() -> WorkflowGraph:
             NodeDefinition("paper_outline", ("problem_analysis", "model_selection"), approval_required=True),
             NodeDefinition("paper_draft", ("paper_outline", "sensitivity")),
             NodeDefinition("consistency_check", ("paper_draft",)),
-            NodeDefinition("final_review", ("consistency_check",), approval_required=True),
+            NodeDefinition("refinement_loop", ("consistency_check",), max_retries=1),
+            NodeDefinition("final_review", ("refinement_loop",), approval_required=True),
             NodeDefinition("export", ("final_review",)),
         ]
     )

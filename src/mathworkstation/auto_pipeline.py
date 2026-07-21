@@ -34,12 +34,13 @@ from .paper_ready import PaperReadyGate
 from .paper_sections import PaperSectionWorkspace
 from .problem_ingestion import ProblemIngestionService
 from .research_audit import ResearchAuditService
+from .refinement import RefinementConfig, RefinementService
 from .run_manager import RunManager
 from .selection import ModelSelectionRegistry
 from .sensitivity import SensitivityEngine
 from .session_manager import SessionManager
 from .stage_service import StageService
-from .structured_llm import ModelPlanProposal, ProblemAnalysis, StructuredLLM
+from .structured_llm import ModelPlanProposal, PaperRefinementProposal, ProblemAnalysis, StructuredLLM
 from .tabular import read_table
 from .workflow_service import WorkflowService
 from .workflow import FailureCategory
@@ -53,7 +54,8 @@ class AutoPipelineService:
         self.checkpoints = CheckpointManager(cases)
         self.memory = MemoryManager(cases, self.artifacts)
         self.sessions = SessionManager(cases)
-        self.workflow = WorkflowService(cases, RunManager(cases), self.checkpoints, self.memory)
+        self.runs = RunManager(cases)
+        self.workflow = WorkflowService(cases, self.runs, self.checkpoints, self.memory)
         self.datasets = DatasetRegistry(cases, self.artifacts)
         self.figures = FigureRegistry(cases, self.artifacts)
         self.compositions = FigureCompositionService(cases, self.artifacts, self.figures)
@@ -89,6 +91,7 @@ class AutoPipelineService:
         self.ingestion = ProblemIngestionService(cases, self.artifacts)
         self.llm = StructuredLLM(CaseLLMService(cases, self.artifacts, self.sessions, self.checkpoints, llm_router))
         self.research = ResearchAuditService(cases, self.artifacts, self.datasets)
+        self.refinement = RefinementService(cases, self.artifacts, self.workflow, self.runs)
 
     def run(
         self,
@@ -104,6 +107,7 @@ class AutoPipelineService:
         source_uri: str | None = None,
         license_name: str | None = None,
         data_description: str = "",
+        refinement_config: RefinementConfig | None = None,
     ) -> dict[str, Any]:
         problem = self.ingestion.ingest(case_id, problem_source)
         data = self.data.register_uploaded(
@@ -201,6 +205,12 @@ class AutoPipelineService:
         consistency = self.stages.check_consistency(case_id, self.consistency, session_id)
         if consistency["result"]["report"]["gate"] != "PASS":
             raise ValueError(f"paper consistency gate failed: {consistency['result']['report']['findings']}")
+        refinement = self.refinement.run(
+            case_id,
+            session_id,
+            lambda context: self._propose_refinement(case_id, session_id, context),
+            refinement_config,
+        )
         self._complete_review(case_id, session_id, approved_by)
         export = self.exporter.export_case(case_id, session_id)
         return {
@@ -210,8 +220,9 @@ class AutoPipelineService:
             "model_plan_artifact_id": plan_artifact_id,
             "paper_ready_artifact_id": ready["approval_artifact_id"],
             "paper_artifact_id": paper["artifact"]["artifact_id"],
-            "paper_final_artifact_id": paper["final_artifact"]["artifact_id"],
+            "paper_final_artifact_id": refinement["paper_final_artifact_id"],
             "consistency_artifact_id": consistency["result"]["report_artifact_id"],
+            "refinement": refinement,
             "export": export,
         }
 
@@ -376,6 +387,35 @@ class AutoPipelineService:
         self.workflow.start_node(case_id, "final_review", session_id)
         self.workflow.succeed_node(case_id, "final_review")
         self.workflow.approve_node(case_id, "final_review", approved_by, "Consistency gate passed")
+
+    def _propose_refinement(
+        self,
+        case_id: str,
+        session_id: str,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        section_artifact_ids = [
+            item["evidence_contract"]["context_artifact_id"]
+            for item in context["sections"].values()
+        ]
+        proposal, response = self.llm.json_call(
+            case_id,
+            session_id,
+            "refinement_loop",
+            "paper_refinement",
+            {
+                "case_id": case_id,
+                "quality_json": context["quality_vector"],
+                "issues_json": context["issues"],
+                "controller_json": context["controller"],
+                "sections_json": context["sections"],
+                "failures_json": context["failed_strategies"],
+            },
+            PaperRefinementProposal,
+            [context["current_paper_artifact_id"], *section_artifact_ids],
+            max_tokens=6000,
+        )
+        return {**proposal.model_dump(mode="json"), "llm_response_artifact_id": response["artifact_id"]}
 
 
 def _scalarize_parameters(value: Any) -> Any:

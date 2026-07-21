@@ -51,6 +51,25 @@ class ModelPlanProposal(BaseModel):
     sensitivity_fractions: list[float] = Field(default_factory=lambda: [0.7, 0.85, 1.0])
 
 
+class SectionPatchProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    section_id: str
+    source_sha256: str = Field(min_length=64, max_length=64)
+    replacement_markdown: str = Field(min_length=20)
+    rationale: str = Field(min_length=5)
+
+
+class PaperRefinementProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = 1
+    strategy: str = Field(min_length=5)
+    issue_ids: list[str] = Field(min_length=1, max_length=3)
+    expected_gains: dict[str, float] = Field(default_factory=dict)
+    patches: list[SectionPatchProposal] = Field(min_length=1, max_length=2)
+
+
 class StructuredLLM:
     def __init__(self, service: CaseLLMService, prompts: PromptRegistry | None = None) -> None:
         self.service = service

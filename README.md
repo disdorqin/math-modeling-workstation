@@ -120,6 +120,17 @@ mathworkstation run-auto-pipeline --case-id <CASE_ID> --session-id <SESSION_ID> 
 
 该入口会依次执行结构化题目分析、数据质量、EDA、模型方案、确定性实验、证据 Claim、12 节论文草稿、一致性检查和 ZIP 导出。`--approved-by` 是显式的关键节点审批身份，不允许模型自行绕过审批。
 
+一致性检查通过后，流水线会进入受控的 `refinement_loop`：同一个 Refinement Cell 在 2--10 个有限 Stage 内重复执行“评估 → 选择缺陷 → 局部补丁 → 验证 → 接受或回滚”。每个补丁最多修改两个章节，必须回显原章节 SHA-256；已验证的数字、Claim、Figure、数据披露和章节证据范围被冻结。候选稿只有通过硬门控且改善目标质量维度后才会成为新的 `paper/current.md`。循环状态、问题账本和每轮 decision 均写入 Case 目录，可断点续跑。
+
+控制默认值：`--refinement-max-stages 10 --refinement-patience 2 --refinement-min-delta 0.015`。对已有初稿可单独执行：
+
+```powershell
+mathworkstation run-refinement --case-id <CASE_ID> --session-id <SESSION_ID> `
+  --routes config/llm-routes.example.json --max-stages 6
+```
+
+已完成循环需要重新开启时追加 `--restart`；该操作会标记后续 `final_review/export` 为 stale，保留旧版本和完整历史。
+
 自动论文使用严格研究质量门：会检查章节完整性、模型公式、图表引用、内部证据 ID 泄漏、模板化空话、数据真实性声明和证据完整性。详细规则见 [`docs/research-quality-gate.md`](docs/research-quality-gate.md)。
 
 `--image-routes` 是可选的流程图视觉参考分支。它只在主流水线末端调用 OpenAI-compatible Images API，生成供 Draw.io Scientific Illustrator 重绘的参考图，同时输出 `workflow-design.json` 和 `drawio-flowchart-prompt.md`。数据图和模型实验图始终由本地 Python 确定性生成。
@@ -135,6 +146,7 @@ python -m streamlit run src/mathworkstation/ui_app.py --server.headless true
 ```
 
 控制台提供 Case 选择、DAG 状态、审批/重试、产物和论文浏览，以及绑定当前 Case、Session 和节点的受控 LLM 对话。详细说明见 `docs/ui-runbook.md`。
+论文页优先显示最后一个 accepted 的 `paper/current.md`，并展示循环精修轮次、接受/拒绝计数、停止原因和质量向量。
 
 不安装包也可以直接运行：
 
