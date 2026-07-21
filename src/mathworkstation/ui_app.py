@@ -1,29 +1,33 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
 
-from .artifact_registry import ArtifactRegistry
-from .case_manager import CaseManager
-from .checkpoint_manager import CheckpointManager
-from .claims import ClaimRegistry
-from .llm.config import RouterConfig
-from .llm.router import LLMRouter
-from .llm.service import CaseLLMService
-from .memory_manager import MemoryManager
-from .paper_consistency import PaperConsistencyChecker
-from .paper_outline import PaperOutlineService
-from .paper_sections import PaperSectionWorkspace
-from .figure_registry import FigureRegistry
-from .datasets import DatasetRegistry
-from .run_manager import RunManager
-from .session_manager import SessionManager
-from .workflow import NodeStatus
-from .workflow_service import WorkflowService
-from .cli import _load_env_file
+# Streamlit executes a file path as __main__, so the package parent is not
+# guaranteed to be on sys.path. Keep both `streamlit run file.py` and imports
+# from the installed package working.
+_SRC_ROOT = str(Path(__file__).resolve().parents[1])
+if _SRC_ROOT not in sys.path:
+    sys.path.insert(0, _SRC_ROOT)
+
+from mathworkstation.artifact_registry import ArtifactRegistry
+from mathworkstation.case_manager import CaseManager
+from mathworkstation.checkpoint_manager import CheckpointManager
+from mathworkstation.claims import ClaimRegistry
+from mathworkstation.llm.config import RouterConfig
+from mathworkstation.llm.router import LLMRouter
+from mathworkstation.llm.service import CaseLLMService
+from mathworkstation.memory_manager import MemoryManager
+from mathworkstation.paper_consistency import PaperConsistencyChecker
+from mathworkstation.figure_registry import FigureRegistry
+from mathworkstation.datasets import DatasetRegistry
+from mathworkstation.run_manager import RunManager
+from mathworkstation.workflow_service import WorkflowService
+from mathworkstation.cli import _load_env_file
 
 
 OUTPUT_ROOT = Path("output")
