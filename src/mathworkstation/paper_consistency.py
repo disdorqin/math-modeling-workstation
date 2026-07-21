@@ -9,6 +9,7 @@ from .case_manager import CaseManager
 from .claims import ClaimRegistry
 from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso, read_json
+from .paper_outline import section_contract
 
 
 CLAIM_REF = re.compile(r"claim-[a-f0-9]{12}")
@@ -54,6 +55,14 @@ class PaperConsistencyChecker:
             cited_claims = set(CLAIM_REF.findall(content))
             cited_figures = set(FIGURE_REF.findall(content))
             placeholders = PLACEHOLDER.findall(content)
+            if self.strict:
+                missing_contracts = [
+                    "/".join(group)
+                    for group in section_contract(section_id).get("required_any", [])
+                    if not any(token in content for token in group)
+                ]
+                if missing_contracts:
+                    findings.append(_finding("BLOCK", section_id, "SECTION_CONTRACT_MISSING", "; ".join(missing_contracts)))
             if self.strict and not content.lstrip().startswith("#"):
                 findings.append(_finding("BLOCK", section_id, "SECTION_HEADING_MISSING", ""))
             if self.strict and section_id in {"model_construction", "model_solution"}:

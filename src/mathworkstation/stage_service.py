@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import re
 from pathlib import Path
 from typing import Any
 
@@ -85,7 +86,19 @@ class StageService:
             upstream=list(dict.fromkeys(upstream)),
         )
         node = self.workflow.succeed_node(case_id, "paper_draft")
-        return {"succeeded": True, "artifact": artifact, "workflow_node": node}
+        final_path = root / "paper" / "paper_final.md"
+        final_content = _render_final_manuscript("\n\n".join(parts))
+        atomic_write_text(final_path, final_content)
+        final_artifact = self.artifacts.register_existing(
+            case_id,
+            final_path.relative_to(root).as_posix(),
+            "paper_final",
+            "python",
+            run_id=started["run"]["run_id"],
+            upstream=[artifact["artifact_id"]],
+            paper_eligible=True,
+        )
+        return {"succeeded": True, "artifact": artifact, "final_artifact": final_artifact, "workflow_node": node}
 
     def check_consistency(
         self,
@@ -115,3 +128,18 @@ class StageService:
             )
             node = failure["node"]
         return {"succeeded": result["report"]["gate"] == "PASS", "started": started, "result": result, "workflow_node": node}
+
+
+def _render_final_manuscript(content: str) -> str:
+    """Remove internal claim/figure markers while keeping numbered figure references."""
+    figure_numbers: dict[str, int] = {}
+
+    def replace_figure(match: re.Match[str]) -> str:
+        figure_id = match.group(1)
+        figure_numbers.setdefault(figure_id, len(figure_numbers) + 1)
+        return f"（图 {figure_numbers[figure_id]}）"
+
+    content = re.sub(r"\[figure-([a-f0-9]{12})\]", replace_figure, content)
+    content = re.sub(r"\[claim-[a-f0-9]{12}\]", "", content)
+    content = re.sub(r"图表证据：([^\[]+)（图 \d+）", r"图：\1", content)
+    return re.sub(r"\n{3,}", "\n\n", content).strip() + "\n"

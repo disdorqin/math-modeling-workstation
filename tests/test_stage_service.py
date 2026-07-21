@@ -12,6 +12,7 @@ from mathworkstation.run_manager import RunManager
 from mathworkstation.stage_service import StageService
 from mathworkstation.workflow import NodeStatus
 from mathworkstation.workflow_service import WorkflowService
+from mathworkstation.stage_service import _render_final_manuscript
 
 
 def _services(tmp_path: Path):
@@ -58,6 +59,14 @@ def test_complete_paper_draft_rejects_placeholders(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="abstract"):
         stages.complete_paper_draft(case_id)
+
+
+def test_final_manuscript_removes_internal_markers() -> None:
+    final = _render_final_manuscript(
+        "# 摘要\n\n结果见 [claim-0123456789ab] 和 [figure-abcdefabcdef]。"
+    )
+    assert "claim-0123456789ab" not in final
+    assert "图 1" in final
 
 
 def test_env_file_does_not_override_existing_value(tmp_path: Path, monkeypatch) -> None:

@@ -195,6 +195,7 @@ class AutoPipelineService:
             "model_plan_artifact_id": plan_artifact_id,
             "paper_ready_artifact_id": ready["approval_artifact_id"],
             "paper_artifact_id": paper["artifact"]["artifact_id"],
+            "paper_final_artifact_id": paper["final_artifact"]["artifact_id"],
             "consistency_artifact_id": consistency["result"]["report_artifact_id"],
             "export": export,
         }

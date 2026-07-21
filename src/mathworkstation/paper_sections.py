@@ -9,7 +9,7 @@ from .case_manager import CaseManager
 from .claims import ClaimRegistry
 from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso, read_json
-from .paper_outline import PaperOutline
+from .paper_outline import PaperOutline, section_contract
 
 
 class PaperSectionWorkspace:
@@ -44,6 +44,7 @@ class PaperSectionWorkspace:
                 "section_id": section.section_id,
                 "title": section.title,
                 "purpose": section.purpose,
+                "section_contract": section_contract(section.section_id),
                 "allowed_claims": [known_claims[claim_id] for claim_id in section.claim_ids],
                 "allowed_figures": [known_figures[figure_id] for figure_id in section.figure_ids],
                 "evidence_pack": _build_evidence_pack(

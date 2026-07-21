@@ -28,6 +28,25 @@ REQUIRED_SECTIONS = {
     "references",
 }
 
+SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
+    "abstract": {"required_any": [["研究目的", "研究目标"], ["研究方法", "方法"], ["主要结果", "结果"], ["稳健性", "边界"]]},
+    "problem_restated": {"required_any": [["研究概述", "研究背景", "问题"], ["目标", "子问题"]]},
+    "assumptions": {"required_any": [["假设"], ["适用", "边界"]]},
+    "notation": {"required_any": [["$", "符号"], ["变量", "目标"]]},
+    "data_analysis": {"required_any": [["数据", "字段"], ["缺失", "质量"]]},
+    "model_construction": {"required_any": [["模型"], ["目标函数", "$", "损失"]]},
+    "model_solution": {"required_any": [["求解", "训练"], ["交叉验证", "指标"]]},
+    "results": {"required_any": [["结果", "模型"], ["图表证据", "图", "表"]]},
+    "sensitivity": {"required_any": [["敏感性", "稳健性"], ["比例", "随机种子", "波动"]]},
+    "strengths_weaknesses": {"required_any": [["优点", "优势"], ["局限", "缺点"]]},
+    "conclusion": {"required_any": [["结论"], ["适用", "外推", "限制"]]},
+    "references": {"required_any": [["参考文献", "来源"]]},
+}
+
+
+def section_contract(section_id: str) -> dict[str, list[list[str]]]:
+    return SECTION_CONTRACTS.get(section_id, {"required_any": []})
+
 
 class SectionPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
