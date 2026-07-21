@@ -55,6 +55,8 @@ def test_optional_failure_degrades_without_becoming_evidence(tmp_path: Path) -> 
     assert action.action == "degrade"
     assert action.paper_eligible is False
     assert workflow.runtimes["supplementary_figure"].status == NodeStatus.DEGRADED
+    workflow.retry("supplementary_figure", "human", "provider recovered")
+    assert workflow.runtimes["supplementary_figure"].status == NodeStatus.RETRYING
 
 
 def test_stale_propagates_to_downstream(tmp_path: Path) -> None:

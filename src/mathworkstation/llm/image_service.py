@@ -10,6 +10,7 @@ from PIL import Image
 from ..artifact_registry import ArtifactRegistry
 from ..case_manager import CaseManager
 from ..figure_registry import FigureRegistry
+from .audit import LLMAuditLogger
 from .image_router import ImageRequest, ImageRouter
 
 
@@ -35,6 +36,8 @@ class CaseImageService:
         model: str | None = None,
         size: str = "1024x1024",
     ) -> dict[str, Any]:
+        root = self.cases.case_root(case_id)
+        self.router.audit = LLMAuditLogger(root / ".internal" / "llm_events.jsonl")
         result = self.router.generate(
             ImageRequest(
                 prompt=prompt,
@@ -49,7 +52,6 @@ class CaseImageService:
         extension = "jpg" if image_format in {"jpeg", "jpg"} else image_format
         if extension not in {"png", "jpg", "webp"}:
             raise ValueError(f"unsupported generated image format: {image_format}")
-        root = self.cases.case_root(case_id)
         relative_path = f"figures/draft/ai-{uuid.uuid4().hex[:12]}.{extension}"
         destination = root / relative_path
         destination.write_bytes(result.content)
@@ -70,4 +72,3 @@ class CaseImageService:
             status="DRAFT",
         )
         return {"figure": figure, "bytes": len(result.content), "format": image_format}
-

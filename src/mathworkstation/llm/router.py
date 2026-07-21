@@ -49,7 +49,11 @@ class RouteHealth:
 
 class AllRoutesFailedError(RuntimeError):
     def __init__(self, attempts: list[dict[str, Any]]) -> None:
-        super().__init__("all configured LLM routes failed")
+        summary = "; ".join(
+            f"{item.get('route', 'unknown')} status={item.get('status_code')} error={item.get('error') or 'request failed'}"
+            for item in attempts
+        )
+        super().__init__(f"all configured LLM routes failed: {summary}")
         self.attempts = attempts
 
 

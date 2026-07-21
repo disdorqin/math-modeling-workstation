@@ -9,17 +9,17 @@
     {
       "name": "linear",
       "parameters": {},
-      "rationale": "检验已知线性数据生成过程"
+      "rationale": "Validate the known linear fixture generation process"
     },
     {
       "name": "ridge",
       "parameters": {"alpha": 1.0},
-      "rationale": "检验正则化稳定性"
+      "rationale": "Check regularized linear stability"
     },
     {
       "name": "random_forest",
       "parameters": {"n_estimators": 100, "max_depth": 6},
-      "rationale": "提供非线性对照"
+      "rationale": "Provide a nonlinear comparison"
     }
   ],
   "primary_metric": "rmse",

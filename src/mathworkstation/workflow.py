@@ -238,6 +238,7 @@ class WorkflowController:
             NodeStatus.NEEDS_REVIEW,
             NodeStatus.STALE,
             NodeStatus.BLOCKED,
+            NodeStatus.DEGRADED,
         }:
             raise InvalidTransitionError(f"cannot retry {node_id} from {runtime.status}")
         runtime.status = NodeStatus.RETRYING

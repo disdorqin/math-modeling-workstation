@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from .data_service import DataService
 from .datasets import DatasetKind, DatasetRegistry
 from .eda import EDAEngine
 from .evaluation_service import EvaluationService
+from .export_service import ExportService
 from .experiments import ExperimentRegistry
 from .figure_registry import FigureRegistry
 from .memory_manager import MemoryManager
@@ -38,12 +40,27 @@ from .session_manager import SessionManager
 from .selection import ModelSelectionRegistry
 from .sensitivity import SensitivityEngine
 from .source_collector import SourceCollector
+from .stage_service import StageService
 from .workflow import FailureCategory
 from .workflow_service import WorkflowService
 
 
 def _print(payload: Any) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _load_env_file(path: Path) -> None:
+    if not path.is_file():
+        return
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+        if name:
+            os.environ.setdefault(name, value)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -242,8 +259,17 @@ def build_parser() -> argparse.ArgumentParser:
     update_section.add_argument("--source", required=True)
     update_section.add_argument("--created-by", default="human")
 
+    complete_draft = commands.add_parser("complete-paper-draft")
+    complete_draft.add_argument("--case-id", required=True)
+    complete_draft.add_argument("--session-id")
+
     consistency = commands.add_parser("check-paper-consistency")
     consistency.add_argument("--case-id", required=True)
+    consistency.add_argument("--session-id")
+
+    export = commands.add_parser("export-case")
+    export.add_argument("--case-id", required=True)
+    export.add_argument("--session-id")
 
     llm_chat = commands.add_parser("llm-chat")
     llm_chat.add_argument("--case-id", required=True)
@@ -270,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _load_env_file(Path(".env.local"))
     args = build_parser().parse_args(argv)
     cases = CaseManager(Path(args.output_root))
     artifacts = ArtifactRegistry(cases)
@@ -307,6 +334,8 @@ def main(argv: list[str] | None = None) -> int:
     outline_service = PaperOutlineService(cases, artifacts, claims, figures)
     section_workspace = PaperSectionWorkspace(cases, artifacts, claims, figures)
     consistency_checker = PaperConsistencyChecker(cases, artifacts, claims, figures)
+    stages = StageService(cases, artifacts, workflow)
+    exporter = ExportService(cases, artifacts, workflow)
 
     try:
         if args.command == "create-case":
@@ -343,7 +372,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "start-node":
             _print(workflow.start_node(args.case_id, args.node_id, args.session_id))
         elif args.command == "succeed-node":
-            protected = {"model_plan", "experiments", "model_selection", "sensitivity"}
+            protected = {
+                "model_plan",
+                "experiments",
+                "model_selection",
+                "sensitivity",
+                "paper_outline",
+                "paper_draft",
+                "consistency_check",
+            }
             if args.node_id in protected:
                 raise ValueError(f"{args.node_id} must use its dedicated validated service")
             _print(workflow.succeed_node(args.case_id, args.node_id))
@@ -433,7 +470,13 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "list-experiments":
             _print(experiments.list_experiments(args.case_id))
         elif args.command == "validate-model-plan":
-            _print(plans.validate_file(args.case_id, args.source, args.dataset_id))
+            _print(
+                stages.run_validated_stage(
+                    args.case_id,
+                    "model_plan",
+                    lambda: plans.validate_file(args.case_id, args.source, args.dataset_id),
+                )
+            )
         elif args.command == "run-model-comparison":
             _print(evaluation.run_comparison(args.case_id, args.plan_artifact_id, args.session_id))
         elif args.command == "select-model":
@@ -503,14 +546,24 @@ def main(argv: list[str] | None = None) -> int:
             output_path.write_text(outline.model_dump_json(indent=2), encoding="utf-8")
             _print({"output": str(output_path.resolve())})
         elif args.command == "validate-outline":
-            _print(outline_service.validate_file(args.case_id, args.source))
+            _print(
+                stages.run_validated_stage(
+                    args.case_id,
+                    "paper_outline",
+                    lambda: outline_service.validate_file(args.case_id, args.source),
+                )
+            )
         elif args.command == "init-paper-sections":
             _print(section_workspace.initialize(args.case_id, args.outline_artifact_id))
         elif args.command == "update-section":
             content = Path(args.source).read_text(encoding="utf-8-sig")
             _print(section_workspace.update_draft(args.case_id, args.section_id, content, args.created_by))
+        elif args.command == "complete-paper-draft":
+            _print(stages.complete_paper_draft(args.case_id, args.session_id))
         elif args.command == "check-paper-consistency":
-            _print(consistency_checker.check(args.case_id))
+            _print(stages.check_consistency(args.case_id, consistency_checker, args.session_id))
+        elif args.command == "export-case":
+            _print(exporter.export_case(args.case_id, args.session_id))
         elif args.command == "llm-chat":
             route_config = RouterConfig.model_validate_json(
                 Path(args.routes).read_text(encoding="utf-8-sig")

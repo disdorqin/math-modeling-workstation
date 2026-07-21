@@ -46,3 +46,6 @@ def test_case_image_service_registers_valid_image_without_prompt(tmp_path: Path)
     assert "private image prompt" not in str(figure)
     assert len(figure["parameters"]["prompt_sha256"]) == 64
     assert (cases.case_root(case["case_id"]) / figure["path"]).is_file()
+    audit = (cases.case_root(case["case_id"]) / ".internal" / "llm_events.jsonl")
+    assert audit.is_file()
+    assert "private image prompt" not in audit.read_text(encoding="utf-8")

@@ -85,6 +85,7 @@ class ImageRouter:
                         False,
                         response.status_code in RETRYABLE_STATUS,
                         request,
+                        self._response_error(response),
                     )
             except Exception as error:
                 event = self._event(
@@ -103,6 +104,15 @@ class ImageRouter:
             if not event["retryable"]:
                 break
         raise AllRoutesFailedError(attempts)
+
+    @staticmethod
+    def _response_error(response: httpx.Response) -> str:
+        try:
+            body = response.json()
+            detail = body.get("error") or body.get("message") or "request failed"
+            return safe_error(RuntimeError(str(detail)))
+        except Exception:
+            return safe_error(RuntimeError(response.text[:240]))
 
     @staticmethod
     def _event(
@@ -128,4 +138,3 @@ class ImageRouter:
             "error": error,
             **request.metadata,
         }
-
