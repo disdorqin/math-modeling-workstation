@@ -128,7 +128,7 @@ class PaperOutlineService:
 def default_outline(title: str, competition_type: str, language: str = "zh") -> PaperOutline:
     definitions = [
         ("abstract", "摘要", "概括问题、方法、结果和关键词"),
-        ("problem_restated", "问题重述", "准确重述题目目标与约束"),
+        ("problem_restated", "引言与问题重述", "说明研究背景、题目价值，并准确重述题目目标与约束"),
         ("assumptions", "模型假设", "列出假设及其适用范围"),
         ("notation", "符号说明", "统一变量、参数和单位"),
         ("data_analysis", "数据分析", "说明来源、质量与探索性结果"),

@@ -18,4 +18,6 @@ For `OBSERVED` data, `run-auto-pipeline` now requires `--source-uri`. A detected
 
 The internal evidence graph remains available in `paper/sections/*/context.json`. The compiled manuscript uses claim and figure references for traceability while keeping raw artifact identifiers out of the final prose.
 
+The paper opening receives a dedicated quality pass: the abstract is organized as purpose, method, result, robustness, and boundary; the introduction/problem-restatement section explains the modeling value and scope. The pipeline also produces a deterministic workflow overview in both PNG and SVG. Its layout uses the same principles as the referenced [Draw.io Scientific Illustrator](https://github.com/icebird1998/drawio-scientific-illustrator): logical regions, explicit arrows, reviewable source structure, and vector export. The current batch pipeline does not require the live Draw.io desktop MCP; that remains an optional interactive refinement path.
+
 The gate is a research-quality floor, not a substitute for human review. Human review is still required for causal interpretation, competition-specific assumptions, source credibility, leakage risk, and the final answer to each subproblem.

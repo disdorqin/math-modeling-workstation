@@ -18,6 +18,7 @@ from .evaluation_service import EvaluationService
 from .experiments import ExperimentRegistry
 from .export_service import ExportService
 from .figure_registry import FigureRegistry
+from .figure_composition import FigureCompositionService
 from .llm.router import LLMRouter
 from .llm.service import CaseLLMService
 from .memory_manager import MemoryManager
@@ -52,6 +53,7 @@ class AutoPipelineService:
         self.workflow = WorkflowService(cases, RunManager(cases), self.checkpoints, self.memory)
         self.datasets = DatasetRegistry(cases, self.artifacts)
         self.figures = FigureRegistry(cases, self.artifacts)
+        self.compositions = FigureCompositionService(cases, self.artifacts, self.figures)
         self.experiments = ExperimentRegistry(cases, self.artifacts)
         self.claims = ClaimRegistry(cases, self.artifacts, self.datasets)
         self.data = DataService(self.artifacts, self.datasets, TabularProfiler(cases, self.artifacts, self.datasets), self.workflow)
@@ -127,6 +129,10 @@ class AutoPipelineService:
         experiment_id = comparison["result"]["experiment_id"]
         selection = self.evaluation.select_model(case_id, experiment_id, comparison["result"]["best_model"], comparison["result"]["comparison_artifact_id"], approved_by, "Selected best validated primary metric result", session_id)
         sensitivity = self.evaluation.run_sensitivity(case_id, experiment_id, plan_artifact_id, None, session_id)
+        workflow_figure = self.compositions.create_workflow_overview(
+            case_id,
+            [problem_artifact_id, data["artifact"]["artifact_id"], plan_artifact_id, comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]],
+        )
         additional_evidence = [
             problem_analysis_artifact_id,
             profile["profile_artifact_id"],
@@ -142,6 +148,8 @@ class AutoPipelineService:
             baseline["result"]["figure"]["artifact_id"],
             comparison["result"]["figure"]["artifact_id"],
             sensitivity["result"]["figure"]["artifact_id"],
+            workflow_figure["figure"]["artifact_id"],
+            workflow_figure["svg_artifact_id"],
         ]
         assessment = self.paper_ready.assess(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], additional_evidence)
         if not assessment["eligible"]:
@@ -159,11 +167,13 @@ class AutoPipelineService:
         claim_ids = {key: value["claim_id"] for key, value in claim_map.items()}
         section_claims: dict[str, str | list[str]] = {
             **claim_ids,
-            "abstract": [claim_ids["problem_restated"], claim_ids["results"], claim_ids["sensitivity"]],
+            "abstract": [claim_ids["problem_restated"], claim_ids["model_construction"], claim_ids["results"], claim_ids["sensitivity"]],
             "strengths_weaknesses": [claim_ids["results"], claim_ids["sensitivity"]],
             "conclusion": [claim_ids["results"], claim_ids["sensitivity"]],
         }
         section_figures: dict[str, list[str]] = {
+            "abstract": [workflow_figure["figure"]["figure_id"]],
+            "problem_restated": [workflow_figure["figure"]["figure_id"]],
             "data_analysis": [figure["figure_id"] for figure in eda["result"]["figures"]],
             "model_solution": [comparison["result"]["figure"]["figure_id"], baseline["result"]["figure"]["figure_id"]],
             "results": [baseline["result"]["figure"]["figure_id"], comparison["result"]["figure"]["figure_id"]],
@@ -330,6 +340,10 @@ class AutoPipelineService:
             content = content.replace("[TODO]", "本节待基于新增证据补充。")
             content = content.replace("[TBD]", "本节待基于新增证据补充。")
             content = _polish_section_draft(section_id, content, context)
+            if section_id == "abstract":
+                content = _ensure_abstract_quality(content, context)
+            elif section_id == "problem_restated":
+                content = _ensure_introduction_quality(content, context)
             if not content.lstrip().startswith("#"):
                 content = f"## {context['title']}\n\n{content}"
             for figure in context["allowed_figures"]:
@@ -409,3 +423,36 @@ def _section_scaffold(section_id: str) -> str:
         "references": "参考文献仅列出已登记且完成来源核验的文献或数据来源；未完成核验的条目不进入正式参考文献表。",
     }
     return scaffolds.get(section_id, "本节按研究目的、方法、证据和限制组织内容，具体陈述以已登记证据为准。")
+
+
+def _ensure_abstract_quality(content: str, context: dict[str, Any]) -> str:
+    claims = {claim.get("claim_type"): claim for claim in context.get("allowed_claims", [])}
+    if len(content) >= 650 and all(keyword in content for keyword in ("方法", "结果", "结论")):
+        return content
+    def item(claim_type: str, fallback: str) -> str:
+        claim = claims.get(claim_type)
+        return f"{claim['text']} [{claim['claim_id']}]" if claim else fallback
+    block = (
+        "### 摘要核心\n\n"
+        f"**研究目的：** {item('problem_analysis', '本文将题目要求转化为可验证的建模目标。')}\n\n"
+        f"**研究方法：** {item('model_plan', '本文采用经数据审查和方案验证的候选模型进行比较。')}\n\n"
+        f"**主要结果：** {item('model_result', '主要结果以已登记实验和评价指标为准。')}\n\n"
+        f"**稳健性与边界：** {item('sensitivity', '稳健性结论仅适用于当前数据范围和实验设置。')}"
+    )
+    return f"{content.rstrip()}\n\n{block}\n"
+
+
+def _ensure_introduction_quality(content: str, context: dict[str, Any]) -> str:
+    if len(content) >= 500 and any(word in content for word in ("研究背景", "研究目的", "问题")):
+        return content
+    claim = next(iter(context.get("allowed_claims", [])), None)
+    evidence = f"{claim['text']} [{claim['claim_id']}]" if claim else "具体背景与题目约束应以原始题面为准。"
+    block = (
+        "### 研究概述\n\n"
+        "数学建模竞赛要求将现实问题转化为可计算、可解释且可验证的模型。本文围绕题目给定对象，"
+        "先明确研究目标和子问题，再结合数据质量、变量定义与评价指标组织后续分析。\n\n"
+        f"**问题界定：** {evidence}\n\n"
+        "在不额外引入题面之外事实的前提下，本文将研究范围、关键变量、约束条件和评价标准分别列出，"
+        "并以数据证据和模型实验回答各子问题。"
+    )
+    return f"{content.rstrip()}\n\n{block}\n"
