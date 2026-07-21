@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifact_registry import ArtifactRegistry
+from .auto_pipeline import AutoPipelineService
 from .baseline import BaselineEngine
 from .case_manager import CaseManager
 from .checkpoint_manager import CheckpointManager
@@ -100,6 +101,18 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_problem = commands.add_parser("ingest-problem", help="preserve and extract a problem statement")
     ingest_problem.add_argument("--case-id", required=True)
     ingest_problem.add_argument("--source", required=True)
+
+    auto_pipeline = commands.add_parser("run-auto-pipeline", help="run the controlled LLM-to-paper pipeline")
+    auto_pipeline.add_argument("--case-id", required=True)
+    auto_pipeline.add_argument("--session-id", required=True)
+    auto_pipeline.add_argument("--problem-source", required=True)
+    auto_pipeline.add_argument("--data-source", required=True)
+    auto_pipeline.add_argument("--dataset-name", required=True)
+    auto_pipeline.add_argument("--target-column")
+    auto_pipeline.add_argument("--competition-type", required=True)
+    auto_pipeline.add_argument("--routes", required=True)
+    auto_pipeline.add_argument("--approved-by", required=True)
+    auto_pipeline.add_argument("--kind", choices=[item.value for item in DatasetKind], default=DatasetKind.OBSERVED.value)
 
     start = commands.add_parser("start-node")
     start.add_argument("--case-id", required=True)
@@ -390,6 +403,21 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "ingest-problem":
             _print(problem_ingestion.ingest(args.case_id, args.source))
+        elif args.command == "run-auto-pipeline":
+            route_config = RouterConfig.model_validate_json(Path(args.routes).read_text(encoding="utf-8-sig"))
+            _print(
+                AutoPipelineService(cases, LLMRouter(route_config)).run(
+                    args.case_id,
+                    args.session_id,
+                    args.problem_source,
+                    args.data_source,
+                    args.dataset_name,
+                    args.target_column,
+                    args.approved_by,
+                    args.competition_type,
+                    DatasetKind(args.kind),
+                )
+            )
         elif args.command == "start-node":
             _print(workflow.start_node(args.case_id, args.node_id, args.session_id))
         elif args.command == "succeed-node":

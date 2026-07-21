@@ -50,7 +50,10 @@ class PaperConsistencyChecker:
             cited_claims = set(CLAIM_REF.findall(content))
             cited_figures = set(FIGURE_REF.findall(content))
             placeholders = PLACEHOLDER.findall(content)
-            numbers = NUMBER.findall(content)
+            body_for_number_scan = "\n".join(
+                line for line in content.splitlines() if not line.lstrip().startswith("#")
+            )
+            numbers = NUMBER.findall(body_for_number_scan)
             for claim_id in sorted(cited_claims):
                 if claim_id not in known_claims:
                     findings.append(_finding("BLOCK", section_id, "UNKNOWN_CLAIM", claim_id))

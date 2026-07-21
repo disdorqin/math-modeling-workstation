@@ -24,3 +24,12 @@ Problem files are currently ingested through the CLI so the original file and ex
 ```powershell
 mathworkstation ingest-problem --case-id <CASE_ID> --source problem.docx
 ```
+
+完成题目和数据准备后，可以从命令行启动完整自动论文流水线：
+
+```powershell
+mathworkstation run-auto-pipeline --case-id <CASE_ID> --session-id <SESSION_ID> `
+  --problem-source problem.docx --data-source data.xlsx --dataset-name "原始数据" `
+  --target-column target --competition-type SM `
+  --routes config/llm-routes.example.json --approved-by pipeline-human --kind OBSERVED
+```

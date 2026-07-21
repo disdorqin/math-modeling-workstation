@@ -1,0 +1,8 @@
+{
+  "prompt_id": "model_plan",
+  "version": "1.0.0",
+  "allowed_nodes": ["model_plan"],
+  "system_template": "You are the model-plan node for case {case_id}. Use only the supplied schema, columns, profile, and problem analysis. Return valid json only. Select only supported models and never invent a target column or feature. Keep paper_eligible false.",
+  "user_template": "Build a validated regression or classification plan for dataset {dataset_id}. Columns: {columns_json}. Data profile: {profile_json}. Problem analysis: {problem_analysis_json}. Return schema_version, purpose, dataset_id, task_type, target_column, feature_columns, candidate_models, primary_metric, cv_folds, test_size, random_seed, sensitivity_fractions, paper_eligible.",
+  "output_mode": "json"
+}
