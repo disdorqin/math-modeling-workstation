@@ -89,6 +89,16 @@ mathworkstation list-prompts
 
 真实 Key 必须通过路由配置中的 `api_key_env` 对应环境变量提供，禁止写入 JSON。
 
+本地 Streamlit 控制台：
+
+```powershell
+python -m pip install -e ".[ui]"
+$env:PYTHONPATH="src"
+python -m streamlit run src/mathworkstation/ui_app.py --server.headless true
+```
+
+控制台提供 Case 选择、DAG 状态、审批/重试、产物和论文浏览，以及绑定当前 Case、Session 和节点的受控 LLM 对话。详细说明见 `docs/ui-runbook.md`。
+
 不安装包也可以直接运行：
 
 ```powershell
