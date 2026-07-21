@@ -38,6 +38,14 @@ mathworkstation profile-dataset --case-id <CASE_ID> --dataset-id <DATASET_ID> --
 mathworkstation list-datasets --case-id <CASE_ID>
 ```
 
+题目材料摄取：
+
+```powershell
+mathworkstation ingest-problem --case-id <CASE_ID> --source problem.pdf
+```
+
+支持 TXT、Markdown，以及安装可选解析依赖后的 PDF/DOCX。原始文件保存于 `input/problem/original`，抽取文本保存于 `input/problem/extracted`，两者分别注册并保留上下游关系。
+
 网页/API 数据先保存来源快照，再登记：
 
 ```powershell

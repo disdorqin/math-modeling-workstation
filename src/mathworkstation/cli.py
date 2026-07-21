@@ -35,6 +35,7 @@ from .paper_ready import PaperReadyGate
 from .paper_consistency import PaperConsistencyChecker
 from .paper_outline import PaperOutlineService, default_outline
 from .paper_sections import PaperSectionWorkspace
+from .problem_ingestion import ProblemIngestionService
 from .recovery import RecoveryService
 from .run_manager import RunManager
 from .session_manager import SessionManager
@@ -95,6 +96,10 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--source", required=True)
     ingest.add_argument("--destination", default="input/data/uploaded")
     ingest.add_argument("--artifact-type", default="uploaded_data")
+
+    ingest_problem = commands.add_parser("ingest-problem", help="preserve and extract a problem statement")
+    ingest_problem.add_argument("--case-id", required=True)
+    ingest_problem.add_argument("--source", required=True)
 
     start = commands.add_parser("start-node")
     start.add_argument("--case-id", required=True)
@@ -325,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         workflow,
     )
     sources = SourceCollector(cases, artifacts)
+    problem_ingestion = ProblemIngestionService(cases, artifacts)
     literature = LiteratureService(cases, artifacts)
     figures = FigureRegistry(cases, artifacts)
     experiments = ExperimentRegistry(cases, artifacts)
@@ -382,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
                     args.artifact_type,
                 )
             )
+        elif args.command == "ingest-problem":
+            _print(problem_ingestion.ingest(args.case_id, args.source))
         elif args.command == "start-node":
             _print(workflow.start_node(args.case_id, args.node_id, args.session_id))
         elif args.command == "succeed-node":

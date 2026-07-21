@@ -18,3 +18,9 @@ The first screen provides:
 - artifact, Claim, and figure inspection;
 - paper Markdown preview and download;
 - controlled LLM chat with route selection.
+
+Problem files are currently ingested through the CLI so the original file and extracted text are both hashed before an LLM session uses them:
+
+```powershell
+mathworkstation ingest-problem --case-id <CASE_ID> --source problem.docx
+```
