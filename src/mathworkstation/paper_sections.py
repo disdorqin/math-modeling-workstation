@@ -46,6 +46,12 @@ class PaperSectionWorkspace:
                 "purpose": section.purpose,
                 "allowed_claims": [known_claims[claim_id] for claim_id in section.claim_ids],
                 "allowed_figures": [known_figures[figure_id] for figure_id in section.figure_ids],
+                "evidence_pack": _build_evidence_pack(
+                    root,
+                    self.artifacts,
+                    [artifact_id for claim in [known_claims[claim_id] for claim_id in section.claim_ids] for artifact_id in claim["evidence_artifact_ids"]],
+                    [figure["artifact_id"] for figure in [known_figures[figure_id] for figure_id in section.figure_ids]],
+                ),
                 "control_rules": [
                     "Do not introduce numerical results outside allowed_claims.",
                     "Cite claim_id for every material factual or numerical statement.",
@@ -55,6 +61,9 @@ class PaperSectionWorkspace:
                 ],
                 "generated_at": now_iso(),
             }
+            context["evidence_digest"] = _build_evidence_digest(
+                context["allowed_claims"], context["evidence_pack"]
+            )
             context_path = section_directory / "context.json"
             draft_path = section_directory / "draft.md"
             atomic_write_json(context_path, context)
@@ -134,3 +143,49 @@ class PaperSectionWorkspace:
             upstream=[context_artifact["artifact_id"]],
         )
 
+
+def _build_evidence_pack(root: Path, artifacts: ArtifactRegistry, artifact_ids: list[str], figure_artifact_ids: list[str]) -> list[dict[str, Any]]:
+    pack: list[dict[str, Any]] = []
+    for artifact_id in dict.fromkeys([*artifact_ids, *figure_artifact_ids]):
+        artifact = artifacts.get(root.name, artifact_id)
+        path = root / artifact["path"]
+        excerpt = ""
+        if path.is_file() and path.suffix.lower() in {".json", ".md", ".txt", ".csv"}:
+            excerpt = path.read_text(encoding="utf-8-sig", errors="replace")[:12000]
+        pack.append(
+            {
+                "artifact_id": artifact_id,
+                "artifact_type": artifact["artifact_type"],
+                "path": artifact["path"],
+                "paper_eligible": artifact.get("paper_eligible", False),
+                "excerpt": excerpt,
+            }
+        )
+    return pack
+
+
+def _build_evidence_digest(claims: list[dict[str, Any]], evidence_pack: list[dict[str, Any]]) -> dict[str, Any]:
+    """Provide a compact, model-friendly evidence index beside raw excerpts."""
+    excerpts = {
+        item["artifact_id"]: item.get("excerpt", "")
+        for item in evidence_pack
+    }
+    return {
+        "claim_rules": [
+            {
+                "claim_id": claim["claim_id"],
+                "claim_type": claim.get("claim_type", ""),
+                "text": claim.get("text", ""),
+                "evidence_artifact_ids": claim.get("evidence_artifact_ids", []),
+            }
+            for claim in claims
+        ],
+        "artifact_excerpts": [
+            {
+                "artifact_id": artifact_id,
+                "excerpt": excerpt[:6000],
+            }
+            for artifact_id, excerpt in excerpts.items()
+            if excerpt
+        ],
+    }

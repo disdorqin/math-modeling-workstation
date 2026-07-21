@@ -26,6 +26,7 @@ class PaperReadyGate:
         experiment_id: str,
         selection_artifact_id: str,
         sensitivity_artifact_id: str,
+        additional_artifact_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         experiment = self.experiments.get(case_id, experiment_id)
         selection = self.artifacts.get(case_id, selection_artifact_id)
@@ -51,6 +52,7 @@ class PaperReadyGate:
             selection_artifact_id,
             sensitivity_artifact_id,
         ]
+        required_ids.extend(additional_artifact_ids or [])
         if any(not item for item in required_ids):
             reasons.append("required_artifact_missing")
         return {
@@ -71,6 +73,7 @@ class PaperReadyGate:
         sensitivity_artifact_id: str,
         approved_by: str,
         note: str,
+        additional_artifact_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         if not note.strip():
             raise ValueError("paper-ready approval requires a note")
@@ -79,6 +82,7 @@ class PaperReadyGate:
             experiment_id,
             selection_artifact_id,
             sensitivity_artifact_id,
+            additional_artifact_ids,
         )
         if not assessment["eligible"]:
             raise ValueError(f"experiment is not paper ready: {assessment['reasons']}")
@@ -102,16 +106,7 @@ class PaperReadyGate:
         )
         promoted: list[str] = []
         for artifact_id in assessment["required_artifact_ids"]:
-            artifact = self.artifacts.get(case_id, artifact_id)
-            append_jsonl(
-                self.artifacts.registry_path(case_id),
-                {
-                    **artifact,
-                    "paper_eligible": True,
-                    "paper_ready_approval_id": approval_artifact["artifact_id"],
-                    "updated_at": now_iso(),
-                },
-            )
+            self.artifacts.promote_to_paper(case_id, artifact_id, approval_artifact["artifact_id"])
             promoted.append(artifact_id)
         self.experiments.update(
             case_id,
@@ -135,4 +130,3 @@ class PaperReadyGate:
             "approval_artifact_id": approval_artifact["artifact_id"],
             "promoted_artifact_ids": promoted,
         }
-

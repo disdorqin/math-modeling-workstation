@@ -27,5 +27,5 @@ def test_section_workspace_creates_isolated_contexts(tmp_path: Path) -> None:
     result_section = cases.case_root(case["case_id"]) / "paper" / "sections" / "results"
     context = json.loads((result_section / "context.json").read_text(encoding="utf-8"))
     assert "Do not change other paper sections." in context["control_rules"]
+    assert context["evidence_digest"]["claim_rules"] == []
     assert (result_section / "draft.md").read_text(encoding="utf-8").endswith("[SECTION_DRAFT_PENDING]\n")
-

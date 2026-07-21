@@ -29,7 +29,8 @@ class ModelPlanCandidate(BaseModel):
     model: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
-    rationale: str = "LLM-proposed candidate; validate before execution"
+    rationale: str | None = None
+    notes: str | None = None
     supported: bool | None = None
 
 

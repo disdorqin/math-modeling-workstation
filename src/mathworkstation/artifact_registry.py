@@ -144,3 +144,19 @@ class ArtifactRegistry:
             "missing_artifact_ids": missing,
             "changed_artifact_ids": changed,
         }
+
+    def promote_to_paper(self, case_id: str, artifact_id: str, approval_artifact_id: str) -> dict[str, Any]:
+        """Promote an already verified artifact after a human evidence decision."""
+        current = self.get(case_id, artifact_id)
+        if current.get("status") != "ACTIVE":
+            raise InvalidCaseError(f"cannot promote inactive artifact: {artifact_id}")
+        if not self.verify(case_id)["valid"]:
+            raise InvalidCaseError("cannot promote artifacts while integrity check fails")
+        promoted = {
+            **current,
+            "paper_eligible": True,
+            "paper_ready_approval_id": approval_artifact_id,
+            "updated_at": now_iso(),
+        }
+        append_jsonl(self.registry_path(case_id), promoted)
+        return promoted

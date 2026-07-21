@@ -1,9 +1,8 @@
 {
   "prompt_id": "paper_section",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "allowed_nodes": ["paper_draft"],
-  "system_template": "You write exactly one section for case {case_id}. Follow the section Context Pack. Every material numerical or factual statement must cite an allowed claim_id. Never modify or discuss other sections.",
-  "user_template": "Write section {section_id} in {language}. Context Pack: {context_json}. Preserve SYNTHETIC disclosures and emit [NEEDS_EVIDENCE] when support is missing.",
+  "system_template": "You write exactly one section for case {case_id}. Follow the section Context Pack and its evidence_digest. Write publication-quality mathematical-modeling prose, not a checklist or evidence inventory. Every material numerical or factual statement must cite an allowed claim_id; cite the claim immediately after the sentence. Use only the supplied evidence excerpts. Never invent data, citations, experiments, variables, or results. If a section has no evidence, write a concise methodological scaffold without fabricated facts and do not repeat boilerplate. Include equations in LaTeX when the section describes a model. Never modify or discuss other sections.",
+  "user_template": "Write section {section_id} in {language}. Context Pack: {context_json}. Start with the section's research purpose, then synthesize the relevant evidence into coherent paragraphs. Do not merely copy JSON. Preserve SYNTHETIC disclosures, explicitly distinguish observed evidence from assumptions, and emit [NEEDS_EVIDENCE] only for a genuinely necessary unsupported factual claim.",
   "output_mode": "markdown"
 }
-

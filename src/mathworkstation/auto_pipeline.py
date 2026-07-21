@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +95,7 @@ class AutoPipelineService:
         self._complete_simple("input_validation", case_id, session_id)
 
         problem_analysis, problem_response = self._run_problem_analysis(case_id, session_id, problem_artifact_id, competition_type, approved_by)
+        problem_analysis_artifact_id = problem_response["artifact_id"]
         self.data.complete_registration(case_id, session_id)
         self.workflow.approve_node(case_id, "data_registration", approved_by, "Dataset provenance reviewed")
         profile = self.data.profile_dataset(case_id, dataset_id, target_column, session_id)
@@ -111,18 +113,37 @@ class AutoPipelineService:
         experiment_id = comparison["result"]["experiment_id"]
         selection = self.evaluation.select_model(case_id, experiment_id, comparison["result"]["best_model"], comparison["result"]["comparison_artifact_id"], approved_by, "Selected best validated primary metric result", session_id)
         sensitivity = self.evaluation.run_sensitivity(case_id, experiment_id, plan_artifact_id, None, session_id)
-        assessment = self.paper_ready.assess(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"])
+        additional_evidence = [
+            problem_analysis_artifact_id,
+            profile["profile_artifact_id"],
+            profile["report_artifact_id"],
+            eda["result"]["summary_artifact_id"],
+            eda["result"]["report_artifact_id"],
+            plan_artifact_id,
+            plan_result["report_artifact_id"],
+            sensitivity["result"]["report_artifact_id"],
+        ]
+        assessment = self.paper_ready.assess(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], additional_evidence)
         if not assessment["eligible"]:
             raise ValueError(f"paper ready gate failed: {assessment['reasons']}")
-        ready = self.paper_ready.approve(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], approved_by, "Automated evidence chain reviewed")
-        claim = self.claims.create(case_id, ClaimInput(
-            text=f"The validated comparison selected {comparison['result']['best_model']} as the best model under the declared primary metric.",
-            claim_type="model_result",
-            evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]],
-            dataset_ids=[dataset_id],
-            section_hint="results",
-        ), approved_by)
-        outline = self._create_outline(case_id, claim["claim_id"], competition_type)
+        ready = self.paper_ready.approve(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], approved_by, "Automated evidence chain reviewed", additional_evidence)
+        claim_map = {
+            "problem_restated": self.claims.create(case_id, ClaimInput(text="The problem analysis was extracted from the declared problem artifact and retained as structured evidence.", claim_type="problem_analysis", evidence_artifact_ids=[problem_analysis_artifact_id], section_hint="problem_restated"), approved_by),
+            "data_analysis": self.claims.create(case_id, ClaimInput(text="The dataset profiling and exploratory analysis artifacts passed the declared data quality workflow.", claim_type="data_quality", evidence_artifact_ids=[profile["profile_artifact_id"], profile["report_artifact_id"], eda["result"]["summary_artifact_id"], eda["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="data_analysis"), approved_by),
+            "model_construction": self.claims.create(case_id, ClaimInput(text="The model plan was validated against the dataset schema and approved before formal comparison.", claim_type="model_plan", evidence_artifact_ids=[plan_artifact_id, plan_result["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_construction"), approved_by),
+            "model_solution": self.claims.create(case_id, ClaimInput(text=f"The declared candidate models were evaluated using the reproducible experiment pipeline; {comparison['result']['best_model']} ranked first under the selected metric.", claim_type="model_comparison", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], comparison["result"]["diagnostics_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_solution"), approved_by),
+            "results": self.claims.create(case_id, ClaimInput(text=f"The validated comparison selected {comparison['result']['best_model']} as the best model under the declared primary metric.", claim_type="model_result", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]], dataset_ids=[dataset_id], section_hint="results"), approved_by),
+            "sensitivity": self.claims.create(case_id, ClaimInput(text="The sensitivity analysis completed across the declared sample fractions and random seeds with a recorded gate.", claim_type="sensitivity", evidence_artifact_ids=[sensitivity["result"]["artifact_id"], sensitivity["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="sensitivity"), approved_by),
+        }
+        claim = claim_map["results"]
+        claim_ids = {key: value["claim_id"] for key, value in claim_map.items()}
+        section_claims: dict[str, str | list[str]] = {
+            **claim_ids,
+            "abstract": [claim_ids["problem_restated"], claim_ids["results"], claim_ids["sensitivity"]],
+            "strengths_weaknesses": [claim_ids["results"], claim_ids["sensitivity"]],
+            "conclusion": [claim_ids["results"], claim_ids["sensitivity"]],
+        }
+        outline = self._create_outline(case_id, section_claims, competition_type)
         sections = self.sections.initialize(case_id, outline["outline_artifact_id"])
         self._generate_sections(case_id, session_id, sections, approved_by)
         paper = self.stages.complete_paper_draft(case_id, session_id)
@@ -192,21 +213,28 @@ class AutoPipelineService:
             raw_name = candidate.get("name") or candidate.get("model")
             if not raw_name:
                 continue
-            name = aliases.get(raw_name, raw_name)
+            normalized_raw_name = str(raw_name).strip().lower()
+            name = aliases.get(normalized_raw_name, normalized_raw_name)
             if name not in supported:
                 continue
             candidate["name"] = name
             if not candidate.get("parameters"):
                 candidate["parameters"] = candidate.get("hyperparameters") or {}
+            candidate["parameters"] = _scalarize_parameters(candidate["parameters"])
             candidate.pop("supported", None)
             candidate.pop("model", None)
             candidate.pop("hyperparameters", None)
             if not candidate.get("rationale"):
-                candidate["rationale"] = "LLM-proposed candidate after deterministic alias normalization"
+                candidate["rationale"] = candidate.get("notes") or "LLM-proposed candidate after deterministic alias and median-parameter normalization"
+            candidate.pop("notes", None)
             normalized_candidates.append(candidate)
         payload["candidate_models"] = normalized_candidates
         if len(normalized_candidates) < 2:
             raise ValueError("LLM model proposal contains fewer than two supported candidate models")
+        fractions = [float(value) for value in payload.get("sensitivity_fractions", []) if 0.2 < float(value) <= 1.0]
+        payload["sensitivity_fractions"] = sorted(set(fractions)) if len(set(fractions)) >= 2 else [0.7, 0.85, 1.0]
+        payload["cv_folds"] = min(10, max(2, int(payload.get("cv_folds", 5))))
+        payload["test_size"] = min(0.49, max(0.06, float(payload.get("test_size", 0.2))))
         if target_column:
             payload["target_column"] = target_column
         root = self.cases.case_root(case_id)
@@ -215,15 +243,15 @@ class AutoPipelineService:
         result = self.plans.validate_file(case_id, path, dataset_id)
         self.workflow.succeed_node(case_id, "model_plan")
         self.workflow.approve_node(case_id, "model_plan", approved_by, "Structured model plan validated")
-        return {"plan": result["plan"]["plan"], "plan_artifact_id": result["plan_artifact_id"], "llm_response": response}
+        return {"plan": result["plan"]["plan"], "plan_artifact_id": result["plan_artifact_id"], "report_artifact_id": result["report_artifact_id"], "llm_response": response}
 
-    def _create_outline(self, case_id: str, claim_id: str, competition: str) -> dict[str, Any]:
+    def _create_outline(self, case_id: str, claim_ids: dict[str, str | list[str]], competition: str) -> dict[str, Any]:
         self.workflow.start_node(case_id, "paper_outline")
         outline = default_outline("自动生成数学建模论文", competition)
         payload = outline.model_dump(mode="json")
         for section in payload["sections"]:
-            if section["section_id"] == "results":
-                section["claim_ids"] = [claim_id]
+            assigned = claim_ids.get(section["section_id"], [])
+            section["claim_ids"] = [assigned] if isinstance(assigned, str) else list(assigned)
         path = self.cases.case_root(case_id) / "paper" / "outline" / "auto-outline.json"
         atomic_write_json(path, payload)
         result = self.outlines.validate_file(case_id, path)
@@ -241,11 +269,77 @@ class AutoPipelineService:
             content = content.replace("[NEEDS_EVIDENCE]", "本节暂无已登记证据，保留结构性说明，不作外推结论。")
             content = content.replace("[TODO]", "本节待基于新增证据补充。")
             content = content.replace("[TBD]", "本节待基于新增证据补充。")
+            content = _polish_section_draft(section_id, content, context)
             if section_id == "results" and "SYNTHETIC" not in content.upper() and "合成" not in content:
                 content += "\n\n本节结果基于明确标注的 SYNTHETIC 数据，不能外推为真实竞赛结论。"
+            if any("synthetic_data_claim" in claim.get("restrictions", []) for claim in context["allowed_claims"]) and "SYNTHETIC" not in content.upper() and "合成" not in content:
+                content += "\n\n本节基于明确标注的 SYNTHETIC 数据，相关结论不外推至真实竞赛数据。"
             self.sections.update_draft(case_id, section_id, content, "llm")
 
     def _complete_review(self, case_id: str, session_id: str, approved_by: str) -> None:
         self.workflow.start_node(case_id, "final_review", session_id)
         self.workflow.succeed_node(case_id, "final_review")
         self.workflow.approve_node(case_id, "final_review", approved_by, "Consistency gate passed")
+
+
+def _scalarize_parameters(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _scalarize_parameters(item) for key, item in value.items()}
+    if isinstance(value, list):
+        candidates = [item for item in value if item is not None]
+        if not candidates:
+            return None
+        numeric = [item for item in candidates if isinstance(item, (int, float)) and not isinstance(item, bool)]
+        if len(numeric) == len(candidates):
+            ordered = sorted(numeric)
+            return ordered[len(ordered) // 2]
+        return _scalarize_parameters(candidates[0])
+    return value
+
+
+def _polish_section_draft(section_id: str, content: str, context: dict[str, Any]) -> str:
+    """Remove repetitive fallback prose and enforce a useful evidence-led floor."""
+    lines = [line.rstrip() for line in content.strip().splitlines()]
+    boilerplate = {
+        "本节暂无已登记证据，保留结构性说明，不作外推结论。",
+        "本节尚未登记可用证据，保留结构性说明。",
+    }
+    filtered: list[str] = []
+    for line in lines:
+        normalized = line.strip().strip("。")
+        if normalized in {item.strip("。") for item in boilerplate}:
+            continue
+        filtered.append(line)
+    content = "\n".join(filtered).strip()
+    claims = context.get("allowed_claims", [])
+    claim_ids = {claim["claim_id"] for claim in claims}
+    cited = set(re.findall(r"claim-[a-f0-9]{12}", content))
+    if claims and not cited.intersection(claim_ids):
+        digest = "\n\n".join(
+            f"{claim['text']} [{claim['claim_id']}]"
+            for claim in claims
+            if claim.get("text")
+        )
+        if digest:
+            content = f"{_section_scaffold(section_id)}\n\n{digest}"
+    if not content:
+        content = _section_scaffold(section_id)
+    return content.rstrip() + "\n"
+
+
+def _section_scaffold(section_id: str) -> str:
+    scaffolds = {
+        "abstract": "本文围绕题目目标建立可复现的数学建模流程，依次完成问题界定、数据检验、模型比较、稳健性分析与证据归档。摘要中的具体结果仅引用后续已验证证据。",
+        "problem_restated": "本节将题目要求转化为可验证的建模目标，并明确输入、输出、约束条件和评价标准。未在问题材料中明确的内容保留为待核实事项。",
+        "assumptions": "模型假设应逐条对应题目条件或数据证据。对于无法由当前材料支持的假设，本流程将其标记为待核实，不将其包装成事实结论。",
+        "notation": r"设样本为 $\{(x_i,y_i)\}_{i=1}^{n}$，其中 $x_i$ 表示第 $i$ 个样本的特征向量，$y_i$ 表示目标变量，$\hat y_i$ 表示模型预测值。其余符号以具体模型和数据字典为准。",
+        "data_analysis": "本节按照数据来源、字段含义、缺失与重复、异常值及分布结构的顺序报告数据分析。所有统计数字均必须来自已登记的数据质量或探索性分析证据。",
+        "model_construction": "将目标变量记为 $y$，特征矩阵记为 $X$。候选模型应在数据字典和题目目标约束下确定，并明确损失函数、参数、训练划分及适用边界。",
+        "model_solution": "本节记录模型训练、交叉验证、参数设定和模型选择规则。算法过程只描述已经注册并执行的实验，不以未经验证的经验替代实验结果。",
+        "results": "本节只报告通过模型选择和实验注册的结果，并将评价指标、比较对象、数据范围与随机种子一并说明，避免脱离证据进行外推。",
+        "sensitivity": "敏感性分析围绕样本规模、随机划分或关键参数改变模型结论的程度展开。稳健性判断应以已登记的敏感性实验和门控结果为依据。",
+        "strengths_weaknesses": "模型优点应从可复现性、解释性、预测性能或计算成本等已验证维度评价；局限性应覆盖数据范围、假设条件、指标选择和外推风险。",
+        "conclusion": "结论应逐条回答题目目标，区分已验证结果、模型解释和待核实事项，并明确数据来源与适用范围。",
+        "references": "参考文献仅列出已登记且完成来源核验的文献或数据来源；未完成核验的条目不进入正式参考文献表。",
+    }
+    return scaffolds.get(section_id, "本节按研究目的、方法、证据和限制组织内容，具体陈述以已登记证据为准。")
