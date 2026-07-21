@@ -19,6 +19,12 @@ from .evaluation_service import EvaluationService
 from .experiments import ExperimentRegistry
 from .figure_registry import FigureRegistry
 from .memory_manager import MemoryManager
+from .llm.config import RouterConfig
+from .llm.image_router import ImageRouter
+from .llm.image_service import CaseImageService
+from .llm.prompts import PromptRegistry
+from .llm.router import LLMRouter
+from .llm.service import CaseLLMService
 from .model_evaluation import ModelEvaluationEngine
 from .model_plan import ModelPlanService
 from .modeling_service import ModelingService
@@ -238,6 +244,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     consistency = commands.add_parser("check-paper-consistency")
     consistency.add_argument("--case-id", required=True)
+
+    llm_chat = commands.add_parser("llm-chat")
+    llm_chat.add_argument("--case-id", required=True)
+    llm_chat.add_argument("--session-id", required=True)
+    llm_chat.add_argument("--node-id", required=True)
+    llm_chat.add_argument("--routes", required=True)
+    llm_chat.add_argument("--message-file", required=True)
+    llm_chat.add_argument("--input-artifact-id", action="append", default=[])
+    llm_chat.add_argument("--model")
+    llm_chat.add_argument("--max-tokens", type=int, default=2000)
+    llm_chat.add_argument("--temperature", type=float, default=0.2)
+
+    image = commands.add_parser("generate-illustration")
+    image.add_argument("--case-id", required=True)
+    image.add_argument("--routes", required=True)
+    image.add_argument("--title", required=True)
+    image.add_argument("--prompt-file", required=True)
+    image.add_argument("--source-artifact-id", action="append", default=[])
+    image.add_argument("--model")
+    image.add_argument("--size", default="1024x1024")
+
+    commands.add_parser("list-prompts")
     return parser
 
 
@@ -483,6 +511,53 @@ def main(argv: list[str] | None = None) -> int:
             _print(section_workspace.update_draft(args.case_id, args.section_id, content, args.created_by))
         elif args.command == "check-paper-consistency":
             _print(consistency_checker.check(args.case_id))
+        elif args.command == "llm-chat":
+            route_config = RouterConfig.model_validate_json(
+                Path(args.routes).read_text(encoding="utf-8-sig")
+            )
+            message = Path(args.message_file).read_text(encoding="utf-8-sig")
+            llm_service = CaseLLMService(
+                cases,
+                artifacts,
+                sessions,
+                checkpoints,
+                LLMRouter(route_config),
+            )
+            _print(
+                llm_service.invoke(
+                    args.case_id,
+                    args.session_id,
+                    args.node_id,
+                    [{"role": "user", "content": message}],
+                    args.input_artifact_id,
+                    args.model,
+                    args.max_tokens,
+                    args.temperature,
+                )
+            )
+        elif args.command == "generate-illustration":
+            route_config = RouterConfig.model_validate_json(
+                Path(args.routes).read_text(encoding="utf-8-sig")
+            )
+            prompt = Path(args.prompt_file).read_text(encoding="utf-8-sig")
+            image_service = CaseImageService(
+                cases,
+                artifacts,
+                figures,
+                ImageRouter(route_config),
+            )
+            _print(
+                image_service.generate(
+                    args.case_id,
+                    args.title,
+                    prompt,
+                    args.source_artifact_id,
+                    args.model,
+                    args.size,
+                )
+            )
+        elif args.command == "list-prompts":
+            _print(PromptRegistry("prompts").list_prompts())
         else:
             raise AssertionError(f"unhandled command: {args.command}")
     except Exception as error:

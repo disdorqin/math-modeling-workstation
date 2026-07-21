@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 
 from .errors import PathViolationError
@@ -36,7 +37,8 @@ def _matches(relative_path: str, patterns: tuple[str, ...]) -> bool:
     normalized = PurePosixPath(relative_path.replace("\\", "/"))
     if normalized.is_absolute() or ".." in normalized.parts:
         return False
-    return any(normalized.match(pattern) for pattern in patterns)
+    normalized_text = normalized.as_posix()
+    return any(fnmatchcase(normalized_text, pattern) for pattern in patterns)
 
 
 DEFAULT_NODE_POLICIES = {
@@ -54,9 +56,15 @@ DEFAULT_NODE_POLICIES = {
     ),
     "paper_draft": NodeAccessPolicy(
         "paper_draft",
-        readable=("analysis/**", "results/**", "figures/final/**", "tables/final/**", ".internal/**"),
+        readable=(
+            "analysis/**",
+            "results/**",
+            "figures/final/**",
+            "tables/final/**",
+            "paper/sections/*/context.json",
+            ".internal/**",
+        ),
         writable=("paper/draft/**", "paper/sections/**"),
         tools=("read_artifact", "write_paper_draft", "validate_claims"),
     ),
 }
-

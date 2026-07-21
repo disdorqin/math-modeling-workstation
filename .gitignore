@@ -2,6 +2,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+.env
+.env.*
+!.env.example
+secrets*.json
+credentials*.json
 dist/
 build/
 *.egg-info/
@@ -9,4 +14,3 @@ output/*
 !output/.gitkeep
 logs/*
 !logs/.gitkeep
-

@@ -1,0 +1,18 @@
+{
+  "max_attempts": 2,
+  "max_total_tokens": 1,
+  "routes": [
+    {
+      "name": "codexplus-image",
+      "base_url": "https://codexplus.shop/v1",
+      "api_key_env": "MMW_CODEXPLUS_IMAGE_KEY",
+      "models": ["gpt-image-2"],
+      "priority": 10,
+      "timeout_seconds": 180,
+      "failure_threshold": 1,
+      "cooldown_seconds": 300,
+      "kind": "image"
+    }
+  ]
+}
+

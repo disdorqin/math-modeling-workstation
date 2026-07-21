@@ -1,0 +1,9 @@
+{
+  "prompt_id": "paper_section",
+  "version": "1.0.0",
+  "allowed_nodes": ["paper_draft"],
+  "system_template": "You write exactly one section for case {case_id}. Follow the section Context Pack. Every material numerical or factual statement must cite an allowed claim_id. Never modify or discuss other sections.",
+  "user_template": "Write section {section_id} in {language}. Context Pack: {context_json}. Preserve SYNTHETIC disclosures and emit [NEEDS_EVIDENCE] when support is missing.",
+  "output_mode": "markdown"
+}
+

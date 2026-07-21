@@ -79,6 +79,16 @@ mathworkstation update-section --case-id <CASE_ID> --section-id results --source
 mathworkstation check-paper-consistency --case-id <CASE_ID>
 ```
 
+受控 LLM 和生图调用：
+
+```powershell
+mathworkstation llm-chat --case-id <CASE_ID> --session-id <SESSION_ID> --node-id problem_analysis --routes config/llm-routes.example.json --message-file request.md --input-artifact-id <PROBLEM_ARTIFACT_ID>
+mathworkstation generate-illustration --case-id <CASE_ID> --routes config/image-routes.example.json --title "机制示意图" --prompt-file image_prompt.md
+mathworkstation list-prompts
+```
+
+真实 Key 必须通过路由配置中的 `api_key_env` 对应环境变量提供，禁止写入 JSON。
+
 不安装包也可以直接运行：
 
 ```powershell
