@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 4 cross-validation, diagnostics and sensitivity acceptance",
+  "dataset_id": "dataset-c42f8aff0532",
+  "task_type": "regression",
+  "target_column": "target",
+  "feature_columns": ["year", "investment", "output"],
+  "candidate_models": [
+    {
+      "name": "linear",
+      "parameters": {},
+      "rationale": "提供可解释的线性参照"
+    },
+    {
+      "name": "ridge",
+      "parameters": {"alpha": 1.0},
+      "rationale": "检验正则化对小样本稳定性的影响"
+    },
+    {
+      "name": "random_forest",
+      "parameters": {"n_estimators": 100, "max_depth": 4},
+      "rationale": "提供非线性集成模型对照"
+    }
+  ],
+  "primary_metric": "rmse",
+  "cv_folds": 3,
+  "test_size": 0.3,
+  "random_seed": 42,
+  "sensitivity_fractions": [0.7, 0.85, 1.0],
+  "paper_eligible": false
+}

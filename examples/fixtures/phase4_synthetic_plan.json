@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 4 PAPER_READY positive-path engineering acceptance on explicitly synthetic data",
+  "dataset_id": "REPLACE_AFTER_REGISTRATION",
+  "task_type": "regression",
+  "target_column": "target",
+  "feature_columns": ["year_index", "investment", "output"],
+  "candidate_models": [
+    {
+      "name": "linear",
+      "parameters": {},
+      "rationale": "检验已知线性数据生成过程"
+    },
+    {
+      "name": "ridge",
+      "parameters": {"alpha": 1.0},
+      "rationale": "检验正则化稳定性"
+    },
+    {
+      "name": "random_forest",
+      "parameters": {"n_estimators": 100, "max_depth": 6},
+      "rationale": "提供非线性对照"
+    }
+  ],
+  "primary_metric": "rmse",
+  "cv_folds": 5,
+  "test_size": 0.2,
+  "random_seed": 42,
+  "sensitivity_fractions": [0.7, 0.85, 1.0],
+  "paper_eligible": false
+}

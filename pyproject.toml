@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "math-modeling-workstation"
+version = "0.1.0"
+description = "A controlled, recoverable, evidence-first mathematical modeling workstation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Math Modeling Workstation Team" }]
+dependencies = [
+  "joblib>=1.4,<2",
+  "matplotlib>=3.9,<4",
+  "numpy>=2.0,<3",
+  "pandas>=2.2,<3",
+  "openpyxl>=3.1,<4",
+  "scikit-learn>=1.5,<2",
+  "seaborn>=0.13,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+ui = ["streamlit>=1.50,<2"]
+langgraph = ["langgraph>=1.1,<2"]
+agents = ["pydantic-ai>=1,<2"]
+
+[project.scripts]
+mathworkstation = "mathworkstation.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]
