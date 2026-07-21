@@ -11,7 +11,7 @@ from .config import RouteConfig, RouterConfig
 from .redaction import safe_error
 
 
-RETRYABLE_STATUS = {401, 403, 408, 409, 425, 429, 500, 502, 503, 504}
+RETRYABLE_STATUS = {401, 403, 408, 409, 425, 429, 500, 502, 503, 504, 524}
 
 
 @dataclass(frozen=True)
