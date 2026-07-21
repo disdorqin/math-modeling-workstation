@@ -71,7 +71,7 @@ class AutoPipelineService:
         self.sections = PaperSectionWorkspace(cases, self.artifacts, self.claims, self.figures)
         self.outlines = PaperOutlineService(cases, self.artifacts, self.claims, self.figures)
         self.paper_ready = PaperReadyGate(cases, self.artifacts, self.experiments)
-        self.consistency = PaperConsistencyChecker(cases, self.artifacts, self.claims, self.figures)
+        self.consistency = PaperConsistencyChecker(cases, self.artifacts, self.claims, self.figures, strict=True)
         self.exporter = ExportService(cases, self.artifacts, self.workflow)
         self.ingestion = ProblemIngestionService(cases, self.artifacts)
         self.llm = StructuredLLM(CaseLLMService(cases, self.artifacts, self.sessions, self.checkpoints, llm_router))
@@ -122,6 +122,10 @@ class AutoPipelineService:
             plan_artifact_id,
             plan_result["report_artifact_id"],
             sensitivity["result"]["report_artifact_id"],
+            *[figure["artifact_id"] for figure in eda["result"]["figures"]],
+            baseline["result"]["figure"]["artifact_id"],
+            comparison["result"]["figure"]["artifact_id"],
+            sensitivity["result"]["figure"]["artifact_id"],
         ]
         assessment = self.paper_ready.assess(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], additional_evidence)
         if not assessment["eligible"]:
@@ -143,7 +147,13 @@ class AutoPipelineService:
             "strengths_weaknesses": [claim_ids["results"], claim_ids["sensitivity"]],
             "conclusion": [claim_ids["results"], claim_ids["sensitivity"]],
         }
-        outline = self._create_outline(case_id, section_claims, competition_type)
+        section_figures: dict[str, list[str]] = {
+            "data_analysis": [figure["figure_id"] for figure in eda["result"]["figures"]],
+            "model_solution": [comparison["result"]["figure"]["figure_id"], baseline["result"]["figure"]["figure_id"]],
+            "results": [baseline["result"]["figure"]["figure_id"], comparison["result"]["figure"]["figure_id"]],
+            "sensitivity": [sensitivity["result"]["figure"]["figure_id"]],
+        }
+        outline = self._create_outline(case_id, section_claims, section_figures, competition_type)
         sections = self.sections.initialize(case_id, outline["outline_artifact_id"])
         self._generate_sections(case_id, session_id, sections, approved_by)
         paper = self.stages.complete_paper_draft(case_id, session_id)
@@ -245,13 +255,20 @@ class AutoPipelineService:
         self.workflow.approve_node(case_id, "model_plan", approved_by, "Structured model plan validated")
         return {"plan": result["plan"]["plan"], "plan_artifact_id": result["plan_artifact_id"], "report_artifact_id": result["report_artifact_id"], "llm_response": response}
 
-    def _create_outline(self, case_id: str, claim_ids: dict[str, str | list[str]], competition: str) -> dict[str, Any]:
+    def _create_outline(
+        self,
+        case_id: str,
+        claim_ids: dict[str, str | list[str]],
+        figure_ids: dict[str, list[str]],
+        competition: str,
+    ) -> dict[str, Any]:
         self.workflow.start_node(case_id, "paper_outline")
         outline = default_outline("自动生成数学建模论文", competition)
         payload = outline.model_dump(mode="json")
         for section in payload["sections"]:
             assigned = claim_ids.get(section["section_id"], [])
             section["claim_ids"] = [assigned] if isinstance(assigned, str) else list(assigned)
+            section["figure_ids"] = list(figure_ids.get(section["section_id"], []))
         path = self.cases.case_root(case_id) / "paper" / "outline" / "auto-outline.json"
         atomic_write_json(path, payload)
         result = self.outlines.validate_file(case_id, path)
@@ -270,6 +287,12 @@ class AutoPipelineService:
             content = content.replace("[TODO]", "本节待基于新增证据补充。")
             content = content.replace("[TBD]", "本节待基于新增证据补充。")
             content = _polish_section_draft(section_id, content, context)
+            if not content.lstrip().startswith("#"):
+                content = f"## {context['title']}\n\n{content}"
+            for figure in context["allowed_figures"]:
+                figure_ref = figure["figure_id"]
+                if figure_ref not in content:
+                    content += f"\n\n图表证据：{figure['title']} [{figure_ref}]\n\n![{figure['title']}](../{figure['path']})\n"
             if section_id == "results" and "SYNTHETIC" not in content.upper() and "合成" not in content:
                 content += "\n\n本节结果基于明确标注的 SYNTHETIC 数据，不能外推为真实竞赛结论。"
             if any("synthetic_data_claim" in claim.get("restrictions", []) for claim in context["allowed_claims"]) and "SYNTHETIC" not in content.upper() and "合成" not in content:
@@ -335,7 +358,7 @@ def _section_scaffold(section_id: str) -> str:
         "notation": r"设样本为 $\{(x_i,y_i)\}_{i=1}^{n}$，其中 $x_i$ 表示第 $i$ 个样本的特征向量，$y_i$ 表示目标变量，$\hat y_i$ 表示模型预测值。其余符号以具体模型和数据字典为准。",
         "data_analysis": "本节按照数据来源、字段含义、缺失与重复、异常值及分布结构的顺序报告数据分析。所有统计数字均必须来自已登记的数据质量或探索性分析证据。",
         "model_construction": "将目标变量记为 $y$，特征矩阵记为 $X$。候选模型应在数据字典和题目目标约束下确定，并明确损失函数、参数、训练划分及适用边界。",
-        "model_solution": "本节记录模型训练、交叉验证、参数设定和模型选择规则。算法过程只描述已经注册并执行的实验，不以未经验证的经验替代实验结果。",
+        "model_solution": r"本节记录模型训练、交叉验证、参数设定和模型选择规则。对回归任务，主指标可写为 $\mathrm{RMSE}=\sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2}$；算法过程只描述已经注册并执行的实验，不以未经验证的经验替代实验结果。",
         "results": "本节只报告通过模型选择和实验注册的结果，并将评价指标、比较对象、数据范围与随机种子一并说明，避免脱离证据进行外推。",
         "sensitivity": "敏感性分析围绕样本规模、随机划分或关键参数改变模型结论的程度展开。稳健性判断应以已登记的敏感性实验和门控结果为依据。",
         "strengths_weaknesses": "模型优点应从可复现性、解释性、预测性能或计算成本等已验证维度评价；局限性应覆盖数据范围、假设条件、指标选择和外推风险。",

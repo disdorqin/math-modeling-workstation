@@ -15,6 +15,8 @@ CLAIM_REF = re.compile(r"claim-[a-f0-9]{12}")
 FIGURE_REF = re.compile(r"figure-[a-f0-9]{12}")
 NUMBER = re.compile(r"(?<![A-Za-z0-9_-])[-+]?\d+(?:\.\d+)?%?")
 PLACEHOLDER = re.compile(r"\[(?:SECTION_DRAFT_PENDING|NEEDS_EVIDENCE|TODO|TBD)\]")
+INTERNAL_ARTIFACT_REF = re.compile(r"\bartifact-[a-f0-9]{12}\b")
+BOILERPLATE = "本节暂无已登记证据"
 
 
 class PaperConsistencyChecker:
@@ -24,11 +26,13 @@ class PaperConsistencyChecker:
         artifacts: ArtifactRegistry,
         claims: ClaimRegistry,
         figures: FigureRegistry,
+        strict: bool = False,
     ) -> None:
         self.cases = cases
         self.artifacts = artifacts
         self.claims = claims
         self.figures = figures
+        self.strict = strict
 
     def check(self, case_id: str) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
@@ -50,6 +54,11 @@ class PaperConsistencyChecker:
             cited_claims = set(CLAIM_REF.findall(content))
             cited_figures = set(FIGURE_REF.findall(content))
             placeholders = PLACEHOLDER.findall(content)
+            if self.strict and not content.lstrip().startswith("#"):
+                findings.append(_finding("BLOCK", section_id, "SECTION_HEADING_MISSING", ""))
+            if self.strict and section_id in {"model_construction", "model_solution"}:
+                if "$" not in content and "\\begin{" not in content:
+                    findings.append(_finding("BLOCK", section_id, "MODEL_FORMULA_MISSING", ""))
             body_for_number_scan = "\n".join(
                 line for line in content.splitlines() if not line.lstrip().startswith("#")
             )
@@ -84,6 +93,8 @@ class PaperConsistencyChecker:
             if any("synthetic_data_claim" in claim.get("restrictions", []) for claim in context["allowed_claims"]):
                 if "SYNTHETIC" not in content.upper() and "合成" not in content:
                     findings.append(_finding("BLOCK", section_id, "SYNTHETIC_DISCLOSURE_MISSING", ""))
+            if self.strict and context["allowed_figures"] and not cited_figures:
+                findings.append(_finding("BLOCK", section_id, "FIGURE_CITATION_MISSING", ""))
             section_results.append(
                 {
                     "section_id": section_id,
@@ -96,6 +107,17 @@ class PaperConsistencyChecker:
         integrity = self.artifacts.verify(case_id)
         if not integrity["valid"]:
             findings.append(_finding("BLOCK", "global", "ARTIFACT_INTEGRITY_FAILED", str(integrity)))
+        if self.strict:
+            paper_text = "\n".join(
+                (root / "paper" / "sections" / item["section_id"] / "draft.md").read_text(encoding="utf-8")
+                for item in manifest["sections"]
+            )
+            internal_refs = sorted(set(INTERNAL_ARTIFACT_REF.findall(paper_text)))
+            if internal_refs:
+                findings.append(_finding("BLOCK", "global", "INTERNAL_ARTIFACT_REFERENCE", ", ".join(internal_refs)))
+            boilerplate_count = paper_text.count(BOILERPLATE)
+            if boilerplate_count:
+                findings.append(_finding("BLOCK", "global", "REPEATED_BOILERPLATE", str(boilerplate_count)))
         bib_path = root / "paper" / "references" / "references.bib"
         citation_report_path = root / "review" / "citation" / "citation_verification.json"
         if bib_path.is_file() and bib_path.read_text(encoding="utf-8").strip():

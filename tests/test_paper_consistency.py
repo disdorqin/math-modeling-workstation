@@ -74,3 +74,26 @@ def test_consistency_requires_citation_verification_for_bibtex(tmp_path: Path) -
     artifacts.register_existing(case["case_id"], "paper/references/references.bib", "literature_bibtex", "human")
     result = PaperConsistencyChecker(cases, artifacts, claims, figures).check(case["case_id"])
     assert "CITATION_VERIFICATION_MISSING" in {item["code"] for item in result["report"]["findings"]}
+
+
+def test_strict_consistency_blocks_internal_ids_and_missing_model_formula(tmp_path: Path) -> None:
+    cases = CaseManager(tmp_path / "output")
+    case = cases.create_case("SM", "Strict quality")
+    artifacts = ArtifactRegistry(cases)
+    claims = ClaimRegistry(cases, artifacts, DatasetRegistry(cases, artifacts))
+    figures = FigureRegistry(cases, artifacts)
+    outline = default_outline("严格质量门", "SM")
+    source = tmp_path / "outline.json"
+    source.write_text(json.dumps(outline.model_dump(mode="json"), ensure_ascii=False), encoding="utf-8")
+    outline_result = PaperOutlineService(cases, artifacts, claims, figures).validate_file(case["case_id"], source)
+    workspace = PaperSectionWorkspace(cases, artifacts, claims, figures)
+    workspace.initialize(case["case_id"], outline_result["outline_artifact_id"])
+    for section in outline.sections:
+        text = f"# {section.title}\n\n本节已完成。"
+        if section.section_id == "model_construction":
+            text += " 内部记录 artifact-0123456789ab。"
+        workspace.update_draft(case["case_id"], section.section_id, text, "human")
+    result = PaperConsistencyChecker(cases, artifacts, claims, figures, strict=True).check(case["case_id"])
+    codes = {item["code"] for item in result["report"]["findings"]}
+    assert "INTERNAL_ARTIFACT_REFERENCE" in codes
+    assert "MODEL_FORMULA_MISSING" in codes
