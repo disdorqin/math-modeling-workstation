@@ -10,6 +10,7 @@ from .artifact_registry import ArtifactRegistry
 from .baseline import BaselineEngine
 from .case_manager import CaseManager
 from .checkpoint_manager import CheckpointManager
+from .claims import ClaimInput, ClaimRegistry
 from .data_quality import TabularProfiler
 from .data_service import DataService
 from .datasets import DatasetKind, DatasetRegistry
@@ -22,6 +23,9 @@ from .model_evaluation import ModelEvaluationEngine
 from .model_plan import ModelPlanService
 from .modeling_service import ModelingService
 from .paper_ready import PaperReadyGate
+from .paper_consistency import PaperConsistencyChecker
+from .paper_outline import PaperOutlineService, default_outline
+from .paper_sections import PaperSectionWorkspace
 from .recovery import RecoveryService
 from .run_manager import RunManager
 from .session_manager import SessionManager
@@ -201,6 +205,39 @@ def build_parser() -> argparse.ArgumentParser:
     approve_ready.add_argument("--sensitivity-artifact-id", required=True)
     approve_ready.add_argument("--approved-by", required=True)
     approve_ready.add_argument("--note", required=True)
+
+    create_claim = commands.add_parser("create-claim")
+    create_claim.add_argument("--case-id", required=True)
+    create_claim.add_argument("--text", required=True)
+    create_claim.add_argument("--claim-type", required=True)
+    create_claim.add_argument("--evidence-artifact-id", action="append", required=True)
+    create_claim.add_argument("--dataset-id", action="append", default=[])
+    create_claim.add_argument("--section-hint")
+    create_claim.add_argument("--created-by", default="human")
+
+    default_paper = commands.add_parser("create-default-outline")
+    default_paper.add_argument("--case-id", required=True)
+    default_paper.add_argument("--title", required=True)
+    default_paper.add_argument("--competition-type", required=True)
+    default_paper.add_argument("--language", choices=["zh", "en", "bilingual"], default="zh")
+    default_paper.add_argument("--output", required=True)
+
+    validate_outline = commands.add_parser("validate-outline")
+    validate_outline.add_argument("--case-id", required=True)
+    validate_outline.add_argument("--source", required=True)
+
+    init_sections = commands.add_parser("init-paper-sections")
+    init_sections.add_argument("--case-id", required=True)
+    init_sections.add_argument("--outline-artifact-id", required=True)
+
+    update_section = commands.add_parser("update-section")
+    update_section.add_argument("--case-id", required=True)
+    update_section.add_argument("--section-id", required=True)
+    update_section.add_argument("--source", required=True)
+    update_section.add_argument("--created-by", default="human")
+
+    consistency = commands.add_parser("check-paper-consistency")
+    consistency.add_argument("--case-id", required=True)
     return parser
 
 
@@ -238,6 +275,10 @@ def main(argv: list[str] | None = None) -> int:
         selections,
     )
     paper_ready = PaperReadyGate(cases, artifacts, experiments)
+    claims = ClaimRegistry(cases, artifacts, datasets)
+    outline_service = PaperOutlineService(cases, artifacts, claims, figures)
+    section_workspace = PaperSectionWorkspace(cases, artifacts, claims, figures)
+    consistency_checker = PaperConsistencyChecker(cases, artifacts, claims, figures)
 
     try:
         if args.command == "create-case":
@@ -409,6 +450,39 @@ def main(argv: list[str] | None = None) -> int:
                     args.note,
                 )
             )
+        elif args.command == "create-claim":
+            _print(
+                claims.create(
+                    args.case_id,
+                    ClaimInput(
+                        text=args.text,
+                        claim_type=args.claim_type,
+                        evidence_artifact_ids=args.evidence_artifact_id,
+                        dataset_ids=args.dataset_id,
+                        section_hint=args.section_hint,
+                    ),
+                    args.created_by,
+                )
+            )
+        elif args.command == "create-default-outline":
+            outline = default_outline(
+                args.title,
+                args.competition_type,
+                args.language,
+            )
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(outline.model_dump_json(indent=2), encoding="utf-8")
+            _print({"output": str(output_path.resolve())})
+        elif args.command == "validate-outline":
+            _print(outline_service.validate_file(args.case_id, args.source))
+        elif args.command == "init-paper-sections":
+            _print(section_workspace.initialize(args.case_id, args.outline_artifact_id))
+        elif args.command == "update-section":
+            content = Path(args.source).read_text(encoding="utf-8-sig")
+            _print(section_workspace.update_draft(args.case_id, args.section_id, content, args.created_by))
+        elif args.command == "check-paper-consistency":
+            _print(consistency_checker.check(args.case_id))
         else:
             raise AssertionError(f"unhandled command: {args.command}")
     except Exception as error:

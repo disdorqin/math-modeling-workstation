@@ -18,6 +18,7 @@ class CaseManager:
         "dataset_registry.jsonl",
         "figure_registry.jsonl",
         "experiment_registry.jsonl",
+        "claim_registry.jsonl",
     )
 
     def __init__(self, output_root: str | Path = "output") -> None:
@@ -76,6 +77,7 @@ class CaseManager:
             (case_root / "dataset_registry.jsonl").touch(exist_ok=False)
             (case_root / "figure_registry.jsonl").touch(exist_ok=False)
             (case_root / "experiment_registry.jsonl").touch(exist_ok=False)
+            (case_root / "claim_registry.jsonl").touch(exist_ok=False)
             atomic_write_text(
                 case_root / "README.md",
                 f"# {title.strip() or case_id}\n\n- Case ID: `{case_id}`\n"

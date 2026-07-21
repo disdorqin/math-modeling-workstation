@@ -68,6 +68,17 @@ mathworkstation assess-paper-ready --case-id <CASE_ID> --experiment-id <EXPERIME
 
 `select-model` 同时记录人工选择并完成 `model_selection` 审批，不需要再调用通用 `approve-node`。
 
+论文证据和分章节工作区：
+
+```powershell
+mathworkstation create-claim --case-id <CASE_ID> --text "模型交叉验证表现稳定" --claim-type model_result --evidence-artifact-id <ARTIFACT_ID>
+mathworkstation create-default-outline --case-id <CASE_ID> --title "论文标题" --competition-type SM --output outline.json
+mathworkstation validate-outline --case-id <CASE_ID> --source outline.json
+mathworkstation init-paper-sections --case-id <CASE_ID> --outline-artifact-id <OUTLINE_ID>
+mathworkstation update-section --case-id <CASE_ID> --section-id results --source results.md
+mathworkstation check-paper-consistency --case-id <CASE_ID>
+```
+
 不安装包也可以直接运行：
 
 ```powershell

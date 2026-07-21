@@ -86,7 +86,7 @@ class ModelPlanService:
         dataset_id: str | None = None,
     ) -> dict[str, Any]:
         source = Path(source_path).resolve()
-        payload = json.loads(source.read_text(encoding="utf-8"))
+        payload = json.loads(source.read_text(encoding="utf-8-sig"))
         if dataset_id:
             payload["dataset_id"] = dataset_id
         plan = ModelPlan.model_validate(payload)
