@@ -111,6 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     auto_pipeline.add_argument("--target-column")
     auto_pipeline.add_argument("--competition-type", required=True)
     auto_pipeline.add_argument("--routes", required=True)
+    auto_pipeline.add_argument("--image-routes", help="optional OpenAI-compatible image routes for the final flowchart reference")
     auto_pipeline.add_argument("--approved-by", required=True)
     auto_pipeline.add_argument("--kind", choices=[item.value for item in DatasetKind], default=DatasetKind.OBSERVED.value)
     auto_pipeline.add_argument("--source-uri")
@@ -408,8 +409,14 @@ def main(argv: list[str] | None = None) -> int:
             _print(problem_ingestion.ingest(args.case_id, args.source))
         elif args.command == "run-auto-pipeline":
             route_config = RouterConfig.model_validate_json(Path(args.routes).read_text(encoding="utf-8-sig"))
+            image_router = None
+            if args.image_routes:
+                image_config = RouterConfig.model_validate_json(
+                    Path(args.image_routes).read_text(encoding="utf-8-sig")
+                )
+                image_router = ImageRouter(image_config)
             _print(
-                AutoPipelineService(cases, LLMRouter(route_config)).run(
+                AutoPipelineService(cases, LLMRouter(route_config), image_router=image_router).run(
                     args.case_id,
                     args.session_id,
                     args.problem_source,

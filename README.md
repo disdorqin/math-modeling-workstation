@@ -114,12 +114,15 @@ mathworkstation run-auto-pipeline --case-id <CASE_ID> --session-id <SESSION_ID> 
   --problem-source problem.md --data-source data.csv --dataset-name "原始数据" `
   --target-column target --competition-type SM `
   --routes config/llm-routes.example.json --approved-by pipeline-human --kind OBSERVED `
-  --source-uri https://data.example.org/source --license "CC BY 4.0"
+  --source-uri https://data.example.org/source --license "CC BY 4.0" `
+  --image-routes config/image-routes.example.json
 ```
 
 该入口会依次执行结构化题目分析、数据质量、EDA、模型方案、确定性实验、证据 Claim、12 节论文草稿、一致性检查和 ZIP 导出。`--approved-by` 是显式的关键节点审批身份，不允许模型自行绕过审批。
 
 自动论文使用严格研究质量门：会检查章节完整性、模型公式、图表引用、内部证据 ID 泄漏、模板化空话、数据真实性声明和证据完整性。详细规则见 [`docs/research-quality-gate.md`](docs/research-quality-gate.md)。
+
+`--image-routes` 是可选的流程图视觉参考分支。它只在主流水线末端调用 OpenAI-compatible Images API，生成供 Draw.io Scientific Illustrator 重绘的参考图，同时输出 `workflow-design.json` 和 `drawio-flowchart-prompt.md`。数据图和模型实验图始终由本地 Python 确定性生成。
 
 真实 Key 必须通过路由配置中的 `api_key_env` 对应环境变量提供，禁止写入 JSON。
 

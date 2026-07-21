@@ -19,7 +19,10 @@ from .experiments import ExperimentRegistry
 from .export_service import ExportService
 from .figure_registry import FigureRegistry
 from .figure_composition import FigureCompositionService
+from .flowchart_service import FlowchartService
 from .llm.router import LLMRouter
+from .llm.image_router import ImageRouter
+from .llm.image_service import CaseImageService
 from .llm.service import CaseLLMService
 from .memory_manager import MemoryManager
 from .model_evaluation import ModelEvaluationEngine
@@ -44,7 +47,7 @@ from .io_utils import atomic_write_json, atomic_write_text, read_json
 
 
 class AutoPipelineService:
-    def __init__(self, cases: CaseManager, llm_router: LLMRouter) -> None:
+    def __init__(self, cases: CaseManager, llm_router: LLMRouter, image_router: ImageRouter | None = None) -> None:
         self.cases = cases
         self.artifacts = ArtifactRegistry(cases)
         self.checkpoints = CheckpointManager(cases)
@@ -54,6 +57,13 @@ class AutoPipelineService:
         self.datasets = DatasetRegistry(cases, self.artifacts)
         self.figures = FigureRegistry(cases, self.artifacts)
         self.compositions = FigureCompositionService(cases, self.artifacts, self.figures)
+        self.flowcharts = FlowchartService(
+            cases,
+            self.artifacts,
+            self.figures,
+            self.compositions,
+            CaseImageService(cases, self.artifacts, self.figures, image_router) if image_router else None,
+        )
         self.experiments = ExperimentRegistry(cases, self.artifacts)
         self.claims = ClaimRegistry(cases, self.artifacts, self.datasets)
         self.data = DataService(self.artifacts, self.datasets, TabularProfiler(cases, self.artifacts, self.datasets), self.workflow)
@@ -129,7 +139,7 @@ class AutoPipelineService:
         experiment_id = comparison["result"]["experiment_id"]
         selection = self.evaluation.select_model(case_id, experiment_id, comparison["result"]["best_model"], comparison["result"]["comparison_artifact_id"], approved_by, "Selected best validated primary metric result", session_id)
         sensitivity = self.evaluation.run_sensitivity(case_id, experiment_id, plan_artifact_id, None, session_id)
-        workflow_figure = self.compositions.create_workflow_overview(
+        workflow_figure = self.flowcharts.create(
             case_id,
             [problem_artifact_id, data["artifact"]["artifact_id"], plan_artifact_id, comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]],
         )
@@ -150,7 +160,12 @@ class AutoPipelineService:
             sensitivity["result"]["figure"]["artifact_id"],
             workflow_figure["figure"]["artifact_id"],
             workflow_figure["svg_artifact_id"],
+            workflow_figure["design_artifact_id"],
+            workflow_figure["prompt_artifact_id"],
         ]
+        ai_reference = workflow_figure.get("ai_reference")
+        if isinstance(ai_reference, dict) and ai_reference.get("figure"):
+            additional_evidence.append(ai_reference["figure"]["artifact_id"])
         assessment = self.paper_ready.assess(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], additional_evidence)
         if not assessment["eligible"]:
             raise ValueError(f"paper ready gate failed: {assessment['reasons']}")
