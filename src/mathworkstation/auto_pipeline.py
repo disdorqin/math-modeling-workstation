@@ -29,6 +29,7 @@ from .paper_outline import PaperOutlineService, default_outline
 from .paper_ready import PaperReadyGate
 from .paper_sections import PaperSectionWorkspace
 from .problem_ingestion import ProblemIngestionService
+from .research_audit import ResearchAuditService
 from .run_manager import RunManager
 from .selection import ModelSelectionRegistry
 from .sensitivity import SensitivityEngine
@@ -75,6 +76,7 @@ class AutoPipelineService:
         self.exporter = ExportService(cases, self.artifacts, self.workflow)
         self.ingestion = ProblemIngestionService(cases, self.artifacts)
         self.llm = StructuredLLM(CaseLLMService(cases, self.artifacts, self.sessions, self.checkpoints, llm_router))
+        self.research = ResearchAuditService(cases, self.artifacts, self.datasets)
 
     def run(
         self,
@@ -87,9 +89,21 @@ class AutoPipelineService:
         approved_by: str,
         competition_type: str,
         data_kind: DatasetKind = DatasetKind.OBSERVED,
+        source_uri: str | None = None,
+        license_name: str | None = None,
+        data_description: str = "",
     ) -> dict[str, Any]:
         problem = self.ingestion.ingest(case_id, problem_source)
-        data = self.data.register_uploaded(case_id, data_source, dataset_name, data_kind, approved_by)
+        data = self.data.register_uploaded(
+            case_id,
+            data_source,
+            dataset_name,
+            data_kind,
+            approved_by,
+            source_uri=source_uri,
+            license_name=license_name,
+            description=data_description,
+        )
         dataset_id = data["dataset"]["dataset_id"]
         problem_artifact_id = problem["extracted_artifact"]["artifact_id"]
         self._complete_simple("input_validation", case_id, session_id)
@@ -122,6 +136,8 @@ class AutoPipelineService:
             plan_artifact_id,
             plan_result["report_artifact_id"],
             sensitivity["result"]["report_artifact_id"],
+            plan_result["research_audit_artifact_id"],
+            plan_result["research_audit_report_artifact_id"],
             *[figure["artifact_id"] for figure in eda["result"]["figures"]],
             baseline["result"]["figure"]["artifact_id"],
             comparison["result"]["figure"]["artifact_id"],
@@ -134,7 +150,7 @@ class AutoPipelineService:
         claim_map = {
             "problem_restated": self.claims.create(case_id, ClaimInput(text="The problem analysis was extracted from the declared problem artifact and retained as structured evidence.", claim_type="problem_analysis", evidence_artifact_ids=[problem_analysis_artifact_id], section_hint="problem_restated"), approved_by),
             "data_analysis": self.claims.create(case_id, ClaimInput(text="The dataset profiling and exploratory analysis artifacts passed the declared data quality workflow.", claim_type="data_quality", evidence_artifact_ids=[profile["profile_artifact_id"], profile["report_artifact_id"], eda["result"]["summary_artifact_id"], eda["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="data_analysis"), approved_by),
-            "model_construction": self.claims.create(case_id, ClaimInput(text="The model plan was validated against the dataset schema and approved before formal comparison.", claim_type="model_plan", evidence_artifact_ids=[plan_artifact_id, plan_result["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_construction"), approved_by),
+            "model_construction": self.claims.create(case_id, ClaimInput(text="The model plan was validated against the dataset schema and the research audit recorded feature and split decisions before formal comparison.", claim_type="model_plan", evidence_artifact_ids=[plan_artifact_id, plan_result["report_artifact_id"], plan_result["research_audit_artifact_id"], plan_result["research_audit_report_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_construction"), approved_by),
             "model_solution": self.claims.create(case_id, ClaimInput(text=f"The declared candidate models were evaluated using the reproducible experiment pipeline; {comparison['result']['best_model']} ranked first under the selected metric.", claim_type="model_comparison", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], comparison["result"]["diagnostics_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_solution"), approved_by),
             "results": self.claims.create(case_id, ClaimInput(text=f"The validated comparison selected {comparison['result']['best_model']} as the best model under the declared primary metric.", claim_type="model_result", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]], dataset_ids=[dataset_id], section_hint="results"), approved_by),
             "sensitivity": self.claims.create(case_id, ClaimInput(text="The sensitivity analysis completed across the declared sample fractions and random seeds with a recorded gate.", claim_type="sensitivity", evidence_artifact_ids=[sensitivity["result"]["artifact_id"], sensitivity["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="sensitivity"), approved_by),
@@ -247,13 +263,40 @@ class AutoPipelineService:
         payload["test_size"] = min(0.49, max(0.06, float(payload.get("test_size", 0.2))))
         if target_column:
             payload["target_column"] = target_column
+        research_audit = self.research.audit(
+            case_id,
+            dataset_id,
+            payload["target_column"],
+            list(payload["feature_columns"]),
+            approved_by,
+        )
+        blocking_research_issues = {
+            "SOURCE_URI_MISSING",
+            "TEMPORAL_SPLIT_REVIEW",
+            "TARGET_AS_FEATURE",
+            "NO_RECOMMENDED_FEATURES",
+        }
+        if research_audit["report"]["gate"] == "BLOCK" or any(
+            issue["code"] in blocking_research_issues
+            for issue in research_audit["report"]["issues"]
+            if issue["severity"] == "REVIEW" or issue["severity"] == "BLOCK"
+        ):
+            raise ValueError(f"research audit blocked model plan: {research_audit['report']['issues']}")
+        payload["feature_columns"] = research_audit["report"]["recommended_feature_columns"]
         root = self.cases.case_root(case_id)
         path = root / "analysis" / "auto_model_plan.json"
         atomic_write_json(path, payload)
         result = self.plans.validate_file(case_id, path, dataset_id)
         self.workflow.succeed_node(case_id, "model_plan")
         self.workflow.approve_node(case_id, "model_plan", approved_by, "Structured model plan validated")
-        return {"plan": result["plan"]["plan"], "plan_artifact_id": result["plan_artifact_id"], "report_artifact_id": result["report_artifact_id"], "llm_response": response}
+        return {
+            "plan": result["plan"]["plan"],
+            "plan_artifact_id": result["plan_artifact_id"],
+            "report_artifact_id": result["report_artifact_id"],
+            "research_audit_artifact_id": research_audit["artifact_id"],
+            "research_audit_report_artifact_id": research_audit["report_artifact_id"],
+            "llm_response": response,
+        }
 
     def _create_outline(
         self,

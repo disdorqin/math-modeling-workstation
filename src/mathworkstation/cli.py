@@ -113,6 +113,9 @@ def build_parser() -> argparse.ArgumentParser:
     auto_pipeline.add_argument("--routes", required=True)
     auto_pipeline.add_argument("--approved-by", required=True)
     auto_pipeline.add_argument("--kind", choices=[item.value for item in DatasetKind], default=DatasetKind.OBSERVED.value)
+    auto_pipeline.add_argument("--source-uri")
+    auto_pipeline.add_argument("--license")
+    auto_pipeline.add_argument("--data-description", default="")
 
     start = commands.add_parser("start-node")
     start.add_argument("--case-id", required=True)
@@ -416,6 +419,9 @@ def main(argv: list[str] | None = None) -> int:
                     args.approved_by,
                     args.competition_type,
                     DatasetKind(args.kind),
+                    source_uri=args.source_uri,
+                    license_name=args.license,
+                    data_description=args.data_description,
                 )
             )
         elif args.command == "start-node":

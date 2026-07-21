@@ -113,7 +113,8 @@ mathworkstation create-session --case-id <CASE_ID>
 mathworkstation run-auto-pipeline --case-id <CASE_ID> --session-id <SESSION_ID> `
   --problem-source problem.md --data-source data.csv --dataset-name "原始数据" `
   --target-column target --competition-type SM `
-  --routes config/llm-routes.example.json --approved-by pipeline-human --kind OBSERVED
+  --routes config/llm-routes.example.json --approved-by pipeline-human --kind OBSERVED `
+  --source-uri https://data.example.org/source --license "CC BY 4.0"
 ```
 
 该入口会依次执行结构化题目分析、数据质量、EDA、模型方案、确定性实验、证据 Claim、12 节论文草稿、一致性检查和 ZIP 导出。`--approved-by` 是显式的关键节点审批身份，不允许模型自行绕过审批。
