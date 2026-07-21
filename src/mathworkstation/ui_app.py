@@ -21,6 +21,7 @@ from mathworkstation.claims import ClaimRegistry
 from mathworkstation.llm.config import RouterConfig
 from mathworkstation.llm.router import LLMRouter
 from mathworkstation.llm.service import CaseLLMService
+from mathworkstation.literature import LiteratureService
 from mathworkstation.memory_manager import MemoryManager
 from mathworkstation.paper_consistency import PaperConsistencyChecker
 from mathworkstation.figure_registry import FigureRegistry
@@ -80,6 +81,7 @@ def _load_case(services: dict[str, Any], case_id: str) -> dict[str, Any]:
         "artifacts": services["artifacts"].list_artifacts(case_id),
         "figures": services["figures"].list_figures(case_id),
         "claims": services["claims"].list_claims(case_id),
+        "literature": LiteratureService(services["cases"], services["artifacts"]).list_records(case_id),
         "root": root,
     }
 
@@ -157,6 +159,17 @@ def _render_evidence(services: dict[str, Any], case: dict[str, Any]) -> None:
     if case["claims"]:
         st.subheader("Claims")
         st.dataframe(case["claims"], use_container_width=True, hide_index=True)
+    if case["literature"]:
+        st.subheader("Literature")
+        st.dataframe(case["literature"], use_container_width=True, hide_index=True)
+        bib_path = case["root"] / "paper" / "references" / "references.bib"
+        if bib_path.is_file():
+            st.download_button(
+                "下载 BibTeX",
+                bib_path.read_text(encoding="utf-8"),
+                file_name="references.bib",
+                mime="text/plain",
+            )
     if case["figures"]:
         st.subheader("Figures")
         for figure in case["figures"]:

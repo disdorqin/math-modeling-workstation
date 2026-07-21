@@ -27,6 +27,7 @@ from .llm.image_service import CaseImageService
 from .llm.prompts import PromptRegistry
 from .llm.router import LLMRouter
 from .llm.service import CaseLLMService
+from .literature import LiteratureService
 from .model_evaluation import ModelEvaluationEngine
 from .model_plan import ModelPlanService
 from .modeling_service import ModelingService
@@ -166,6 +167,17 @@ def build_parser() -> argparse.ArgumentParser:
     collect = commands.add_parser("collect-url")
     collect.add_argument("--case-id", required=True)
     collect.add_argument("--url", required=True)
+
+    literature = commands.add_parser("search-literature")
+    literature.add_argument("--case-id", required=True)
+    literature.add_argument("--query", required=True)
+    literature.add_argument("--rows", type=int, default=5)
+
+    bibtex = commands.add_parser("export-bibtex")
+    bibtex.add_argument("--case-id", required=True)
+
+    citations = commands.add_parser("verify-citations")
+    citations.add_argument("--case-id", required=True)
 
     run_eda = commands.add_parser("run-eda")
     run_eda.add_argument("--case-id", required=True)
@@ -313,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
         workflow,
     )
     sources = SourceCollector(cases, artifacts)
+    literature = LiteratureService(cases, artifacts)
     figures = FigureRegistry(cases, artifacts)
     experiments = ExperimentRegistry(cases, artifacts)
     modeling = ModelingService(
@@ -450,6 +463,12 @@ def main(argv: list[str] | None = None) -> int:
             _print(datasets.current_records(args.case_id))
         elif args.command == "collect-url":
             _print(sources.collect_url(args.case_id, args.url))
+        elif args.command == "search-literature":
+            _print(literature.search_crossref(args.case_id, args.query, args.rows))
+        elif args.command == "export-bibtex":
+            _print(literature.export_bibtex(args.case_id))
+        elif args.command == "verify-citations":
+            _print(literature.verify_citations(args.case_id))
         elif args.command == "run-eda":
             _print(modeling.run_eda(args.case_id, args.dataset_id, args.target_column, args.session_id))
         elif args.command == "run-baseline":

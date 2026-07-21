@@ -79,6 +79,16 @@ mathworkstation update-section --case-id <CASE_ID> --section-id results --source
 mathworkstation check-paper-consistency --case-id <CASE_ID>
 ```
 
+文献检索和引用验证：
+
+```powershell
+mathworkstation search-literature --case-id <CASE_ID> --query "mathematical modeling sensitivity analysis" --rows 5
+mathworkstation export-bibtex --case-id <CASE_ID>
+mathworkstation verify-citations --case-id <CASE_ID>
+```
+
+检索结果先保存 Crossref 原始快照，再进入独立引用注册表。BibTeX 不会自动变成论文结论；论文一致性检查发现未验证引用时会阻断 `PASS`。
+
 受控 LLM 和生图调用：
 
 ```powershell

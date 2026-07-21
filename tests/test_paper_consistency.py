@@ -54,3 +54,23 @@ def test_consistency_passes_completed_empty_evidence_sections(tmp_path: Path) ->
     assert result["report"]["gate"] == "PASS"
     assert artifacts.get(case["case_id"], result["report_artifact_id"])["paper_eligible"] is True
 
+
+def test_consistency_requires_citation_verification_for_bibtex(tmp_path: Path) -> None:
+    cases = CaseManager(tmp_path / "output")
+    case = cases.create_case("SM", "Citation gate")
+    artifacts = ArtifactRegistry(cases)
+    claims = ClaimRegistry(cases, artifacts, DatasetRegistry(cases, artifacts))
+    figures = FigureRegistry(cases, artifacts)
+    outline = default_outline("引用门", "SM")
+    source = tmp_path / "outline.json"
+    source.write_text(json.dumps(outline.model_dump(mode="json"), ensure_ascii=False), encoding="utf-8")
+    outline_result = PaperOutlineService(cases, artifacts, claims, figures).validate_file(case["case_id"], source)
+    workspace = PaperSectionWorkspace(cases, artifacts, claims, figures)
+    workspace.initialize(case["case_id"], outline_result["outline_artifact_id"])
+    for section in outline.sections:
+        workspace.update_draft(case["case_id"], section.section_id, "本节已完成。", "human")
+    bib = cases.case_root(case["case_id"]) / "paper" / "references" / "references.bib"
+    bib.write_text("@article{example, title={Example}}\n", encoding="utf-8")
+    artifacts.register_existing(case["case_id"], "paper/references/references.bib", "literature_bibtex", "human")
+    result = PaperConsistencyChecker(cases, artifacts, claims, figures).check(case["case_id"])
+    assert "CITATION_VERIFICATION_MISSING" in {item["code"] for item in result["report"]["findings"]}

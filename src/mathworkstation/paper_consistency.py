@@ -93,6 +93,16 @@ class PaperConsistencyChecker:
         integrity = self.artifacts.verify(case_id)
         if not integrity["valid"]:
             findings.append(_finding("BLOCK", "global", "ARTIFACT_INTEGRITY_FAILED", str(integrity)))
+        bib_path = root / "paper" / "references" / "references.bib"
+        citation_report_path = root / "review" / "citation" / "citation_verification.json"
+        if bib_path.is_file() and bib_path.read_text(encoding="utf-8").strip():
+            if not citation_report_path.is_file():
+                findings.append(_finding("BLOCK", "references", "CITATION_VERIFICATION_MISSING", ""))
+            else:
+                citation_report = read_json(citation_report_path)
+                missing = [item["doi"] for item in citation_report.get("results", []) if not item.get("exists")]
+                if missing:
+                    findings.append(_finding("BLOCK", "references", "CITATION_NOT_VERIFIED", ", ".join(missing)))
         severities = {finding["severity"] for finding in findings}
         gate = "BLOCK" if "BLOCK" in severities else "REVIEW" if "REVIEW" in severities else "PASS"
         report = {
@@ -135,4 +145,3 @@ def _render_report(report: dict[str, Any]) -> str:
         "## Findings\n\n"
         f"{findings}\n"
     )
-
