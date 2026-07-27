@@ -1,0 +1,243 @@
+name: agent-layer-tests
+
+# Five jobs, each pinning one distinct claim this project makes:
+#
+#   full-suite-all-extras -- the WHOLE test suite, with every optional extra
+#                      installed ([dev,ui,langgraph]), on every supported
+#                      Python (3.11, 3.12). This is the authoritative
+#                      "all tests pass" evidence: tests/test_ui_app.py
+#                      EXECUTES here rather than skipping.
+#   builtin-env    -- the agent layer works with ZERO optional dependencies:
+#                      builtin runs, auto selects builtin, and explicitly
+#                      requesting langgraph fails non-zero.
+#   langgraph-env  -- the [langgraph] extra installs and the LangGraph runtime
+#                      actually runs (not just importable -- executed), auto
+#                      selects it, and compare-agent-runtimes is conformant.
+#   agent-modeling-smoke -- SCOPED to the bounded modeling SUBGRAPH: protocol
+#                      -> 3 candidates -> evaluation -> judge -> adjudicator
+#                      -> evidence promotion -> exactly one VERIFIED claim.
+#                      NOT the full workstation pipeline.
+#   full-deterministic-paper-smoke -- the ENTIRE workstation DAG in legal
+#                      production order, ending in a real paper, submission
+#                      preflight and two hash-drift-free validate-case runs.
+#                      Driven by one shared script, not duplicated YAML.
+#
+# The two smokes are deliberately distinct: a modeling-subgraph smoke is not
+# a complete deterministic workstation smoke, and neither is named as if it
+# were the other.
+#
+# STATUS AT TIME OF WRITING: this file's YAML is validated locally and both
+# smoke paths were rehearsed locally, but no GitHub Actions run of it has
+# been observed -- the authoring sandbox has no outbound access to github.com
+# to push or trigger one. Do not read a green checkmark into this file's
+# existence; read it only once a run has actually appeared under the
+# repository's Actions tab.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  full-suite-all-extras:
+    # The one job that installs EVERY optional extra (including [ui] ->
+    # streamlit) so the full test suite -- all 180 test functions, with the
+    # UI test EXECUTED rather than skipped -- runs on a matrix of the
+    # project's supported Python versions. This is the job whose pytest
+    # output is the authoritative "all tests pass" evidence.
+    name: Full test suite (all extras, all supported Pythons)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install with dev + ui + langgraph extras
+        run: pip install -e ".[dev,ui,langgraph]"
+      - name: Report the optional-dependency versions this job actually installed
+        run: |
+          python -c "import sys; print('python', sys.version)"
+          python -m pytest --version
+          python -c "import streamlit; print('streamlit', streamlit.__version__)"
+          python -c "import importlib.metadata as m; print('langgraph', m.version('langgraph'))"
+      - name: Full real pytest suite -- UI test EXECUTES here (not skipped)
+        run: pytest -ra -vv
+
+  builtin-env:
+    name: Agent layer (builtin runtime, no optional deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install (dev only -- no langgraph, no agents extra)
+        run: pip install -e ".[dev]"
+      - name: Confirm langgraph is genuinely absent in this job
+        run: |
+          python -c "from mathworkstation.agents.graph import langgraph_available; assert langgraph_available() is False, 'langgraph must NOT be installed in the builtin-env job'"
+      - name: Run the full real pytest suite
+        run: pytest -v
+      - name: run-agent-pipeline with --runtime builtin on a fresh case
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-builtin create-case --competition CUMCM --title "CI builtin smoke" --language zh > /tmp/case.json
+          CASE_ID=$(python -c "import json;print(json.load(open('/tmp/case.json'))['case_id'])")
+          echo "CASE_ID=$CASE_ID" >> "$GITHUB_ENV"
+          python -m mathworkstation.cli --output-root /tmp/ci-builtin run-agent-pipeline --case-id "$CASE_ID" --runtime builtin
+      - name: --runtime langgraph must fail with a distinct, actionable error here
+        run: |
+          if python -m mathworkstation.cli --output-root /tmp/ci-builtin run-agent-pipeline --case-id "$CASE_ID" --runtime langgraph; then
+            echo "expected failure: langgraph must not be available in this job" >&2
+            exit 1
+          fi
+      - name: --runtime auto must select builtin here (and succeed)
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-builtin run-agent-pipeline --case-id "$CASE_ID" --runtime auto
+
+  langgraph-env:
+    name: Agent layer (LangGraph runtime installed and executed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install with the langgraph extra
+        run: pip install -e ".[dev,langgraph]"
+      - name: Confirm langgraph is actually importable in this job, and report its version
+        run: |
+          python -c "from mathworkstation.agents.graph import langgraph_available; assert langgraph_available() is True, 'langgraph extra did not install correctly'"
+          # importlib.metadata is authoritative: a distribution always has a
+          # version, whereas a top-level __version__ attribute is optional and
+          # langgraph may not define one -- "unknown" would be no proof at all.
+          python -c "import importlib.metadata as m; print('langgraph version:', m.version('langgraph'))"
+      - name: Run the full real pytest suite (langgraph present)
+        run: pytest -v
+      - name: run-agent-pipeline with --runtime langgraph on a fresh case
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph create-case --competition CUMCM --title "CI langgraph smoke" --language zh > /tmp/case.json
+          CASE_ID=$(python -c "import json;print(json.load(open('/tmp/case.json'))['case_id'])")
+          echo "CASE_ID=$CASE_ID" >> "$GITHUB_ENV"
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph run-agent-pipeline --case-id "$CASE_ID" --runtime langgraph
+      - name: --runtime auto must select langgraph here (and succeed)
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph run-agent-pipeline --case-id "$CASE_ID" --runtime auto
+      - name: compare-agent-runtimes -- builtin vs LangGraph must be conformant
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph compare-agent-runtimes --case-id "$CASE_ID" --report /tmp/runtime-diff.json
+          echo "conformant (exit 0). Report:"
+          cat /tmp/runtime-diff.json
+      - name: Upload the runtime-conformance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-conformance
+          path: /tmp/runtime-diff.json
+
+  agent-modeling-smoke:
+    # SCOPED SMOKE #1 of 2: the bounded modeling SUBGRAPH only (protocol ->
+    # 3 candidates -> evaluation -> judge -> adjudicator -> evidence
+    # promotion -> VERIFIED claim). This deliberately does NOT profile the
+    # dataset or build a paper -- it reads the registered dataset artifact
+    # directly. It is NOT the full workstation pipeline; see
+    # full-deterministic-paper-smoke below for that.
+    name: Agent modeling smoke (modeling subgraph + reuse + evidence promotion)
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install (dev only)
+        run: pip install -e ".[dev]"
+      - name: Full real pytest suite (UI test skips cleanly without the [ui] extra)
+        run: pytest -ra -v
+      - name: Diabetes fixture through the modeling fan-out (real sklearn fits, no API key)
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-smoke create-case --competition CUMCM --title "CI modeling smoke" --language zh > /tmp/case.json
+          CASE_ID=$(python -c "import json;print(json.load(open('/tmp/case.json'))['case_id'])")
+          echo "CASE_ID=$CASE_ID" >> "$GITHUB_ENV"
+          python -m mathworkstation.cli --output-root /tmp/ci-smoke register-dataset --case-id "$CASE_ID" --name diabetes --kind OBSERVED --source examples/fixtures/diabetes_progression.csv --description "CI fixture" > /tmp/dataset.json
+          DATASET_ID=$(python -c "import json;print(json.load(open('/tmp/dataset.json'))['dataset_id'])")
+          echo "DATASET_ID=$DATASET_ID" >> "$GITHUB_ENV"
+          # No profile-dataset here on purpose: this is the modeling-SUBGRAPH
+          # smoke. Profiling (the data_quality node) is gated behind
+          # input_validation -> data_registration in the production DAG
+          # (proven by tests/test_full_smoke_dag_order.py); the fan-out reads
+          # the dataset artifact directly and does not need that chain. The
+          # full DAG order IS walked by full-deterministic-paper-smoke.
+          python scripts/run_modeling_fanout_on_case.py /tmp/ci-smoke "$CASE_ID" "$DATASET_ID" progression age,sex,bmi,bp,s1,s2,s3,s4,s5,s6 | tee /tmp/firstrun.log
+          grep -q "computed" /tmp/firstrun.log
+      - name: Rerun the fan-out -- must be a zero-fit, reuse-only pass
+        run: |
+          python scripts/run_modeling_fanout_on_case.py /tmp/ci-smoke "$CASE_ID" "$DATASET_ID" progression age,sex,bmi,bp,s1,s2,s3,s4,s5,s6 | tee /tmp/rerun.log
+          grep -q "reused" /tmp/rerun.log
+      - name: Promote the modeling evidence chain and verify exactly one VERIFIED claim
+        run: |
+          python - <<'EOF'
+          import json, os, subprocess, sys
+          case_id = os.environ["CASE_ID"]
+          root = "/tmp/ci-smoke"
+          sys.path.insert(0, "src")
+          from mathworkstation.case_manager import CaseManager
+          from mathworkstation.artifact_registry import ArtifactRegistry
+          from mathworkstation.datasets import DatasetRegistry
+          from mathworkstation.claims import ClaimRegistry
+          cases = CaseManager(root); artifacts = ArtifactRegistry(cases)
+          datasets = DatasetRegistry(cases, artifacts); claims = ClaimRegistry(cases, artifacts, datasets)
+          active = artifacts.list_artifacts(case_id)
+          protocol = [a for a in active if a["artifact_type"] == "modeling_protocol" and a["status"] == "ACTIVE"][-1]
+          comparison = [a for a in active if a["artifact_type"] == "model_comparison" and a["status"] == "ACTIVE"][-1]
+          run = lambda *args: subprocess.run(["python", "-m", "mathworkstation.cli", "--output-root", root, *args], check=True)
+          run("assess-modeling-evidence", "--case-id", case_id,
+              "--protocol-artifact-id", protocol["artifact_id"], "--comparison-artifact-id", comparison["artifact_id"])
+          run("approve-modeling-evidence", "--case-id", case_id,
+              "--protocol-artifact-id", protocol["artifact_id"], "--comparison-artifact-id", comparison["artifact_id"],
+              "--approved-by", "ci", "--note", "CI modeling-smoke evidence promotion")
+          selection = [c for c in claims.list_claims(case_id)
+                       if c["claim_type"] == "model_selection" and comparison["artifact_id"] in c["evidence_artifact_ids"]]
+          assert len(selection) == 1, f"expected exactly one model_selection claim for the current comparison, got {len(selection)}"
+          run("recheck-claim-evidence", "--case-id", case_id, "--claim-id", selection[0]["claim_id"], "--checked-by", "ci")
+          final = claims.get(case_id, selection[0]["claim_id"])
+          assert final["status"] == "VERIFIED", f"claim did not become VERIFIED: {final['status']} {final.get('restrictions')}"
+          print("VERIFIED winning-model claim:", final["claim_id"])
+          EOF
+      - name: validate-case -- no hash drift after the modeling chain
+        run: python -m mathworkstation.cli --output-root /tmp/ci-smoke validate-case --case-id "$CASE_ID"
+
+  full-deterministic-paper-smoke:
+    # SCOPED SMOKE #2 of 2: the ENTIRE workstation path, in legal production
+    # DAG order, with zero LLM/API calls -- input_validation -> data
+    # registration -> data_quality/profile -> EDA -> model plan -> comparison
+    # -> selection -> sensitivity -> evidence promotion -> full paper (12
+    # sections, 4 embedded figures) -> consistency gate -> submission
+    # preflight -> audit export -> validate-case twice (hash-drift). Driven
+    # by ONE shared script (scripts/run_full_deterministic_smoke.py) so the
+    # full workflow is not duplicated across divergent YAML blocks.
+    name: Full deterministic paper smoke (whole DAG, no LLM key)
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install (dev only)
+        run: pip install -e ".[dev]"
+      - name: DAG-order regression tests (profiling is gated, order is walkable)
+        run: pytest tests/test_full_smoke_dag_order.py -ra -v
+      - name: Run the full deterministic paper smoke (legal DAG order, real fits, real paper)
+        run: python scripts/run_full_deterministic_smoke.py /tmp/ci-full-smoke
