@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "policy": "extract_patterns_only",
+  "sources": [
+    {
+      "name": "MathModelAgent",
+      "url": "https://github.com/jihe520/MathModelAgent",
+      "license_status": "review_required",
+      "adopted_patterns": ["multi_agent_roles", "code_interpreter", "human_in_loop", "fallback_handoff", "skill_workflow", "output_layout"]
+    },
+    {
+      "name": "LLM-MM-Agent",
+      "url": "https://github.com/usail-hkust/LLM-MM-Agent",
+      "license_status": "GPL-3.0-review-required",
+      "adopted_patterns": ["modeling_agent", "coding_agent", "analysis_agent", "paper_agent", "project_management"]
+    },
+    {
+      "name": "MathModel-Skill",
+      "url": "https://github.com/yushui2022/MathModel-Skill",
+      "license_status": "review_required",
+      "adopted_patterns": ["workflow_contracts", "paper_output_layout", "format_checks", "domain_skill_split", "demo_walkthrough"]
+    },
+    {
+      "name": "AI-Scientist",
+      "url": "https://github.com/SakanaAI/AI-Scientist",
+      "license_status": "Apache-2.0",
+      "adopted_patterns": ["idea_to_experiment", "generated_code_artifact", "run_logs", "review_artifact", "example_paper_bundle"]
+    },
+    {
+      "name": "STORM",
+      "url": "https://github.com/stanford-oval/storm",
+      "license_status": "Apache-2.0",
+      "adopted_patterns": ["multi_perspective_research", "question_driven_retrieval", "knowledge_curation", "collaborative_research"]
+    },
+    {
+      "name": "PaperQA",
+      "url": "https://github.com/Future-House/paper-qa",
+      "license_status": "MIT",
+      "adopted_patterns": ["source_grounded_qa", "citation_evidence", "configurable_prompts", "held_out_evaluation", "index_reuse"]
+    },
+    {
+      "name": "AI Agent Evals",
+      "url": "https://github.com/microsoft/ai-agent-evals",
+      "license_status": "MIT",
+      "adopted_patterns": ["agent_evaluation", "model_judge_plus_metrics", "ci_evaluation"]
+    },
+    {
+      "name": "CUMCM-Paper-And-SourceCode",
+      "url": "https://github.com/yan-fanyu/CUMCM-Paper-And-SourceCode",
+      "license_status": "review_required",
+      "adopted_patterns": ["problem_paper_pairing", "paper_code_alignment", "competition_case_benchmark"]
+    },
+    {
+      "name": "AutoGen",
+      "url": "https://github.com/microsoft/autogen",
+      "license_status": "MIT-and-LGPL-components-review-required",
+      "adopted_patterns": ["tool_workbench", "multi_agent_handoff", "human_oversight", "bounded_tool_iterations"]
+    },
+    {
+      "name": "LangGraph",
+      "url": "https://github.com/langchain-ai/langgraph",
+      "license_status": "MIT",
+      "adopted_patterns": ["durable_execution", "checkpoint_resume", "state_transitions", "interrupt_for_approval"]
+    },
+    {
+      "name": "LlamaIndex",
+      "url": "https://github.com/run-llama/llama_index",
+      "license_status": "MIT",
+      "adopted_patterns": ["document_connectors", "structured_ingestion", "retrieval_index", "integration_boundary"]
+    },
+    {
+      "name": "OpenHands",
+      "url": "https://github.com/All-Hands-AI/OpenHands",
+      "license_status": "MIT-and-component-review-required",
+      "adopted_patterns": ["backend_profiles", "sandbox_boundary", "automation_triggers", "artifact_workspace"]
+    },
+    {
+      "name": "AgentLaboratory",
+      "url": "https://github.com/SamuelSchmidgall/AgentLaboratory",
+      "license_status": "Apache-2.0",
+      "adopted_patterns": ["literature_experiment_report_phases", "copilot_mode", "resource_notes", "latex_preflight"]
+    }
+  ]
+}

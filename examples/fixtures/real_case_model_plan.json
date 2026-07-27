@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "purpose": "对比线性、正则化线性与集成模型在小样本强共线性临床数据上的一年期病情进展预测能力，并为风险分层提供可复现的预测基准",
+  "dataset_id": "REPLACE_AFTER_REGISTRATION",
+  "task_type": "regression",
+  "target_column": "progression",
+  "feature_columns": ["age", "sex", "bmi", "bp", "s1", "s2", "s3", "s4", "s5", "s6"],
+  "candidate_models": [
+    {
+      "name": "linear",
+      "parameters": {},
+      "rationale": "作为无正则化基准，暴露 s1/s2 与 s3/s4 共线性带来的系数不稳定"
+    },
+    {
+      "name": "ridge",
+      "parameters": {"alpha": 1.0},
+      "rationale": "L2 正则化压缩共线性方向的系数方差，是本类临床数据的常规稳健选择"
+    },
+    {
+      "name": "lasso",
+      "parameters": {"alpha": 0.5},
+      "rationale": "L1 正则化同时完成特征选择，用于验证问题一的特征筛选结论"
+    },
+    {
+      "name": "random_forest",
+      "parameters": {"n_estimators": 300, "max_depth": 6},
+      "rationale": "提供非线性与交互作用的对照，检验线性假设是否损失了信息"
+    },
+    {
+      "name": "gradient_boosting",
+      "parameters": {"n_estimators": 200, "max_depth": 3, "learning_rate": 0.05},
+      "rationale": "梯度提升作为强非线性对照，检验小样本下是否过拟合"
+    }
+  ],
+  "primary_metric": "rmse",
+  "cv_folds": 5,
+  "test_size": 0.2,
+  "random_seed": 42,
+  "sensitivity_fractions": [0.6, 0.8, 1.0],
+  "paper_eligible": false
+}
