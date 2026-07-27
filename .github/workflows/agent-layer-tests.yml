@@ -1,6 +1,6 @@
 name: agent-layer-tests
 
-# Five jobs, each pinning one distinct claim this project makes:
+# Six jobs, each pinning one distinct claim this project makes:
 #
 #   full-suite-all-extras -- the WHOLE test suite, with every optional extra
 #                      installed ([dev,ui,langgraph]), on every supported
@@ -12,7 +12,12 @@ name: agent-layer-tests
 #                      requesting langgraph fails non-zero.
 #   langgraph-env  -- the [langgraph] extra installs and the LangGraph runtime
 #                      actually runs (not just importable -- executed), auto
-#                      selects it, and compare-agent-runtimes is conformant.
+#                      selects it, and compare-agent-runtimes is conformant on a
+#                      POPULATED case. The case is walked (input_validation ->
+#                      data_registration approved) and a dataset is registered
+#                      before comparison, so conformance proves BOTH runtimes
+#                      executed the agent roster -- NOT a trivial both-halt on a
+#                      dataset-less case (which would also yield differences==[]).
 #   agent-modeling-smoke -- SCOPED to the bounded modeling SUBGRAPH: protocol
 #                      -> 3 candidates -> evaluation -> judge -> adjudicator
 #                      -> evidence promotion -> exactly one VERIFIED claim.
@@ -21,6 +26,11 @@ name: agent-layer-tests
 #                      production order, ending in a real paper, submission
 #                      preflight and two hash-drift-free validate-case runs.
 #                      Driven by one shared script, not duplicated YAML.
+#   windows-publish-dryrun -- runs scripts/publish-m1-branch.ps1 -SkipPush
+#                      -SkipRemote on a real Windows runner, exercising the
+#                      heavy verification (deps, full pytest, runtime identity,
+#                      NON-TRIVIAL conformance, modeling smoke, full paper
+#                      smoke) without any commit/push/network/branch switch.
 #
 # The two smokes are deliberately distinct: a modeling-subgraph smoke is not
 # a complete deterministic workstation smoke, and neither is named as if it
@@ -120,25 +130,67 @@ jobs:
           python -c "import importlib.metadata as m; print('langgraph version:', m.version('langgraph'))"
       - name: Run the full real pytest suite (langgraph present)
         run: pytest -v
-      - name: run-agent-pipeline with --runtime langgraph on a fresh case
+      - name: Populate a case so BOTH runtimes execute the agent roster (conformance must NOT be a trivial both-halt)
         run: |
-          python -m mathworkstation.cli --output-root /tmp/ci-langgraph create-case --competition CUMCM --title "CI langgraph smoke" --language zh > /tmp/case.json
+          set -euo pipefail
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph create-case --competition CUMCM --title "CI langgraph conformance" --language zh > /tmp/case.json
           CASE_ID=$(python -c "import json;print(json.load(open('/tmp/case.json'))['case_id'])")
           echo "CASE_ID=$CASE_ID" >> "$GITHUB_ENV"
-          python -m mathworkstation.cli --output-root /tmp/ci-langgraph run-agent-pipeline --case-id "$CASE_ID" --runtime langgraph
-      - name: --runtime auto must select langgraph here (and succeed)
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph start-node --case-id "$CASE_ID" --node-id input_validation
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph succeed-node --case-id "$CASE_ID" --node-id input_validation
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph register-dataset --case-id "$CASE_ID" --name diabetes --kind OBSERVED --source examples/fixtures/diabetes_progression.csv --description "CI fixture" > /tmp/dataset.json
+          DATASET_ID=$(python -c "import json;print(json.load(open('/tmp/dataset.json'))['dataset_id'])")
+          echo "DATASET_ID=$DATASET_ID" >> "$GITHUB_ENV"
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph complete-data-registration --case-id "$CASE_ID"
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph approve-node --case-id "$CASE_ID" --node-id data_registration --approved-by ci
+      - name: compare-agent-runtimes -- builtin vs LangGraph must be conformant on the POPULATED case
         run: |
-          python -m mathworkstation.cli --output-root /tmp/ci-langgraph run-agent-pipeline --case-id "$CASE_ID" --runtime auto
-      - name: compare-agent-runtimes -- builtin vs LangGraph must be conformant
-        run: |
-          python -m mathworkstation.cli --output-root /tmp/ci-langgraph compare-agent-runtimes --case-id "$CASE_ID" --report /tmp/runtime-diff.json
+          set -euo pipefail
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph compare-agent-runtimes --case-id "$CASE_ID" --dataset-id "$DATASET_ID" --target-column progression --report /tmp/runtime-diff.json
           echo "conformant (exit 0). Report:"
           cat /tmp/runtime-diff.json
+          python -c "import json;d=json.load(open('/tmp/runtime-diff.json'));assert d['differences']==[],'conformance failed: '+json.dumps(d['differences'],ensure_ascii=False)[:500]"
+      - name: run-agent-pipeline with --runtime langgraph executes the full roster on the populated case
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph run-agent-pipeline --case-id "$CASE_ID" --runtime langgraph --dataset-id "$DATASET_ID" --target-column progression
+      - name: --runtime auto must select langgraph here (and succeed)
+        run: |
+          python -m mathworkstation.cli --output-root /tmp/ci-langgraph run-agent-pipeline --case-id "$CASE_ID" --runtime auto --dataset-id "$DATASET_ID" --target-column progression
       - name: Upload the runtime-conformance report
         uses: actions/upload-artifact@v4
         with:
           name: runtime-conformance
           path: /tmp/runtime-diff.json
+
+  windows-publish-dryrun:
+    # Validates scripts/publish-m1-branch.ps1 on a real Windows runner WITHOUT
+    # touching the network, switching branches, or requiring gh auth. The script
+    # itself exercises the heavy verification (dependency install, full pytest,
+    # runtime identity on a POPULATED case, NON-TRIVIAL runtime conformance,
+    # modeling smoke, full deterministic paper smoke). -SkipPush stops it before
+    # any commit/push/PR, and -SkipRemote skips the git/remote/branch phases.
+    # This is the CI substitute for the local `pwsh -File ... -SkipPush` dry run.
+    name: Windows publish dry-run (PowerShell -SkipPush -SkipRemote)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install with dev + ui + langgraph extras
+        run: pip install -e ".[dev,ui,langgraph]"
+      - name: Run the publish dry-run (no push, no remote ops)
+        shell: pwsh
+        run: ./scripts/publish-m1-branch.ps1 -SkipPush -SkipRemote
+      - name: Upload the dry-run transcript and artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-publish-dryrun
+          path: |
+            verification-run.log
+            artifacts/
 
   agent-modeling-smoke:
     # SCOPED SMOKE #1 of 2: the bounded modeling SUBGRAPH only (protocol ->
