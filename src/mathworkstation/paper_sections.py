@@ -10,6 +10,7 @@ from .claims import ClaimRegistry
 from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso, read_json
 from .paper_outline import PaperOutline, section_contract
+from .paper_contracts import PaperContractService
 
 
 class PaperSectionWorkspace:
@@ -19,11 +20,13 @@ class PaperSectionWorkspace:
         artifacts: ArtifactRegistry,
         claims: ClaimRegistry,
         figures: FigureRegistry,
+        contracts: PaperContractService | None = None,
     ) -> None:
         self.cases = cases
         self.artifacts = artifacts
         self.claims = claims
         self.figures = figures
+        self.contracts = contracts
 
     def initialize(self, case_id: str, outline_artifact_id: str) -> dict[str, Any]:
         outline_artifact = self.artifacts.get(case_id, outline_artifact_id)
@@ -47,6 +50,11 @@ class PaperSectionWorkspace:
                 "section_contract": section_contract(section.section_id),
                 "allowed_claims": [known_claims[claim_id] for claim_id in section.claim_ids],
                 "allowed_figures": [known_figures[figure_id] for figure_id in section.figure_ids],
+                "section_evidence_pack": (
+                    self.contracts.build_section_pack(case_id, section.section_id).model_dump(mode="json")
+                    if self.contracts
+                    else {"section_id": section.section_id, "subproblems": [], "results": [], "tables": []}
+                ),
                 "evidence_pack": _build_evidence_pack(
                     root,
                     self.artifacts,

@@ -60,7 +60,12 @@ class DataService:
             derived_from=derived_from,
             description=description,
         )
-        return {"artifact": artifact, "dataset": dataset}
+        return {
+            "artifact": artifact,
+            "dataset": dataset,
+            "dataset_id": dataset["dataset_id"],
+            "artifact_id": artifact["artifact_id"],
+        }
 
     def register_artifact(
         self,

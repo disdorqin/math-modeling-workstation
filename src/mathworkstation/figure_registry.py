@@ -69,3 +69,46 @@ class FigureRegistry:
         append_jsonl(self.registry_path(case_id), figure)
         return figure
 
+    def get(self, case_id: str, figure_id: str) -> dict[str, Any]:
+        for figure in self.list_figures(case_id):
+            if figure["figure_id"] == figure_id:
+                return figure
+        raise KeyError(f"figure not found: {figure_id}")
+
+    def promote(
+        self,
+        case_id: str,
+        figure_id: str,
+        approval_artifact_id: str,
+        approved_by: str,
+        note: str,
+    ) -> dict[str, Any]:
+        """Promote a DRAFT figure to FINAL after an explicit human evidence decision.
+
+        Deterministic engines (EDA, baseline, model comparison, sensitivity) always
+        register figures as DRAFT so that no plot silently becomes paper evidence.
+        A figure only becomes citable in an outline once a human ties it to an
+        existing ``paper_ready_approval`` artifact through this method.
+        """
+        if not note.strip():
+            raise ValueError("figure promotion requires a note")
+        figure = self.get(case_id, figure_id)
+        approval = self.artifacts.get(case_id, approval_artifact_id)
+        if approval["artifact_type"] != "paper_ready_approval":
+            raise ValueError(
+                f"approval artifact is not a paper_ready_approval: {approval_artifact_id}"
+            )
+        if figure["status"] == "FINAL":
+            return figure
+        self.artifacts.promote_to_paper(case_id, figure["artifact_id"], approval_artifact_id)
+        promoted = {
+            **figure,
+            "status": "FINAL",
+            "paper_ready_approval_id": approval_artifact_id,
+            "approved_by": approved_by,
+            "approval_note": note,
+            "updated_at": now_iso(),
+        }
+        append_jsonl(self.registry_path(case_id), promoted)
+        return promoted
+

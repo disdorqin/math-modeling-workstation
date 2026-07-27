@@ -110,6 +110,29 @@ class WorkflowService:
         self.memory.build_resume_brief(case_id, controller.snapshot())
         return controller.snapshot()["nodes"][node_id]
 
+    def degrade_node(
+        self,
+        case_id: str,
+        node_id: str,
+        approved_by: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        controller = self.checkpoints.load(case_id)
+        controller.degrade(node_id, approved_by, reason)
+        self.checkpoints.save(case_id, controller, reason=f"node_degraded:{node_id}")
+        append_jsonl(
+            self.cases.case_root(case_id) / "decisions.jsonl",
+            {
+                "timestamp": now_iso(),
+                "event": "node_degraded",
+                "node_id": node_id,
+                "approved_by": approved_by,
+                "reason": reason,
+            },
+        )
+        self.memory.build_resume_brief(case_id, controller.snapshot())
+        return controller.snapshot()["nodes"][node_id]
+
     def mark_stale(self, case_id: str, node_id: str, reason: str) -> dict[str, Any]:
         controller = self.checkpoints.load(case_id)
         controller.mark_stale(node_id, reason)

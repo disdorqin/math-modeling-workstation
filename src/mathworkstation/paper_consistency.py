@@ -16,6 +16,14 @@ CLAIM_REF = re.compile(r"claim-[a-f0-9]{12}")
 FIGURE_REF = re.compile(r"figure-[a-f0-9]{12}")
 NUMBER = re.compile(r"(?<![A-Za-z0-9_-])[-+]?\d+(?:\.\d+)?%?")
 PLACEHOLDER = re.compile(r"\[(?:SECTION_DRAFT_PENDING|NEEDS_EVIDENCE|TODO|TBD)\]")
+# Inline and display math carry structural digits (subscripts, exponents, norms
+# such as $L_2$ or $\lVert\beta\rVert_1$) that are notation, not empirical
+# results. Scanning them for unattributed numbers produces pure false positives,
+# so math spans are removed before the number scan.
+MATH_SPAN = re.compile(
+    r"\$\$.*?\$\$|\$[^$\n]*\$|\\begin\{[^}]*\}.*?\\end\{[^}]*\}",
+    re.DOTALL,
+)
 INTERNAL_ARTIFACT_REF = re.compile(r"\bartifact-[a-f0-9]{12}\b")
 BOILERPLATE = "本节暂无已登记证据"
 
@@ -71,7 +79,7 @@ class PaperConsistencyChecker:
             body_for_number_scan = "\n".join(
                 line for line in content.splitlines() if not line.lstrip().startswith("#")
             )
-            numbers = NUMBER.findall(body_for_number_scan)
+            numbers = NUMBER.findall(MATH_SPAN.sub(" ", body_for_number_scan))
             for claim_id in sorted(cited_claims):
                 if claim_id not in known_claims:
                     findings.append(_finding("BLOCK", section_id, "UNKNOWN_CLAIM", claim_id))

@@ -10,6 +10,7 @@ from .baseline import BaselineEngine
 from .case_manager import CaseManager
 from .checkpoint_manager import CheckpointManager
 from .claims import ClaimInput, ClaimRegistry
+from .control_plane import ControlPlane
 from .data_quality import TabularProfiler
 from .data_service import DataService
 from .datasets import DatasetKind, DatasetRegistry
@@ -32,6 +33,16 @@ from .paper_consistency import PaperConsistencyChecker
 from .paper_outline import PaperOutlineService, default_outline
 from .paper_ready import PaperReadyGate
 from .paper_sections import PaperSectionWorkspace
+from .paper_contracts import (
+    AssumptionRecord,
+    DataSemanticRecord,
+    DiagnosticRecord,
+    PaperContractService,
+    StorylineRecord,
+    SubproblemAnswerRecord,
+    SubproblemContract,
+)
+from .review_engine import ReviewEngine
 from .problem_ingestion import ProblemIngestionService
 from .research_audit import ResearchAuditService
 from .refinement import RefinementConfig, RefinementService
@@ -41,7 +52,11 @@ from .sensitivity import SensitivityEngine
 from .session_manager import SessionManager
 from .stage_service import StageService
 from .structured_llm import ModelPlanProposal, PaperRefinementProposal, ProblemAnalysis, StructuredLLM
+from .submission import SubmissionService
 from .tabular import read_table
+from .task_executors import TaskExecutionService
+from .task_paper_bridge import TaskPaperEvidenceBridge
+from .task_paper_pipeline import TaskPaperPipelineService
 from .workflow_service import WorkflowService
 from .workflow import FailureCategory
 from .io_utils import atomic_write_json, atomic_write_text, read_json
@@ -68,6 +83,13 @@ class AutoPipelineService:
         )
         self.experiments = ExperimentRegistry(cases, self.artifacts)
         self.claims = ClaimRegistry(cases, self.artifacts, self.datasets)
+        self.contracts = PaperContractService(cases, self.artifacts)
+        self.control = ControlPlane(cases)
+        self.reviews = ReviewEngine(cases, self.artifacts)
+        self.task_execution = TaskExecutionService(cases, self.artifacts)
+        self.task_paper_bridge = TaskPaperEvidenceBridge(
+            cases, self.artifacts, self.task_execution, self.contracts, self.claims, self.figures
+        )
         self.data = DataService(self.artifacts, self.datasets, TabularProfiler(cases, self.artifacts, self.datasets), self.workflow)
         self.modeling = ModelingService(
             self.workflow,
@@ -83,15 +105,70 @@ class AutoPipelineService:
             ModelSelectionRegistry(cases, self.artifacts, self.experiments),
         )
         self.stages = StageService(cases, self.artifacts, self.workflow)
-        self.sections = PaperSectionWorkspace(cases, self.artifacts, self.claims, self.figures)
+        self.sections = PaperSectionWorkspace(cases, self.artifacts, self.claims, self.figures, self.contracts)
         self.outlines = PaperOutlineService(cases, self.artifacts, self.claims, self.figures)
         self.paper_ready = PaperReadyGate(cases, self.artifacts, self.experiments)
         self.consistency = PaperConsistencyChecker(cases, self.artifacts, self.claims, self.figures, strict=True)
         self.exporter = ExportService(cases, self.artifacts, self.workflow)
+        self.submission = SubmissionService(cases, self.artifacts)
         self.ingestion = ProblemIngestionService(cases, self.artifacts)
         self.llm = StructuredLLM(CaseLLMService(cases, self.artifacts, self.sessions, self.checkpoints, llm_router))
         self.research = ResearchAuditService(cases, self.artifacts, self.datasets)
         self.refinement = RefinementService(cases, self.artifacts, self.workflow, self.runs)
+        self.task_paper_pipeline = TaskPaperPipelineService(
+            cases,
+            self.artifacts,
+            self.task_paper_bridge,
+            self.contracts,
+            self.claims,
+            self.figures,
+            self.outlines,
+            self.sections,
+            self.stages,
+            self.consistency,
+            self.submission,
+        )
+
+    def execute_task_family(
+        self,
+        case_id: str,
+        family: str,
+        plan: dict[str, Any],
+        frame: Any | None = None,
+        dataset_ids: list[str] | None = None,
+        source_artifact_ids: list[str] | None = None,
+        created_by: str = "human",
+    ) -> dict[str, Any]:
+        """Run a non-bootstrap task family and project it into paper evidence."""
+        self.control.initialize_budget(case_id)
+        self.control.consume(case_id, experiments=1, artifacts=1)
+        return self.task_paper_bridge.execute_and_register(
+            case_id,
+            family,
+            plan,
+            frame,
+            dataset_ids,
+            source_artifact_ids,
+            created_by,
+        )
+
+    def run_task_paper_pipeline(
+        self,
+        case_id: str,
+        family: str,
+        plan: dict[str, Any],
+        frame: Any | None = None,
+        title: str | None = None,
+        dataset_ids: list[str] | None = None,
+        source_artifact_ids: list[str] | None = None,
+        created_by: str = "human",
+        competition_type: str = "SM",
+    ) -> dict[str, Any]:
+        self.control.initialize_budget(case_id)
+        self.control.consume(case_id, experiments=1, artifacts=1)
+        return self.task_paper_pipeline.run(
+            case_id, family, plan, frame, title, dataset_ids, source_artifact_ids, created_by, competition_type
+        )
 
     def run(
         self,
@@ -109,6 +186,7 @@ class AutoPipelineService:
         data_description: str = "",
         refinement_config: RefinementConfig | None = None,
     ) -> dict[str, Any]:
+        self.control.initialize_budget(case_id)
         problem = self.ingestion.ingest(case_id, problem_source)
         data = self.data.register_uploaded(
             case_id,
@@ -126,6 +204,10 @@ class AutoPipelineService:
 
         problem_analysis, problem_response = self._run_problem_analysis(case_id, session_id, problem_artifact_id, competition_type, approved_by)
         problem_analysis_artifact_id = problem_response["artifact_id"]
+        self.contracts.persist_subproblems(
+            case_id,
+            _complete_subproblem_contracts(problem_analysis.subproblems, problem_analysis_artifact_id),
+        )
         self.data.complete_registration(case_id, session_id)
         self.workflow.approve_node(case_id, "data_registration", approved_by, "Dataset provenance reviewed")
         profile = self.data.profile_dataset(case_id, dataset_id, target_column, session_id)
@@ -139,10 +221,12 @@ class AutoPipelineService:
         baseline = self.modeling.run_baseline(case_id, dataset_id, plan_result["plan"]["target_column"], plan_result["plan"]["feature_columns"], plan_result["plan"]["task_type"], plan_result["plan"]["test_size"], plan_result["plan"]["random_seed"], session_id)
         if not baseline["succeeded"]:
             raise ValueError(f"baseline failed: {baseline['error']}")
+        self.control.consume(case_id, experiments=1, artifacts=1)
         comparison = self.evaluation.run_comparison(case_id, plan_artifact_id, session_id)
         experiment_id = comparison["result"]["experiment_id"]
         selection = self.evaluation.select_model(case_id, experiment_id, comparison["result"]["best_model"], comparison["result"]["comparison_artifact_id"], approved_by, "Selected best validated primary metric result", session_id)
         sensitivity = self.evaluation.run_sensitivity(case_id, experiment_id, plan_artifact_id, None, session_id)
+        self.control.consume(case_id, experiments=2, artifacts=2)
         workflow_figure = self.flowcharts.create(
             case_id,
             [problem_artifact_id, data["artifact"]["artifact_id"], plan_artifact_id, comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]],
@@ -174,13 +258,39 @@ class AutoPipelineService:
         if not assessment["eligible"]:
             raise ValueError(f"paper ready gate failed: {assessment['reasons']}")
         ready = self.paper_ready.approve(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], approved_by, "Automated evidence chain reviewed", additional_evidence)
+        self.control.approve(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor", ready["approval_artifact_id"])
+        result_records, comparison_table, comparison_table_artifact = self._register_result_evidence(
+            case_id, dataset_id, experiment_id, comparison["result"], sensitivity["result"]
+        )
+        self._register_content_evidence(
+            case_id,
+            dataset_id,
+            problem_analysis.subproblems,
+            problem_analysis_artifact_id,
+            plan_result,
+            comparison["result"],
+            sensitivity["result"],
+            result_records,
+        )
+        comparison_results = [item for item in result_records if item.result_type == "MODEL_COMPARISON"]
+        sensitivity_results = [item for item in result_records if item.result_type == "SENSITIVITY"]
+        metric_text = "，".join(
+            f"{item.metric.upper()} 均值为 {item.formatted_value()}"
+            + (f"（标准差 {item.std:.6f}）" if item.std is not None else "")
+            for item in comparison_results
+        )
+        sensitivity_text = "，".join(
+            f"数据比例 {item.metadata['fraction']:.2f} 下 {item.metric.upper()} 均值为 {item.formatted_value()}"
+            + (f"（标准差 {item.std:.6f}）" if item.std is not None else "")
+            for item in sensitivity_results
+        )
         claim_map = {
-            "problem_restated": self.claims.create(case_id, ClaimInput(text="The problem analysis was extracted from the declared problem artifact and retained as structured evidence.", claim_type="problem_analysis", evidence_artifact_ids=[problem_analysis_artifact_id], section_hint="problem_restated"), approved_by),
-            "data_analysis": self.claims.create(case_id, ClaimInput(text="The dataset profiling and exploratory analysis artifacts passed the declared data quality workflow.", claim_type="data_quality", evidence_artifact_ids=[profile["profile_artifact_id"], profile["report_artifact_id"], eda["result"]["summary_artifact_id"], eda["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="data_analysis"), approved_by),
-            "model_construction": self.claims.create(case_id, ClaimInput(text="The model plan was validated against the dataset schema and the research audit recorded feature and split decisions before formal comparison.", claim_type="model_plan", evidence_artifact_ids=[plan_artifact_id, plan_result["report_artifact_id"], plan_result["research_audit_artifact_id"], plan_result["research_audit_report_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_construction"), approved_by),
-            "model_solution": self.claims.create(case_id, ClaimInput(text=f"The declared candidate models were evaluated using the reproducible experiment pipeline; {comparison['result']['best_model']} ranked first under the selected metric.", claim_type="model_comparison", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], comparison["result"]["diagnostics_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_solution"), approved_by),
-            "results": self.claims.create(case_id, ClaimInput(text=f"The validated comparison selected {comparison['result']['best_model']} as the best model under the declared primary metric.", claim_type="model_result", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"]], dataset_ids=[dataset_id], section_hint="results"), approved_by),
-            "sensitivity": self.claims.create(case_id, ClaimInput(text="The sensitivity analysis completed across the declared sample fractions and random seeds with a recorded gate.", claim_type="sensitivity", evidence_artifact_ids=[sensitivity["result"]["artifact_id"], sensitivity["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="sensitivity"), approved_by),
+            "problem_restated": self.claims.create(case_id, ClaimInput(text="题目分析已从登记的问题材料中提取，并形成可追踪的目标与子问题合同。", claim_type="problem_analysis", evidence_artifact_ids=[problem_analysis_artifact_id], section_hint="problem_restated", subproblem_ids=[item.subproblem_id for item in self.contracts.list_subproblems(case_id)]), approved_by),
+            "data_analysis": self.claims.create(case_id, ClaimInput(text="数据画像与探索性分析已完成缺失、重复、字段及分布检查，相关结论仅适用于登记的数据范围。", claim_type="data_quality", evidence_artifact_ids=[profile["profile_artifact_id"], profile["report_artifact_id"], eda["result"]["summary_artifact_id"], eda["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="data_analysis"), approved_by),
+            "model_construction": self.claims.create(case_id, ClaimInput(text="候选模型方案已根据数据字段完成验证，并在正式比较前登记特征、划分方式与评价指标。", claim_type="model_plan", evidence_artifact_ids=[plan_artifact_id, plan_result["report_artifact_id"], plan_result["research_audit_artifact_id"], plan_result["research_audit_report_artifact_id"]], dataset_ids=[dataset_id], section_hint="model_construction"), approved_by),
+            "model_solution": self.claims.create(case_id, ClaimInput(text=f"候选模型经过可复现实验比较，{comparison['result']['best_model']} 在主指标排序中位列第一；{metric_text}。", claim_type="model_comparison", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], comparison["result"]["diagnostics_artifact_id"], comparison_table_artifact["artifact_id"]], dataset_ids=[dataset_id], section_hint="model_solution", result_record_ids=[item.result_id for item in comparison_results], table_record_ids=[comparison_table.table_id]), approved_by),
+            "results": self.claims.create(case_id, ClaimInput(text=f"模型比较选择 {comparison['result']['best_model']} 为当前最优方案；{metric_text}，完整候选模型比较见表 [{comparison_table.table_id}]。", claim_type="model_result", evidence_artifact_ids=[comparison["result"]["comparison_artifact_id"], sensitivity["result"]["artifact_id"], comparison_table_artifact["artifact_id"]], dataset_ids=[dataset_id], section_hint="results", result_record_ids=[item.result_id for item in comparison_results], table_record_ids=[comparison_table.table_id]), approved_by),
+            "sensitivity": self.claims.create(case_id, ClaimInput(text=f"敏感性实验覆盖预设样本比例与随机种子，门控结果为 {sensitivity['result']['summary']['gate']}；{sensitivity_text}。", claim_type="sensitivity", evidence_artifact_ids=[sensitivity["result"]["artifact_id"], sensitivity["result"]["report_artifact_id"]], dataset_ids=[dataset_id], section_hint="sensitivity", result_record_ids=[item.result_id for item in sensitivity_results]), approved_by),
         }
         claim = claim_map["results"]
         claim_ids = {key: value["claim_id"] for key, value in claim_map.items()}
@@ -211,8 +321,21 @@ class AutoPipelineService:
             lambda context: self._propose_refinement(case_id, session_id, context),
             refinement_config,
         )
+        final_text = (self.cases.case_root(case_id) / "paper" / "final.md").read_text(encoding="utf-8")
+        complete_paper, complete_paper_artifact = self.contracts.write_assessment(case_id, final_text)
+        if complete_paper.gate != "PASS":
+            raise ValueError(f"complete paper contract failed: {complete_paper.issue_codes}")
+        review = self.reviews.review(case_id, final_text, self.contracts)
+        if review["report"]["gate"] == "BLOCK":
+            raise ValueError(f"final review blocked: {[item['code'] for item in review['report']['issues']]}")
+        repair_requests = self.reviews.create_repair_requests(case_id, review["report"]["issues"])
+        self.control.approve(case_id, "final_review", approved_by, "Complete-paper contract and full review passed", complete_paper_artifact["artifact_id"])
         self._complete_review(case_id, session_id, approved_by)
+        submission = self.submission.prepare(case_id, competition_type)
+        if submission["preflight"]["gate"] != "PASS":
+            raise ValueError(f"submission preflight failed: {submission['preflight']['findings']}")
         export = self.exporter.export_case(case_id, session_id)
+        export["submission"] = self.exporter.export_submission(case_id)
         return {
             "case_id": case_id,
             "session_id": session_id,
@@ -222,6 +345,10 @@ class AutoPipelineService:
             "paper_artifact_id": paper["artifact"]["artifact_id"],
             "paper_final_artifact_id": refinement["paper_final_artifact_id"],
             "consistency_artifact_id": consistency["result"]["report_artifact_id"],
+            "complete_paper_artifact_id": complete_paper_artifact["artifact_id"],
+            "full_review_artifact_id": review["artifact"]["artifact_id"],
+            "repair_request_ids": [item.request_id for item in repair_requests],
+            "submission": submission,
             "refinement": refinement,
             "export": export,
         }
@@ -367,6 +494,7 @@ class AutoPipelineService:
             content = content.replace("[TODO]", "本节待基于新增证据补充。")
             content = content.replace("[TBD]", "本节待基于新增证据补充。")
             content = _polish_section_draft(section_id, content, context)
+            content = _inject_typed_evidence(content, context)
             if section_id == "abstract":
                 content = _ensure_abstract_quality(content, context)
             elif section_id == "problem_restated":
@@ -377,11 +505,148 @@ class AutoPipelineService:
                 figure_ref = figure["figure_id"]
                 if figure_ref not in content:
                     content += f"\n\n图表证据：{figure['title']} [{figure_ref}]\n\n![{figure['title']}](../{figure['path']})\n"
-            if section_id == "results" and "SYNTHETIC" not in content.upper() and "合成" not in content:
-                content += "\n\n本节结果基于明确标注的 SYNTHETIC 数据，不能外推为真实竞赛结论。"
             if any("synthetic_data_claim" in claim.get("restrictions", []) for claim in context["allowed_claims"]) and "SYNTHETIC" not in content.upper() and "合成" not in content:
                 content += "\n\n本节基于明确标注的 SYNTHETIC 数据，相关结论不外推至真实竞赛数据。"
             self.sections.update_draft(case_id, section_id, content, "llm")
+
+    def _register_result_evidence(
+        self,
+        case_id: str,
+        dataset_id: str,
+        experiment_id: str,
+        comparison: dict[str, Any],
+        sensitivity: dict[str, Any],
+    ) -> tuple[list[Any], Any, dict[str, Any]]:
+        records = []
+        best_model = comparison["best_model"]
+        best = comparison["comparison"]["models"][best_model]
+        for metric in ("rmse", "mae", "r2") if comparison["comparison"]["task_type"] == "regression" else ("accuracy", "macro_f1"):
+            records.append(
+                self.contracts.create_result(
+                    case_id,
+                    result_type="MODEL_COMPARISON",
+                    metric=metric,
+                    value=best[f"{metric}_mean"],
+                    std=best[f"{metric}_std"],
+                    model_name=best_model,
+                    dataset_id=dataset_id,
+                    experiment_id=experiment_id,
+                    direction="MINIMIZE" if metric in {"rmse", "mae"} else "MAXIMIZE",
+                    scope=f"{comparison['comparison']['cv_folds']}-fold cross-validation",
+                    source_artifact_ids=[comparison["comparison_artifact_id"]],
+                    section_ids=["abstract", "model_solution", "results", "conclusion"],
+                )
+            )
+        for item in sensitivity["summary"]["grouped"]:
+            records.append(
+                self.contracts.create_result(
+                    case_id,
+                    result_type="SENSITIVITY",
+                    metric=sensitivity["summary"]["primary_metric"],
+                    value=item["mean"],
+                    std=item["std"],
+                    model_name=sensitivity["summary"]["best_model"],
+                    dataset_id=dataset_id,
+                    experiment_id=experiment_id,
+                    direction="MINIMIZE" if sensitivity["summary"]["primary_metric"] in {"rmse", "mae"} else "MAXIMIZE",
+                    scope="sample-fraction and random-seed sensitivity",
+                    source_artifact_ids=[sensitivity["artifact_id"]],
+                    section_ids=["abstract", "sensitivity", "conclusion"],
+                    metadata={"fraction": item["fraction"], "runs": item["runs"]},
+                )
+            )
+        primary = comparison["comparison"]["primary_metric"]
+        primary_results = [item for item in records if item.result_type == "MODEL_COMPARISON" and item.metric == primary]
+        table, artifact = self.contracts.create_table(
+            case_id,
+            title=f"候选模型 {primary.upper()} 交叉验证比较",
+            columns=["模型", f"{primary.upper()} 均值", "标准差", "稳定性"],
+            rows=[
+                [name, f"{comparison['comparison']['models'][name][f'{primary}_mean']:.6f}", f"{comparison['comparison']['models'][name][f'{primary}_std']:.6f}", comparison['comparison']['models'][name]["stability"]]
+                for name in comparison["comparison"]["ranking"]
+            ],
+            result_ids=[item.result_id for item in primary_results],
+            source_artifact_ids=[comparison["comparison_artifact_id"]],
+            section_ids=["model_solution", "results"],
+        )
+        return records, table, artifact
+
+    def _register_content_evidence(
+        self,
+        case_id: str,
+        dataset_id: str,
+        subproblems: list[SubproblemContract],
+        problem_artifact_id: str,
+        plan_result: dict[str, Any],
+        comparison: dict[str, Any],
+        sensitivity: dict[str, Any],
+        results: list[Any],
+    ) -> None:
+        result_ids = [item.result_id for item in results]
+        assumptions = [
+            AssumptionRecord(
+                assumption_id="assumption-observed-scope",
+                statement="样本字段口径在建模期间保持一致。",
+                source_artifact_ids=[problem_artifact_id, plan_result["plan_artifact_id"]],
+                necessity="保证特征与目标的解释口径一致。",
+                risk="字段口径变化会削弱外推可靠性。",
+                validation="通过数据字段检查与模型方案审核。",
+                affected_sections=["assumptions", "model_construction", "conclusion"],
+            )
+        ]
+        semantics = [
+            DataSemanticRecord(
+                semantic_id=f"semantic-{dataset_id}-{column}",
+                dataset_id=dataset_id,
+                field=column,
+                role="TARGET" if column == plan_result["plan"]["target_column"] else "FEATURE",
+                meaning="目标变量" if column == plan_result["plan"]["target_column"] else "建模特征",
+                decision="进入已登记模型方案。",
+                source_artifact_ids=[plan_result["plan_artifact_id"]],
+            )
+            for column in [*plan_result["plan"]["feature_columns"], plan_result["plan"]["target_column"]]
+        ]
+        diagnostic_values = comparison["diagnostics"]
+        diagnostics = [
+            DiagnosticRecord(
+                diagnostic_id="diagnostic-residual-summary",
+                diagnostic_type="RESIDUAL",
+                metric="residual_std",
+                value=diagnostic_values.get("residual_std"),
+                interpretation=f"残差均值为 {diagnostic_values.get('residual_mean', 0.0):.6f}，残差标准差为 {diagnostic_values.get('residual_std', 0.0):.6f}。",
+                limitation="该诊断基于当前数据与全量拟合，不替代独立外部验证。",
+                source_artifact_ids=[comparison["diagnostics_artifact_id"]],
+            )
+        ]
+        best = comparison["best_model"]
+        primary = comparison["comparison"]["primary_metric"]
+        primary_result = next(item for item in results if item.result_type == "MODEL_COMPARISON" and item.metric == primary)
+        answers = [
+            SubproblemAnswerRecord(
+                answer_id=f"answer-{item.subproblem_id}",
+                subproblem_id=item.subproblem_id,
+                method=f"采用 {best} 候选模型比较与敏感性分析",
+                result_record_ids=[primary_result.result_id, *result_ids],
+                answer=f"在当前数据与实验协议下，{best} 的 {primary.upper()} 均值为 {primary_result.value:.6f}，并完成敏感性检验。",
+                limitation="结论仅适用于当前观测数据、特征口径与实验设置。",
+                source_artifact_ids=[comparison["comparison_artifact_id"], sensitivity["artifact_id"]],
+                section_id="conclusion",
+            )
+            for item in subproblems
+        ]
+        storyline = StorylineRecord(
+            storyline_id="storyline-main",
+            title="问题—证据—结论主线",
+            steps=[
+                {"stage": "问题", "text": "明确目标、变量和子问题。"},
+                {"stage": "方法", "text": f"比较候选模型并选择 {best}。"},
+                {"stage": "证据", "text": f"报告 {primary.upper()}、诊断和敏感性结果。"},
+                {"stage": "结论", "text": "逐条回答子问题并声明外推边界。"},
+            ],
+            subproblem_ids=[item.subproblem_id for item in subproblems],
+            source_record_ids=[item.result_id for item in results],
+        )
+        self.contracts.persist_analysis_records(case_id, assumptions, semantics, diagnostics, answers, storyline)
 
     def _complete_review(self, case_id: str, session_id: str, approved_by: str) -> None:
         self.workflow.start_node(case_id, "final_review", session_id)
@@ -405,6 +670,7 @@ class AutoPipelineService:
             "paper_refinement",
             {
                 "case_id": case_id,
+                "audit_scope_json": context["audit_scope"],
                 "quality_json": context["quality_vector"],
                 "issues_json": context["issues"],
                 "controller_json": context["controller"],
@@ -431,6 +697,71 @@ def _scalarize_parameters(value: Any) -> Any:
             return ordered[len(ordered) // 2]
         return _scalarize_parameters(candidates[0])
     return value
+
+
+def _complete_subproblem_contracts(
+    subproblems: list[SubproblemContract], evidence_artifact_id: str
+) -> list[SubproblemContract]:
+    return [
+        item.model_copy(
+            update={
+                "status": "COMPLETED",
+                "evidence_artifact_ids": list(
+                    dict.fromkeys([*item.evidence_artifact_ids, evidence_artifact_id])
+                ),
+            }
+        )
+        for item in subproblems
+    ]
+
+
+def _inject_typed_evidence(content: str, context: dict[str, Any]) -> str:
+    pack = context.get("section_evidence_pack", {})
+    results = pack.get("results", [])
+    tables = pack.get("tables", [])
+    subproblems = pack.get("subproblems", [])
+    answers = pack.get("answers", [])
+    blocks: list[str] = []
+    if subproblems:
+        lines = [
+            f"- {item['title']}（{item['subproblem_id']}）：{item['objective']}，状态 {item['status']}。"
+            for item in subproblems
+        ]
+        blocks.append("### 子问题合同\n\n" + "\n".join(lines))
+    if results:
+        lines = []
+        for item in results:
+            standard_deviation = (
+                f"，标准差 {item['std']:.6f}" if item.get("std") is not None else ""
+            )
+            model = f"，模型 {item['model_name']}" if item.get("model_name") else ""
+            fraction = (
+                f"，数据比例 {item['metadata']['fraction']:.2f}"
+                if item.get("metadata", {}).get("fraction") is not None
+                else ""
+            )
+            lines.append(
+                f"- {item['metric'].upper()} = {item['value']:.6f}{standard_deviation}{model}{fraction} "
+                f"[{item['result_id']}]。"
+            )
+        blocks.append("### 量化结果\n\n" + "\n".join(lines))
+    if answers:
+        lines = [
+            f"- {item['answer']}（方法：{item['method']}；局限：{item['limitation']}） [{item['answer_id']}]。"
+            for item in answers
+        ]
+        blocks.append("### 子问题回答\n\n" + "\n".join(lines))
+    for table in tables:
+        header = "| " + " | ".join(table["columns"]) + " |"
+        divider = "|" + "|".join("---" for _ in table["columns"]) + "|"
+        rows = ["| " + " | ".join(str(cell) for cell in row) + " |" for row in table["rows"]]
+        blocks.append(
+            f"### {table['title']} [{table['table_id']}]\n\n{header}\n{divider}\n"
+            + "\n".join(rows)
+        )
+    if not blocks:
+        return content
+    return content.rstrip() + "\n\n" + "\n\n".join(blocks) + "\n"
 
 
 def _polish_section_draft(section_id: str, content: str, context: dict[str, Any]) -> str:

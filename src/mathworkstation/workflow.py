@@ -245,6 +245,33 @@ class WorkflowController:
         runtime.review = {"requested_by": requested_by, "reason": reason, "timestamp": now_iso()}
         runtime.updated_at = now_iso()
 
+    def degrade(self, node_id: str, approved_by: str, reason: str) -> None:
+        """Record an explicit human decision to run without an optional branch.
+
+        Unlike :meth:`skip`, which blocks everything downstream, a degraded node
+        counts as success-like: the pipeline continues, but the case history
+        permanently records who decided to omit the branch and why. Only nodes
+        declared ``may_degrade`` accept this transition.
+        """
+        if not reason.strip():
+            raise ValueError("degrade requires a reason")
+        definition = self.graph.definitions[node_id]
+        if not definition.may_degrade:
+            raise InvalidTransitionError(f"node does not allow degradation: {node_id}")
+        runtime = self._runtime(node_id)
+        if runtime.status in {NodeStatus.RUNNING, NodeStatus.SUCCEEDED}:
+            raise InvalidTransitionError(f"cannot degrade {node_id} from {runtime.status}")
+        runtime.status = NodeStatus.DEGRADED
+        runtime.active_run_id = None
+        runtime.review = {"approved_by": approved_by, "reason": reason, "timestamp": now_iso()}
+        runtime.last_error = {
+            "category": "OPTIONAL_BRANCH_OMITTED",
+            "message": reason,
+            "timestamp": now_iso(),
+        }
+        runtime.updated_at = now_iso()
+        self._unblock_ready_descendants(node_id)
+
     def skip(self, node_id: str, approved_by: str, reason: str) -> None:
         if not reason.strip():
             raise ValueError("skip requires a reason")
@@ -346,7 +373,7 @@ def default_workflow_graph() -> WorkflowGraph:
             NodeDefinition("paper_outline", ("problem_analysis", "model_selection"), approval_required=True),
             NodeDefinition("paper_draft", ("paper_outline", "sensitivity")),
             NodeDefinition("consistency_check", ("paper_draft",)),
-            NodeDefinition("refinement_loop", ("consistency_check",), max_retries=1),
+            NodeDefinition("refinement_loop", ("consistency_check",), max_retries=1, may_degrade=True),
             NodeDefinition("final_review", ("refinement_loop",), approval_required=True),
             NodeDefinition("export", ("final_review",)),
         ]

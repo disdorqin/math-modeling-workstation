@@ -4,7 +4,9 @@ import json
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .paper_contracts import SubproblemContract
 
 from .llm.prompts import PromptRegistry
 from .llm.service import CaseLLMService
@@ -13,13 +15,43 @@ from .llm.service import CaseLLMService
 class ProblemAnalysis(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    objectives: Any = Field(default_factory=list)
-    subproblems: Any = Field(default_factory=list)
-    variables: Any = Field(default_factory=list)
-    constraints: Any = Field(default_factory=list)
-    evaluation_targets: Any = Field(default_factory=list)
-    uncertainties: Any = Field(default_factory=list)
-    open_questions: Any = Field(default_factory=list)
+    objectives: list[str] = Field(default_factory=list)
+    subproblems: list[SubproblemContract] = Field(default_factory=list)
+    variables: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    evaluation_targets: list[str] = Field(default_factory=list)
+    uncertainties: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+
+    @field_validator("objectives", "variables", "constraints", "evaluation_targets", "uncertainties", "open_questions", mode="before")
+    @classmethod
+    def normalize_string_lists(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        return [str(item) for item in value]
+
+    @field_validator("subproblems", mode="before")
+    @classmethod
+    def normalize_subproblems(cls, value: Any) -> list[Any]:
+        if value is None:
+            return []
+        values = [value] if isinstance(value, str) else list(value)
+        normalized = []
+        for index, item in enumerate(values, start=1):
+            if isinstance(item, str):
+                normalized.append(
+                    {
+                        "subproblem_id": f"subproblem-{index:02d}",
+                        "title": item,
+                        "objective": item,
+                        "owner_section": "problem_restated",
+                    }
+                )
+            else:
+                normalized.append(item)
+        return normalized
 
 
 class ModelPlanCandidate(BaseModel):
@@ -67,6 +99,7 @@ class PaperRefinementProposal(BaseModel):
     strategy: str = Field(min_length=5)
     issue_ids: list[str] = Field(min_length=1, max_length=3)
     expected_gains: dict[str, float] = Field(default_factory=dict)
+    evidence_blockers: list[str] = Field(default_factory=list)
     patches: list[SectionPatchProposal] = Field(min_length=1, max_length=2)
 
 
