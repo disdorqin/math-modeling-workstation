@@ -28,6 +28,16 @@
 .PARAMETER SkipInstall
   Skip `pip install -e` when the environment is already prepared.
 
+.PARAMETER SkipRemote
+  Skip all remote / branch / repository-identity git operations. Intended for
+  CI dry-run validation (a GitHub-hosted `windows-latest` job that must NOT
+  touch the network, switch branches, or require `gh` auth). The heavy
+  verification -- dependency install, pytest, runtime identity, NON-TRIVIAL
+  runtime conformance, modeling smoke, full paper smoke -- still runs in full.
+  Only Phases 1-3 (identity, remote verify, feature branch) and the file-moving
+  part of Phase 4 (workflow placement) are skipped; workflow YAML parse + safety
+  scan still run.
+
 .PARAMETER Branch
   Feature branch name. Default m1-verification-and-ci.
 
@@ -39,6 +49,7 @@
 param(
     [switch]$SkipPush,
     [switch]$SkipInstall,
+    [switch]$SkipRemote,
     [string]$Branch   = "m1-verification-and-ci",
     [string]$RepoSlug = "disdorqin/math-modeling-workstation",
     [string]$BaseSha  = "30a5ebbd6d6bdd58683e1c84e9a42db8448c3e28"
@@ -70,91 +81,116 @@ function Run([string]$what, [scriptblock]$b) {
 try {
 
 # =============================================================== 1. IDENTITY
-Phase "1. REPOSITORY IDENTITY (real Windows working tree)"
-$top = git rev-parse --show-toplevel 2>&1
-if ($LASTEXITCODE -ne 0) { Fail "not a git working tree: $top" }
-Write-Host "toplevel   : $top"
-Write-Host "remotes    :"; git remote -v
-Write-Host "branch     : $(git branch --show-current)"
-Write-Host "HEAD       : $(git rev-parse HEAD)"
-Write-Host "log -5     :"; git log -5 --oneline
-Write-Host "status     :"; git status --short
-Write-Host "porcelain  :"; git status --porcelain=v1 | Select-Object -First 40
-Write-Host "branch -vv :"; git branch -vv
+if ($SkipRemote) {
+    Phase "1. REPOSITORY IDENTITY (SKIPPED -- SkipRemote)"
+    Write-Host "toplevel: $(git rev-parse --show-toplevel 2>&1)"
+    Write-Host "branch  : $(git branch --show-current 2>&1)"
+    Write-Host "HEAD    : $(git rev-parse HEAD 2>&1)"
+    Write-Host "(remote verify + origin match skipped under -SkipRemote)" -ForegroundColor Yellow
+} else {
+    Phase "1. REPOSITORY IDENTITY (real Windows working tree)"
+    $top = git rev-parse --show-toplevel 2>&1
+    if ($LASTEXITCODE -ne 0) { Fail "not a git working tree: $top" }
+    Write-Host "toplevel   : $top"
+    Write-Host "remotes    :"; git remote -v
+    Write-Host "branch     : $(git branch --show-current)"
+    Write-Host "HEAD       : $(git rev-parse HEAD)"
+    Write-Host "log -5     :"; git log -5 --oneline
+    Write-Host "status     :"; git status --short
+    Write-Host "porcelain  :"; git status --porcelain=v1 | Select-Object -First 40
+    Write-Host "branch -vv :"; git branch -vv
 
-$originUrl = git remote get-url origin 2>&1
-if ($LASTEXITCODE -ne 0) { Fail "no 'origin' remote configured" }
-if ($originUrl -notmatch "math-modeling-workstation") {
-    Fail "origin '$originUrl' is not the expected repository -- refusing to continue"
+    $originUrl = git remote get-url origin 2>&1
+    if ($LASTEXITCODE -ne 0) { Fail "no 'origin' remote configured" }
+    if ($originUrl -notmatch "math-modeling-workstation") {
+        Fail "origin '$originUrl' is not the expected repository -- refusing to continue"
+    }
+    Write-Host "origin confirmed: $originUrl" -ForegroundColor Green
 }
-Write-Host "origin confirmed: $originUrl" -ForegroundColor Green
 
 # ================================================ 2. VERIFY EXISTING REMOTE
-Phase "2. VERIFY THE EXISTING REMOTE (this script never creates a repository)"
-Run "git fetch origin --prune" { git fetch origin --prune }
-
-Step "remote main"
-$remoteMainLine = git ls-remote origin refs/heads/main
-if ($LASTEXITCODE -ne 0 -or -not $remoteMainLine) {
-    Fail "cannot reach origin. The repository is known to exist; this is an auth/network problem. Run 'gh auth login' (browser flow) and retry. This script will NOT create a repository."
-}
-$remoteMain = ($remoteMainLine -split "\s+")[0]
-Write-Host "remote main SHA : $remoteMain"
-Write-Host "expected base   : $BaseSha"
-if ($remoteMain -ne $BaseSha) {
-    Write-Host "NOTE: remote main has moved since the recorded base. Branching from the CURRENT remote main." -ForegroundColor Yellow
-}
-
-$ghCli = Get-Command gh -ErrorAction SilentlyContinue
-if ($ghCli) {
-    Step "gh auth status (token value never printed)"
-    gh auth status 2>&1 | Select-Object -First 8
-    Step "gh repo view"
-    gh repo view $RepoSlug --json nameWithOwner,url,visibility,defaultBranchRef
+if ($SkipRemote) {
+    Phase "2. VERIFY THE EXISTING REMOTE (SKIPPED -- SkipRemote)"
+    Write-Host "remote main SHA : $BaseSha (assumed; network + gh auth skipped)" -ForegroundColor Yellow
+    $remoteMain = $BaseSha
 } else {
-    Fail "gh CLI is required for the PR and Actions phases. Install: winget install --id GitHub.cli, then 'gh auth login' (choose the browser flow -- do not paste a token anywhere)."
+    Phase "2. VERIFY THE EXISTING REMOTE (this script never creates a repository)"
+    Run "git fetch origin --prune" { git fetch origin --prune }
+
+    Step "remote main"
+    $remoteMainLine = git ls-remote origin refs/heads/main
+    if ($LASTEXITCODE -ne 0 -or -not $remoteMainLine) {
+        Fail "cannot reach origin. The repository is known to exist; this is an auth/network problem. Run 'gh auth login' (browser flow) and retry. This script will NOT create a repository."
+    }
+    $remoteMain = ($remoteMainLine -split "\s+")[0]
+    Write-Host "remote main SHA : $remoteMain"
+    Write-Host "expected base   : $BaseSha"
+    if ($remoteMain -ne $BaseSha) {
+        Write-Host "NOTE: remote main has moved since the recorded base. Branching from the CURRENT remote main." -ForegroundColor Yellow
+    }
+
+    $ghCli = Get-Command gh -ErrorAction SilentlyContinue
+    if ($ghCli) {
+        Step "gh auth status (token value never printed)"
+        gh auth status 2>&1 | Select-Object -First 8
+        Step "gh repo view"
+        gh repo view $RepoSlug --json nameWithOwner,url,visibility,defaultBranchRef
+    } else {
+        Fail "gh CLI is required for the PR and Actions phases. Install: winget install --id GitHub.cli, then 'gh auth login' (choose the browser flow -- do not paste a token anywhere)."
+    }
 }
 
 # ================================================== 3. FEATURE BRANCH SETUP
-Phase "3. FEATURE BRANCH"
-$localMain = git rev-parse main 2>$null
-Write-Host "local main : $localMain"
-Write-Host "remote main: $remoteMain"
-if ($localMain -ne $remoteMain) {
-    Write-Host "local main differs from remote main -- NOT overwriting either history." -ForegroundColor Yellow
-    Write-Host "Investigate with: git log --oneline main..origin/main ; git log --oneline origin/main..main" -ForegroundColor Yellow
-    Fail "local/remote main divergence -- resolve manually before publishing"
-}
-
-$exists = git branch --list $Branch
-if ($exists) {
-    Step "branch '$Branch' already exists -- inspecting, not resetting"
-    git log --oneline "main..$Branch"
-    git switch $Branch
+if ($SkipRemote) {
+    Phase "3. FEATURE BRANCH (SKIPPED -- SkipRemote)"
+    Write-Host "on branch: $(git branch --show-current 2>&1)" -ForegroundColor Yellow
+    Write-Host "(branch create/switch skipped; CI dry-run stays on the checked-out ref)" -ForegroundColor Yellow
 } else {
-    Step "creating '$Branch' from main"
-    git switch main
-    git pull --ff-only origin main
-    git switch -c $Branch
+    Phase "3. FEATURE BRANCH"
+    $localMain = git rev-parse main 2>$null
+    Write-Host "local main : $localMain"
+    Write-Host "remote main: $remoteMain"
+    if ($localMain -ne $remoteMain) {
+        Write-Host "local main differs from remote main -- NOT overwriting either history." -ForegroundColor Yellow
+        Write-Host "Investigate with: git log --oneline main..origin/main ; git log --oneline origin/main..main" -ForegroundColor Yellow
+        Fail "local/remote main divergence -- resolve manually before publishing"
+    }
+
+    $exists = git branch --list $Branch
+    if ($exists) {
+        Step "branch '$Branch' already exists -- inspecting, not resetting"
+        git log --oneline "main..$Branch"
+        git switch $Branch
+    } else {
+        Step "creating '$Branch' from main"
+        git switch main
+        git pull --ff-only origin main
+        git switch -c $Branch
+    }
+    if ($LASTEXITCODE -ne 0) { Fail "could not switch to $Branch" }
+    Write-Host "on branch: $(git branch --show-current)" -ForegroundColor Green
 }
-if ($LASTEXITCODE -ne 0) { Fail "could not switch to $Branch" }
-Write-Host "on branch: $(git branch --show-current)" -ForegroundColor Green
 
 # ============================================= 4. WORKFLOW PLACEMENT
 Phase "4. WORKFLOW FILES"
 $tpl = "ci-templates\agent-layer-tests.yml"
 $dst = ".github\workflows\agent-layer-tests.yml"
-New-Item -ItemType Directory -Force ".github\workflows" | Out-Null
-if ((Test-Path $tpl) -and (Test-Path $dst)) {
-    Write-Host "both copies exist -- comparing before touching anything"
-    $diff = Compare-Object (Get-Content $tpl) (Get-Content $dst)
-    if ($diff) { $diff | Format-Table -AutoSize; Copy-Item $tpl $dst -Force; Write-Host "repo copy refreshed from template" }
-    else { Write-Host "identical" }
-    Remove-Item $tpl -Force
-} elseif (Test-Path $tpl) {
-    Move-Item $tpl $dst; Write-Host "moved template -> $dst" -ForegroundColor Green
-} elseif (-not (Test-Path $dst)) {
-    Fail "agent-layer-tests.yml found in neither location"
+if ($SkipRemote) {
+    Write-Host "workflow placement SKIPPED (SkipRemote): not moving template -> dst in CI dry-run"
+    if (-not (Test-Path $dst)) { Fail "required workflow missing: $dst" }
+} else {
+    New-Item -ItemType Directory -Force ".github\workflows" | Out-Null
+    if ((Test-Path $tpl) -and (Test-Path $dst)) {
+        Write-Host "both copies exist -- comparing before touching anything"
+        $diff = Compare-Object (Get-Content $tpl) (Get-Content $dst)
+        if ($diff) { $diff | Format-Table -AutoSize; Copy-Item $tpl $dst -Force; Write-Host "repo copy refreshed from template" }
+        else { Write-Host "identical" }
+        Remove-Item $tpl -Force
+    } elseif (Test-Path $tpl) {
+        Move-Item $tpl $dst; Write-Host "moved template -> $dst" -ForegroundColor Green
+    } elseif (-not (Test-Path $dst)) {
+        Fail "agent-layer-tests.yml found in neither location"
+    }
 }
 foreach ($wf in @(".github\workflows\ci.yml", $dst)) {
     if (-not (Test-Path $wf)) { Fail "required workflow missing: $wf" }
@@ -289,9 +325,22 @@ $rt = Join-Path $env:TEMP "mmw-rt"
 Remove-Item $rt -Recurse -Force -ErrorAction SilentlyContinue
 $CASE = (python -m mathworkstation.cli --output-root $rt create-case --competition CUMCM --title "runtime identity" --language zh | ConvertFrom-Json).case_id
 Write-Host "case: $CASE"
+
+# Populate the case so BOTH runtimes can actually execute the agent roster.
+# A dataset-less case makes data_steward block in BOTH runtimes, which yields
+# `differences == []` only because both halted identically -- that is NOT the
+# conformance this audit requires. Register a numeric dataset and approve
+# data_registration so data_quality unblocks, mirroring the pytest path.
+python -m mathworkstation.cli --output-root $rt start-node --case-id $CASE --node-id input_validation | Out-Null
+python -m mathworkstation.cli --output-root $rt succeed-node --case-id $CASE --node-id input_validation | Out-Null
+$mDs = (python -m mathworkstation.cli --output-root $rt register-dataset --case-id $CASE --name diabetes --kind OBSERVED --source "examples\fixtures\diabetes_progression.csv" --description "fixture" | ConvertFrom-Json).dataset_id
+if (-not $mDs) { Fail "could not register diabetes dataset for the conformance case" }
+python -m mathworkstation.cli --output-root $rt complete-data-registration --case-id $CASE | Out-Null
+python -m mathworkstation.cli --output-root $rt approve-node --case-id $CASE --node-id data_registration --approved-by local | Out-Null
+Write-Host "populated case $CASE with dataset $mDs" -ForegroundColor Green
 function RuntimeOf([string]$mode) {
     Step "run-agent-pipeline --runtime $mode"
-    python -m mathworkstation.cli --output-root $rt run-agent-pipeline --case-id $CASE --runtime $mode | Out-Null
+    python -m mathworkstation.cli --output-root $rt run-agent-pipeline --case-id $CASE --runtime $mode --dataset-id $mDs --target-column progression | Out-Null
     if ($LASTEXITCODE -ne 0) { Fail "run-agent-pipeline --runtime $mode failed" }
     $s = Get-Content (Join-Path $rt "$CASE\agents\run_summary.json") -Raw | ConvertFrom-Json
     Write-Host ("  requested={0} actual={1} langgraph_available={2} accepted={3} verdicts={4}" -f `
@@ -307,7 +356,7 @@ Write-Host "RUNTIME IDENTITY PROVEN builtin='$rB' langgraph='$rL' auto='$rA'" -F
 # ================================================== 10. CONFORMANCE
 Phase "10. RUNTIME CONFORMANCE"
 New-Item -ItemType Directory -Force "artifacts" | Out-Null
-python -m mathworkstation.cli --output-root $rt compare-agent-runtimes --case-id $CASE --report "artifacts\runtime-conformance.json"
+python -m mathworkstation.cli --output-root $rt compare-agent-runtimes --case-id $CASE --dataset-id $mDs --target-column progression --report "artifacts\runtime-conformance.json"
 $cExit = $LASTEXITCODE
 Write-Host "compare-agent-runtimes exit: $cExit"
 if (Test-Path "artifacts\runtime-conformance.json") { Get-Content "artifacts\runtime-conformance.json" -Raw }
