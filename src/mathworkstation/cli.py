@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -482,9 +484,97 @@ def _run_agents_in_workspace(workspace_root: Path, case_id: str, args, prefer_la
         claims=ws_claims, figures=ws_figures, checker=ws_checker,
     )
     adjudicator = Adjudicator(ws_cases, ws_artifacts, ws_claims, ws_figures)
-    state = _build_agent_state(case_id, args.session_id, args.dataset_id, args.target_column, args.goal)
+    dataset_id = args.dataset_id
+    if not dataset_id:
+        # A populated conformance case carries exactly one registered dataset.
+        # Discover it so compare-agent-runtimes works without --dataset-id and
+        # cannot accidentally compare a dataset-less (trivially-halting) case as
+        # if it were meaningful conformance.
+        registered = ws_datasets.current_records(case_id)
+        if len(registered) == 1:
+            dataset_id = registered[0]["dataset_id"]
+    state = _build_agent_state(case_id, args.session_id, dataset_id, args.target_column, args.goal)
     final_state, runtime_used = run_graph(agents, adjudicator, state, prefer_langgraph=prefer_langgraph)
     return dict(final_state), runtime_used
+
+
+def _build_artifact_sha_map(workspace_case_root: Path) -> dict[str, str]:
+    """Map each random ``artifact-<uuid>`` id in a workspace's registry to the
+    *normalized content* sha256 of the artifact file. Two isolated workspaces
+    that hold logically-identical artifacts under different ids (and different
+    wall-clock ``generated_at`` timestamps) resolve to the same sha, which is
+    exactly what lets :func:`diff_states` compare them as conformant instead of
+    spuriously diverging on process-local metadata."""
+    registry_path = workspace_case_root / "artifact_registry.jsonl"
+    mapping: dict[str, str] = {}
+    if not registry_path.exists():
+        return mapping
+    for line in registry_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        artifact_id = record.get("artifact_id")
+        relative_path = record.get("path")
+        if not artifact_id or not relative_path:
+            continue
+        artifact_file = workspace_case_root / relative_path
+        if not artifact_file.exists():
+            # Non-file / missing artifact: fall back to the registry's own
+            # content sha so the id still resolves to *something* stable.
+            content_sha = record.get("sha256")
+            if content_sha:
+                mapping[artifact_id] = content_sha
+            continue
+        mapping[artifact_id] = _normalized_artifact_sha(artifact_file)
+    return mapping
+
+
+#: Keys whose values are process-local (wall-clock timestamps, run/session ids)
+#: and must not affect an artifact's semantic identity when two runtimes
+#: produce the "same" logical artifact.
+_RUNTIME_SPECIFIC_ARTIFACT_KEYS = {
+    "generated_at", "created_at", "updated_at", "produced_at",
+    "registered_at", "run_id", "session_id",
+}
+
+#: Random per-run ids minted by the registry (artifact-<uuid>, figure-<uuid>,
+#: dataset-<uuid>, ...). They are process-local and must not affect an artifact
+#: file's semantic identity when two runtimes produce the same logical artifact.
+_ARTIFACT_ID_RE = re.compile(
+    r"^(artifact|figure|dataset|comparison|candidate|protocol|model|session|run|evidence)-[0-9a-f]{12}$"
+)
+
+
+def _strip_runtime_keys(node: Any) -> Any:
+    if isinstance(node, dict):
+        return {
+            key: _strip_runtime_keys(value)
+            for key, value in node.items()
+            if key not in _RUNTIME_SPECIFIC_ARTIFACT_KEYS
+            and not (isinstance(key, str) and key.endswith("_at"))
+        }
+    if isinstance(node, list):
+        return [_strip_runtime_keys(item) for item in node]
+    if isinstance(node, str) and _ARTIFACT_ID_RE.match(node):
+        return "__ARTIFACT_REF__"
+    return node
+
+
+def _normalized_artifact_sha(path: Path) -> str:
+    """Content sha256 of an artifact file, ignoring runtime-specific keys (wall
+    -clock timestamps, run/session ids) so two runtimes that produce the same
+    logical artifact under different ids/timestamps resolve to one identity."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    normalized = _strip_runtime_keys(data)
+    blob = json.dumps(normalized, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
 
 
 def _compare_agent_runtimes(cases: CaseManager, args) -> int:
@@ -516,6 +606,7 @@ def _compare_agent_runtimes(cases: CaseManager, args) -> int:
 
     source_root = cases.case_root(args.case_id)  # raises CaseNotFoundError if missing
     results: dict[str, dict[str, Any]] = {}
+    artifact_sha: dict[str, dict[str, str]] = {}
     with tempfile.TemporaryDirectory(prefix="mmw-compare-") as tmp:
         tmp_path = Path(tmp)
         for runtime_name, prefer_langgraph in (("builtin", False), ("langgraph", True)):
@@ -534,8 +625,14 @@ def _compare_agent_runtimes(cases: CaseManager, args) -> int:
                 )
                 return 4
             results[runtime_name] = final_state
+            artifact_sha[runtime_name] = _build_artifact_sha_map(workspace_case_root)
 
-    differences = diff_states(results["builtin"], results["langgraph"])
+    differences = diff_states(
+        results["builtin"],
+        results["langgraph"],
+        builtin_artifact_sha=artifact_sha.get("builtin"),
+        langgraph_artifact_sha=artifact_sha.get("langgraph"),
+    )
     print(render_report(differences))
     if args.report:
         Path(args.report).write_text(
