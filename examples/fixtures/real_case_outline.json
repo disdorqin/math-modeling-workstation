@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "title": "慢性疾病一年期病情进展的量化建模与风险分层",
+  "language": "zh",
+  "competition_type": "CUMCM",
+  "sections": [
+    {
+      "section_id": "abstract",
+      "title": "摘要",
+      "purpose": "概括问题、方法、结果和关键词",
+      "claim_ids": [
+        "claim-4d802d59f904",
+        "claim-f2277bc077d8",
+        "claim-b1753f7288e6"
+      ],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "problem_restated",
+      "title": "引言与问题重述",
+      "purpose": "说明研究背景、题目价值，并准确重述题目目标与约束",
+      "claim_ids": [],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "assumptions",
+      "title": "模型假设",
+      "purpose": "列出假设及其适用范围",
+      "claim_ids": [],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "notation",
+      "title": "符号说明",
+      "purpose": "统一变量、参数和单位",
+      "claim_ids": [],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "data_analysis",
+      "title": "数据分析",
+      "purpose": "说明来源、质量与探索性结果",
+      "claim_ids": [
+        "claim-15aae502b368",
+        "claim-6216872e652a",
+        "claim-4de95f663feb"
+      ],
+      "figure_ids": [
+        "figure-d4bb4f0d6c70",
+        "figure-7bcf583c3d10"
+      ],
+      "required": true
+    },
+    {
+      "section_id": "model_construction",
+      "title": "模型建立",
+      "purpose": "给出模型结构、公式和依据",
+      "claim_ids": [],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "model_solution",
+      "title": "模型求解",
+      "purpose": "记录算法、参数和执行过程",
+      "claim_ids": [
+        "claim-4d802d59f904"
+      ],
+      "figure_ids": [
+        "figure-8c0270f7257b"
+      ],
+      "required": true
+    },
+    {
+      "section_id": "results",
+      "title": "结果分析",
+      "purpose": "基于已批准证据报告结果",
+      "claim_ids": [
+        "claim-4d802d59f904",
+        "claim-f2277bc077d8"
+      ],
+      "figure_ids": [
+        "figure-8c0270f7257b"
+      ],
+      "required": true
+    },
+    {
+      "section_id": "sensitivity",
+      "title": "敏感性与稳健性",
+      "purpose": "报告敏感性门及限制",
+      "claim_ids": [
+        "claim-f186d077beae",
+        "claim-b1753f7288e6"
+      ],
+      "figure_ids": [
+        "figure-73c2b7cbf33c"
+      ],
+      "required": true
+    },
+    {
+      "section_id": "strengths_weaknesses",
+      "title": "模型优缺点",
+      "purpose": "评价适用性与局限",
+      "claim_ids": [],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "conclusion",
+      "title": "结论",
+      "purpose": "回答子问题并限制外推范围",
+      "claim_ids": [
+        "claim-4d802d59f904",
+        "claim-b1753f7288e6"
+      ],
+      "figure_ids": [],
+      "required": true
+    },
+    {
+      "section_id": "references",
+      "title": "参考文献",
+      "purpose": "列出可验证来源",
+      "claim_ids": [],
+      "figure_ids": [],
+      "required": true
+    }
+  ]
+}

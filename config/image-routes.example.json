@@ -3,21 +3,10 @@
   "max_total_tokens": 1,
   "routes": [
     {
-      "name": "testvideo-image-primary",
-      "base_url": "https://testvideo.site/v1",
-      "api_key_env": "MMW_TESTVIDEO_IMAGE_KEY",
-      "models": ["gpt-image-2"],
-      "priority": 5,
-      "timeout_seconds": 180,
-      "failure_threshold": 1,
-      "cooldown_seconds": 120,
-      "kind": "image"
-    },
-    {
-      "name": "codexplus-image",
-      "base_url": "https://codexplus.shop/v1",
-      "api_key_env": "MMW_CODEXPLUS_IMAGE_KEY",
-      "models": ["gpt-image-2"],
+      "name": "openai-compatible-image-primary",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "models": ["gpt-image-1"],
       "priority": 10,
       "timeout_seconds": 180,
       "failure_threshold": 1,

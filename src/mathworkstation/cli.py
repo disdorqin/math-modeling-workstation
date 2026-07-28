@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -32,7 +34,7 @@ from .literature import LiteratureService
 from .model_evaluation import ModelEvaluationEngine
 from .model_plan import ModelPlanService
 from .modeling_service import ModelingService
-from .paper_ready import PaperReadyGate
+from .paper_ready import ModelingEvidenceGate, PaperReadyGate
 from .paper_consistency import PaperConsistencyChecker
 from .paper_outline import PaperOutlineService, default_outline
 from .paper_sections import PaperSectionWorkspace
@@ -45,6 +47,7 @@ from .selection import ModelSelectionRegistry
 from .sensitivity import SensitivityEngine
 from .source_collector import SourceCollector
 from .stage_service import StageService
+from .submission import SubmissionService
 from .workflow import FailureCategory
 from .workflow_service import WorkflowService
 
@@ -152,6 +155,49 @@ def build_parser() -> argparse.ArgumentParser:
     approve.add_argument("--approved-by", required=True)
     approve.add_argument("--note", default="")
 
+    agent_pipeline = commands.add_parser(
+        "run-agent-pipeline",
+        help="run the multi-agent slice; agents propose, the workflow adjudicates",
+    )
+    agent_pipeline.add_argument("--case-id", required=True)
+    agent_pipeline.add_argument("--session-id")
+    agent_pipeline.add_argument("--dataset-id")
+    agent_pipeline.add_argument("--target-column")
+    agent_pipeline.add_argument("--goal", default="complete the modeling case")
+    agent_pipeline.add_argument(
+        "--runtime",
+        choices=["auto", "langgraph", "builtin"],
+        default="auto",
+        help="auto uses LangGraph when installed and the built-in runner otherwise",
+    )
+
+    compare_runtimes = commands.add_parser(
+        "compare-agent-runtimes",
+        help=(
+            "run the agent pipeline on the same case under both the builtin runner "
+            "and LangGraph, in isolated workspaces, and diff the resulting state "
+            "under the runtime semantics contract (agents/semantics.py)"
+        ),
+    )
+    compare_runtimes.add_argument("--case-id", required=True)
+    compare_runtimes.add_argument("--session-id")
+    compare_runtimes.add_argument("--dataset-id")
+    compare_runtimes.add_argument("--target-column")
+    compare_runtimes.add_argument("--goal", default="complete the modeling case")
+    compare_runtimes.add_argument(
+        "--report",
+        help="write the machine-readable diff report (JSON) to this path in addition to stdout",
+    )
+
+    degrade = commands.add_parser(
+        "degrade-node",
+        help="record an approved decision to run without an optional branch",
+    )
+    degrade.add_argument("--case-id", required=True)
+    degrade.add_argument("--node-id", required=True)
+    degrade.add_argument("--approved-by", required=True)
+    degrade.add_argument("--reason", required=True)
+
     stale = commands.add_parser("mark-stale")
     stale.add_argument("--case-id", required=True)
     stale.add_argument("--node-id", required=True)
@@ -233,6 +279,16 @@ def build_parser() -> argparse.ArgumentParser:
     list_figures = commands.add_parser("list-figures")
     list_figures.add_argument("--case-id", required=True)
 
+    promote_figure = commands.add_parser(
+        "promote-figure",
+        help="approve a DRAFT figure as citable paper evidence",
+    )
+    promote_figure.add_argument("--case-id", required=True)
+    promote_figure.add_argument("--figure-id", required=True)
+    promote_figure.add_argument("--approval-artifact-id", required=True)
+    promote_figure.add_argument("--approved-by", required=True)
+    promote_figure.add_argument("--note", required=True)
+
     list_experiments = commands.add_parser("list-experiments")
     list_experiments.add_argument("--case-id", required=True)
 
@@ -267,6 +323,24 @@ def build_parser() -> argparse.ArgumentParser:
     assess.add_argument("--experiment-id", required=True)
     assess.add_argument("--selection-artifact-id", required=True)
     assess.add_argument("--sensitivity-artifact-id", required=True)
+    assess.add_argument(
+        "--additional-artifact-id",
+        action="append",
+        default=[],
+        help="extra evidence artifact to include in the paper-ready bundle (repeatable)",
+    )
+
+    assess_modeling_evidence = commands.add_parser("assess-modeling-evidence")
+    assess_modeling_evidence.add_argument("--case-id", required=True)
+    assess_modeling_evidence.add_argument("--protocol-artifact-id", required=True)
+    assess_modeling_evidence.add_argument("--comparison-artifact-id", required=True)
+
+    approve_modeling_evidence = commands.add_parser("approve-modeling-evidence")
+    approve_modeling_evidence.add_argument("--case-id", required=True)
+    approve_modeling_evidence.add_argument("--protocol-artifact-id", required=True)
+    approve_modeling_evidence.add_argument("--comparison-artifact-id", required=True)
+    approve_modeling_evidence.add_argument("--approved-by", required=True)
+    approve_modeling_evidence.add_argument("--note", required=True)
 
     approve_ready = commands.add_parser("approve-paper-ready")
     approve_ready.add_argument("--case-id", required=True)
@@ -275,6 +349,12 @@ def build_parser() -> argparse.ArgumentParser:
     approve_ready.add_argument("--sensitivity-artifact-id", required=True)
     approve_ready.add_argument("--approved-by", required=True)
     approve_ready.add_argument("--note", required=True)
+    approve_ready.add_argument(
+        "--additional-artifact-id",
+        action="append",
+        default=[],
+        help="extra evidence artifact promoted alongside the experiment bundle (repeatable)",
+    )
 
     create_claim = commands.add_parser("create-claim")
     create_claim.add_argument("--case-id", required=True)
@@ -284,6 +364,11 @@ def build_parser() -> argparse.ArgumentParser:
     create_claim.add_argument("--dataset-id", action="append", default=[])
     create_claim.add_argument("--section-hint")
     create_claim.add_argument("--created-by", default="human")
+
+    recheck_claim = commands.add_parser("recheck-claim-evidence")
+    recheck_claim.add_argument("--case-id", required=True)
+    recheck_claim.add_argument("--claim-id", required=True)
+    recheck_claim.add_argument("--checked-by", required=True)
 
     default_paper = commands.add_parser("create-default-outline")
     default_paper.add_argument("--case-id", required=True)
@@ -318,6 +403,20 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--case-id", required=True)
     export.add_argument("--session-id")
 
+    submission = commands.add_parser("prepare-submission", help="render and preflight the user-facing paper package")
+    submission.add_argument("--case-id", required=True)
+    submission.add_argument("--profile", default="SM", choices=["SM", "CUMCM", "MCM", "ICM"])
+    submission.add_argument("--compile-pdf", action="store_true")
+
+    task_paper = commands.add_parser("run-task-paper", help="run one task family through evidence and paper contracts")
+    task_paper.add_argument("--case-id", required=True)
+    task_paper.add_argument("--family", required=True, choices=["classification", "forecasting", "optimization", "simulation", "ranking"])
+    task_paper.add_argument("--plan", required=True, help="JSON task protocol file")
+    task_paper.add_argument("--frame")
+    task_paper.add_argument("--title")
+    task_paper.add_argument("--competition-type", default="SM")
+    task_paper.add_argument("--created-by", default="human")
+
     llm_chat = commands.add_parser("llm-chat")
     llm_chat.add_argument("--case-id", required=True)
     llm_chat.add_argument("--session-id", required=True)
@@ -340,6 +439,207 @@ def build_parser() -> argparse.ArgumentParser:
 
     commands.add_parser("list-prompts")
     return parser
+
+
+def _build_agent_state(case_id: str, session_id, dataset_id, target_column, goal) -> dict[str, Any]:
+    return {
+        "case_id": case_id,
+        "session_id": session_id,
+        "dataset_id": dataset_id,
+        "target_column": target_column,
+        "goal": goal,
+        "reports": [],
+        "verdicts": [],
+        "accepted": [],
+        "blocked": [],
+        "halted": False,
+        "halt_reason": "",
+    }
+
+
+def _run_agents_in_workspace(workspace_root: Path, case_id: str, args, prefer_langgraph: bool):
+    """Run the agent pipeline against an isolated copy of the case and return
+    the raw final :class:`WorkstationState` (not the CLI summary shape) --
+    compare-agent-runtimes needs the full verdict/report detail the summary
+    view intentionally drops."""
+    from .agents.adjudicator import Adjudicator
+    from .agents.graph import run as run_graph
+    from .agents.roster import build_default_roster
+
+    ws_cases = CaseManager(workspace_root)
+    ws_artifacts = ArtifactRegistry(ws_cases)
+    ws_datasets = DatasetRegistry(ws_cases, ws_artifacts)
+    ws_claims = ClaimRegistry(ws_cases, ws_artifacts, ws_datasets)
+    ws_figures = FigureRegistry(ws_cases, ws_artifacts)
+    ws_checkpoints = CheckpointManager(ws_cases)
+    ws_memory = MemoryManager(ws_cases, ws_artifacts)
+    ws_runs = RunManager(ws_cases)
+    ws_workflow = WorkflowService(ws_cases, ws_runs, ws_checkpoints, ws_memory)
+    ws_data = DataService(ws_artifacts, ws_datasets, TabularProfiler(ws_cases, ws_artifacts, ws_datasets), ws_workflow)
+    ws_eda = EDAEngine(ws_cases, ws_artifacts, ws_datasets, ws_figures)
+    ws_checker = PaperConsistencyChecker(ws_cases, ws_artifacts, ws_claims, ws_figures)
+
+    agents = build_default_roster(
+        data=ws_data, eda=ws_eda, cases=ws_cases, artifacts=ws_artifacts,
+        claims=ws_claims, figures=ws_figures, checker=ws_checker,
+    )
+    adjudicator = Adjudicator(ws_cases, ws_artifacts, ws_claims, ws_figures)
+    dataset_id = args.dataset_id
+    if not dataset_id:
+        # A populated conformance case carries exactly one registered dataset.
+        # Discover it so compare-agent-runtimes works without --dataset-id and
+        # cannot accidentally compare a dataset-less (trivially-halting) case as
+        # if it were meaningful conformance.
+        registered = ws_datasets.current_records(case_id)
+        if len(registered) == 1:
+            dataset_id = registered[0]["dataset_id"]
+    state = _build_agent_state(case_id, args.session_id, dataset_id, args.target_column, args.goal)
+    final_state, runtime_used = run_graph(agents, adjudicator, state, prefer_langgraph=prefer_langgraph)
+    return dict(final_state), runtime_used
+
+
+def _build_artifact_sha_map(workspace_case_root: Path) -> dict[str, str]:
+    """Map each random ``artifact-<uuid>`` id in a workspace's registry to the
+    *normalized content* sha256 of the artifact file. Two isolated workspaces
+    that hold logically-identical artifacts under different ids (and different
+    wall-clock ``generated_at`` timestamps) resolve to the same sha, which is
+    exactly what lets :func:`diff_states` compare them as conformant instead of
+    spuriously diverging on process-local metadata."""
+    registry_path = workspace_case_root / "artifact_registry.jsonl"
+    mapping: dict[str, str] = {}
+    if not registry_path.exists():
+        return mapping
+    for line in registry_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        artifact_id = record.get("artifact_id")
+        relative_path = record.get("path")
+        if not artifact_id or not relative_path:
+            continue
+        artifact_file = workspace_case_root / relative_path
+        if not artifact_file.exists():
+            # Non-file / missing artifact: fall back to the registry's own
+            # content sha so the id still resolves to *something* stable.
+            content_sha = record.get("sha256")
+            if content_sha:
+                mapping[artifact_id] = content_sha
+            continue
+        mapping[artifact_id] = _normalized_artifact_sha(artifact_file)
+    return mapping
+
+
+#: Keys whose values are process-local (wall-clock timestamps, run/session ids)
+#: and must not affect an artifact's semantic identity when two runtimes
+#: produce the "same" logical artifact.
+_RUNTIME_SPECIFIC_ARTIFACT_KEYS = {
+    "generated_at", "created_at", "updated_at", "produced_at",
+    "registered_at", "run_id", "session_id",
+}
+
+#: Random per-run ids minted by the registry (artifact-<uuid>, figure-<uuid>,
+#: dataset-<uuid>, ...). They are process-local and must not affect an artifact
+#: file's semantic identity when two runtimes produce the same logical artifact.
+_ARTIFACT_ID_RE = re.compile(
+    r"^(artifact|figure|dataset|comparison|candidate|protocol|model|session|run|evidence)-[0-9a-f]{12}$"
+)
+
+
+def _strip_runtime_keys(node: Any) -> Any:
+    if isinstance(node, dict):
+        return {
+            key: _strip_runtime_keys(value)
+            for key, value in node.items()
+            if key not in _RUNTIME_SPECIFIC_ARTIFACT_KEYS
+            and not (isinstance(key, str) and key.endswith("_at"))
+        }
+    if isinstance(node, list):
+        return [_strip_runtime_keys(item) for item in node]
+    if isinstance(node, str) and _ARTIFACT_ID_RE.match(node):
+        return "__ARTIFACT_REF__"
+    return node
+
+
+def _normalized_artifact_sha(path: Path) -> str:
+    """Content sha256 of an artifact file, ignoring runtime-specific keys (wall
+    -clock timestamps, run/session ids) so two runtimes that produce the same
+    logical artifact under different ids/timestamps resolve to one identity."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    normalized = _strip_runtime_keys(data)
+    blob = json.dumps(normalized, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _compare_agent_runtimes(cases: CaseManager, args) -> int:
+    """compare-agent-runtimes: run the SAME case through both runtimes, each in
+    its own isolated workspace copy, and diff the result under the runtime
+    semantics contract. Returns a distinct exit code per outcome so a caller
+    (a CI job, a script) can tell "not comparable here" apart from "compared
+    and disagreed":
+
+        0  conformant
+        1  compared, and the runtimes disagree on an EXACT/CANONICAL field
+        3  langgraph is not installed in this environment -- not comparable
+        4  a runtime selection did not actually run the runtime it was asked for
+    """
+    import shutil
+    import tempfile
+
+    from .agents.graph import langgraph_available
+    from .agents.semantics import diff_states, render_report
+
+    if not langgraph_available():
+        print(
+            "LANGGRAPH_UNAVAILABLE: langgraph is not installed in this environment; "
+            "compare-agent-runtimes needs both runtimes present to compare them. "
+            'Install with: pip install -e ".[langgraph]"',
+            file=sys.stderr,
+        )
+        return 3
+
+    source_root = cases.case_root(args.case_id)  # raises CaseNotFoundError if missing
+    results: dict[str, dict[str, Any]] = {}
+    artifact_sha: dict[str, dict[str, str]] = {}
+    with tempfile.TemporaryDirectory(prefix="mmw-compare-") as tmp:
+        tmp_path = Path(tmp)
+        for runtime_name, prefer_langgraph in (("builtin", False), ("langgraph", True)):
+            workspace_root = tmp_path / runtime_name
+            workspace_case_root = workspace_root / args.case_id
+            shutil.copytree(source_root, workspace_case_root)
+            final_state, runtime_used = _run_agents_in_workspace(
+                workspace_root, args.case_id, args, prefer_langgraph
+            )
+            if runtime_used != runtime_name:
+                print(
+                    f"RUNTIME_SELECTION_MISMATCH: asked for {runtime_name!r} but the "
+                    f"pipeline actually used {runtime_used!r}; refusing to compare a "
+                    "runtime against itself under two labels.",
+                    file=sys.stderr,
+                )
+                return 4
+            results[runtime_name] = final_state
+            artifact_sha[runtime_name] = _build_artifact_sha_map(workspace_case_root)
+
+    differences = diff_states(
+        results["builtin"],
+        results["langgraph"],
+        builtin_artifact_sha=artifact_sha.get("builtin"),
+        langgraph_artifact_sha=artifact_sha.get("langgraph"),
+    )
+    print(render_report(differences))
+    if args.report:
+        Path(args.report).write_text(
+            json.dumps({"case_id": args.case_id, "differences": differences}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    return 1 if differences else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -379,12 +679,14 @@ def main(argv: list[str] | None = None) -> int:
         selections,
     )
     paper_ready = PaperReadyGate(cases, artifacts, experiments)
+    modeling_evidence = ModelingEvidenceGate(cases, artifacts)
     claims = ClaimRegistry(cases, artifacts, datasets)
     outline_service = PaperOutlineService(cases, artifacts, claims, figures)
     section_workspace = PaperSectionWorkspace(cases, artifacts, claims, figures)
     consistency_checker = PaperConsistencyChecker(cases, artifacts, claims, figures)
     stages = StageService(cases, artifacts, workflow)
     exporter = ExportService(cases, artifacts, workflow)
+    submission_service = SubmissionService(cases, artifacts)
 
     try:
         if args.command == "create-case":
@@ -499,6 +801,37 @@ def main(argv: list[str] | None = None) -> int:
                     args.note,
                 )
             )
+        elif args.command == "run-agent-pipeline":
+            from .agents.runtime import AgentPipeline
+        
+            if args.runtime == "langgraph":
+                from .agents.graph import langgraph_available
+        
+                if not langgraph_available():
+                    raise RuntimeError(
+                        "langgraph is not installed; run: pip install -e \".[langgraph]\""
+                    )
+            _print(
+                AgentPipeline(cases, artifacts, datasets, figures, claims, workflow).run(
+                    args.case_id,
+                    args.session_id,
+                    args.dataset_id,
+                    args.target_column,
+                    args.goal,
+                    prefer_langgraph=args.runtime != "builtin",
+                )
+            )
+        elif args.command == "compare-agent-runtimes":
+            return _compare_agent_runtimes(cases, args)
+        elif args.command == "degrade-node":
+            _print(
+                workflow.degrade_node(
+                    args.case_id,
+                    args.node_id,
+                    args.approved_by,
+                    args.reason,
+                )
+            )
         elif args.command == "mark-stale":
             _print(workflow.mark_stale(args.case_id, args.node_id, args.reason))
         elif args.command == "retry-node":
@@ -570,6 +903,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "list-figures":
             _print(figures.list_figures(args.case_id))
+        elif args.command == "promote-figure":
+            _print(
+                figures.promote(
+                    args.case_id,
+                    args.figure_id,
+                    args.approval_artifact_id,
+                    args.approved_by,
+                    args.note,
+                )
+            )
         elif args.command == "list-experiments":
             _print(experiments.list_experiments(args.case_id))
         elif args.command == "validate-model-plan":
@@ -611,6 +954,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.experiment_id,
                     args.selection_artifact_id,
                     args.sensitivity_artifact_id,
+                    args.additional_artifact_id or None,
                 )
             )
         elif args.command == "approve-paper-ready":
@@ -620,6 +964,25 @@ def main(argv: list[str] | None = None) -> int:
                     args.experiment_id,
                     args.selection_artifact_id,
                     args.sensitivity_artifact_id,
+                    args.approved_by,
+                    args.note,
+                    args.additional_artifact_id or None,
+                )
+            )
+        elif args.command == "assess-modeling-evidence":
+            _print(
+                modeling_evidence.assess(
+                    args.case_id,
+                    args.protocol_artifact_id,
+                    args.comparison_artifact_id,
+                )
+            )
+        elif args.command == "approve-modeling-evidence":
+            _print(
+                modeling_evidence.approve(
+                    args.case_id,
+                    args.protocol_artifact_id,
+                    args.comparison_artifact_id,
                     args.approved_by,
                     args.note,
                 )
@@ -638,6 +1001,8 @@ def main(argv: list[str] | None = None) -> int:
                     args.created_by,
                 )
             )
+        elif args.command == "recheck-claim-evidence":
+            _print(claims.recheck_evidence(args.case_id, args.claim_id, args.checked_by))
         elif args.command == "create-default-outline":
             outline = default_outline(
                 args.title,
@@ -667,6 +1032,16 @@ def main(argv: list[str] | None = None) -> int:
             _print(stages.check_consistency(args.case_id, consistency_checker, args.session_id))
         elif args.command == "export-case":
             _print(exporter.export_case(args.case_id, args.session_id))
+        elif args.command == "prepare-submission":
+            _print(submission_service.prepare(args.case_id, args.profile, args.compile_pdf))
+        elif args.command == "run-task-paper":
+            task_service = AutoPipelineService(cases, None)  # type: ignore[arg-type]
+            plan = json.loads(Path(args.plan).read_text(encoding="utf-8-sig"))
+            frame = None
+            if args.frame:
+                from .tabular import read_table
+                frame = read_table(Path(args.frame))
+            _print(task_service.run_task_paper_pipeline(args.case_id, args.family, plan, frame, args.title, created_by=args.created_by, competition_type=args.competition_type))
         elif args.command == "llm-chat":
             route_config = RouterConfig.model_validate_json(
                 Path(args.routes).read_text(encoding="utf-8-sig")

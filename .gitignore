@@ -14,3 +14,18 @@ output/*
 !output/.gitkeep
 logs/*
 !logs/.gitkeep
+
+# CodeGraph local index (generated, do not commit)
+.codegraph/
+
+# Local LLM/image relay route files -- contain credentials, never commit
+*.local.json
+
+# Verification transcript (local run artefact, may echo absolute paths)
+verification-run.log
+ci-artifacts/
+artifacts/
+
+# Transient session/delivery reports -- never commit (generated, not canonical)
+VERIFICATION_REPORT_*.md
+DELIVERY_STATUS_*.md

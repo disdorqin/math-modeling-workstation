@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: "Math Modeling Workstation"
+message: "If this software supports your work, cite the repository and the release used."
+type: software
+authors:
+  - name: "Math Modeling Workstation Team"
+license: "Proprietary"
+version: "0.1.0"

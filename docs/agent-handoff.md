@@ -54,6 +54,9 @@ returns 1-2 section patches. It cannot regenerate the whole paper.
 ## Important Files
 
 - `docs/recurrent-refinement-architecture.md`: detailed design specification.
+- `docs/complete-paper-stage-plan.md`: complete-paper contract, full-stage
+  review domains, external project lessons, safety gaps, and implementation
+  roadmap.
 - `src/mathworkstation/refinement.py`: refinement state machine, quality vector,
   issue registry, patch validation, acceptance/rollback, early stopping,
   epochs, and resume logic.
@@ -69,6 +72,10 @@ returns 1-2 section patches. It cannot regenerate the whole paper.
   refinement state.
 - `tests/test_refinement.py`: coverage for number protection, accepted patch,
   interruption/resume, strategy reset, and plateau stop.
+- `tests/test_auto_pipeline_e2e.py`: deterministic full-chain acceptance from
+  problem/data inputs through experiments, refinement, final paper, and ZIP.
+- `docs/end-to-end-acceptance-2026-07-22.md`: measured acceptance results and
+  the remaining evidence-to-narrative gap.
 
 ## Persistent Case State
 
@@ -125,7 +132,46 @@ after that reset. Repeated patch fingerprints are rejected to prevent loops.
 
 - Latest refactor commit: `e7dd14d` (`Add controlled recurrent paper refinement loop`).
 - Previous architecture specification commit: `c2e18dd`.
-- Full test suite passed: `77 passed`.
+- Full test suite passed after the current maintenance pass: `100 passed`.
+- Current maintenance pass adds stage transaction recovery and controller
+  projection tests plus deterministic end-to-end acceptance; full suite passed
+  after the maintenance changes: `100 passed`.
+- The tabular auto pipeline now persists typed `SubproblemContract`,
+  `ResultRecord`, and `TableRecord` truth records under `results/contracts/`,
+  projects `SectionEvidencePack` into drafting contexts, renders exact Chinese
+  numerical Claims/tables, and requires `CompletePaperContract` to pass before
+  final review/export.
+- Remaining work is governed by `docs/remaining-work-optimized-roadmap.md`.
+  The next slice is Phase A: deepen the regression paper with assumption,
+  data-semantic, diagnostic, subproblem-answer, and storyline records before
+  adding new task families.
+- This pass advanced all four requested phases: Phase A evidence records and
+  answer/storyline artifacts; Phase B deterministic full review and upstream
+  repair requests; Phase C explicit human approval, budget, and provenance
+  primitives; Phase D common task-family protocol plugins, invalid-protocol
+  gates, and a unified deterministic 12-section paper path for all five
+  families.
+- `src/mathworkstation/task_executors.py` now contains deterministic executors
+  for classification, forecasting, optimization, simulation, and ranking;
+  `TaskExecutionService` persists their protocol and result Artifact. The
+  non-tabular results are projected into Claims, tables, and figures through
+  the common evidence bridge; family-specific live-LLM refinement calibration
+  remains outside the release acceptance gate.
+- `src/mathworkstation/submission.py` now creates a clean user-facing Markdown
+  copy, deterministic LaTeX, and a persisted preflight report. `prepare-submission`
+  exposes the operation through the CLI. PDF compilation is attempted only
+  after preflight passes and records `LATEX_ENGINE_MISSING` when the local TeX
+  toolchain is unavailable.
+- `TaskPaperEvidenceBridge` now records family-specific evidence in addition to
+  headline metrics: classification confusion cells, forecasting point counts,
+  optimization solution variables and feasible-point counts, simulation
+  empirical interval endpoints, and ranking query/pair counts.
+- `src/mathworkstation/task_paper_pipeline.py` and
+  `AutoPipelineService.run_task_paper_pipeline()` integrate all five task
+  families through the existing DAG dependencies, 12-section outline, paper
+  contracts, consistency gate, and submission preflight. `run-task-paper` is
+  available from the CLI. This path is deterministic; family-specific live-LLM
+  refinement has not yet been benchmarked.
 - Streamlit console was started at `http://127.0.0.1:8501` in the previous
   session, but verify process/port state before relying on it.
 - Live LLM/image APIs were not called during the refinement tests.

@@ -39,7 +39,14 @@ class PromptTemplate(BaseModel):
 
 class PromptRegistry:
     def __init__(self, root: str | Path = "prompts") -> None:
-        self.root = Path(root)
+        requested = Path(root)
+        if requested.exists():
+            self.root = requested
+        else:
+            # Keep the editable/source checkout runnable when invoked outside its cwd.
+            project_root = Path(__file__).resolve().parents[3]
+            fallback = project_root / requested
+            self.root = fallback if fallback.exists() else requested
 
     def load(self, prompt_id: str) -> PromptTemplate:
         matches = list(self.root.rglob(f"{prompt_id}.json"))
@@ -68,4 +75,3 @@ def _fields(template: str) -> set[str]:
         for _, field_name, _, _ in string.Formatter().parse(template)
         if field_name
     }
-

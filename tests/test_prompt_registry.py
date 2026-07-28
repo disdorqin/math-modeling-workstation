@@ -30,3 +30,8 @@ def test_prompt_rejects_wrong_node_and_missing_variables() -> None:
     with pytest.raises(ValueError, match="missing prompt variables"):
         prompt.render("paper_draft", {"case_id": "x"})
 
+
+def test_prompt_registry_falls_back_to_project_root_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    registry = PromptRegistry("prompts")
+    assert registry.load("problem_analysis").prompt_id == "problem_analysis"

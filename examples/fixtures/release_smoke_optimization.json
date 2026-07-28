@@ -1,0 +1,13 @@
+{
+  "variables": [
+    {"name": "x", "lower": 0, "upper": 4, "step": 1},
+    {"name": "y", "lower": 0, "upper": 4, "step": 1}
+  ],
+  "objective": {
+    "sense": "max",
+    "coefficients": {"x": 2, "y": 1}
+  },
+  "constraints": [
+    {"coefficients": {"x": 1, "y": 1}, "operator": "<=", "rhs": 4}
+  ]
+}

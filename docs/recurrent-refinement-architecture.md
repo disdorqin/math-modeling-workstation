@@ -175,6 +175,13 @@ memory/
   refinement_state.json
 ```
 
+`memory/refinement_state.json` is the mutable controller projection. It is
+updated after every stage and contains the active stage, open issue IDs,
+accepted/rejected patch IDs, quality vector, section attention, and stopping
+counters. Stage directories, accepted versions, patch records, and JSONL
+history are append-only evidence and must not be overwritten to simulate
+hidden-state updates.
+
 Each accepted paper version and each stage decision is an Artifact. `paper/current.md` is a convenience pointer/copy, never the only copy of a version.
 
 ## 6. Quality Model
@@ -386,16 +393,22 @@ These controls bound both model rumination and mechanical rewrite loops.
 - On restart, load `refinement_state.json`, verify the frozen digest, and resume the first incomplete stage directory.
 - A changed evidence digest marks all later paper stages stale and starts a new refinement epoch; old versions remain immutable.
 
-Stage publication uses a two-phase commit:
+Stage publication uses a local transaction directory under
+`refinement/stages/stage-NNN/.pending/` (or the corresponding epoch path):
 
-1. write all candidate files under `refinement/stages/stage-NNN/.pending/`;
-2. verify file hashes and decision schema;
-3. register immutable Artifacts;
-4. atomically replace `refinement_state.json` and `paper/current.md`;
-5. append the history event and mark the stage `COMMITTED`.
+1. write the stage files and a `transaction.json` containing their hashes;
+2. verify those hashes, atomically publish the files into the stage directory,
+   and register their Artifacts;
+3. write `result.json`, then update `paper/current.md`, the state projection,
+   and append history idempotently;
+4. write `COMMITTED.json` with the result hash.
 
-On recovery, a `.pending` directory without a committed decision is resumed or
-discarded by hash and Run ID. It is never interpreted as an accepted paper.
+If the process stops after `result.json` but before the state projection is
+committed, the next run hydrates that result without invoking the proposer a
+second time. If it stops earlier, incomplete pending files remain diagnostic
+input and the stage is retried with a new Run. A missing commit marker for an
+already projected stage is repaired from `result.json`; it is never treated as
+a new accepted version.
 
 The event history is the audit source; `refinement_state.json` is a rebuildable
 projection for fast startup. This avoids a corrupt current-state file becoming

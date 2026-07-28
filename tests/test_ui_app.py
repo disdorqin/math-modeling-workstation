@@ -1,8 +1,21 @@
 import json
 from pathlib import Path
 
-from mathworkstation.case_manager import CaseManager
-from mathworkstation.ui_app import _sessions_for_case, _status_counts, _workflow_rows
+import pytest
+
+# ui_app imports streamlit at module scope; the [ui] extra is optional. Turn
+# its absence into a deliberate, reported skip rather than a hard collection
+# error, so `pytest` on a minimal install stays green and the CI job that
+# DOES install [ui] still exercises this test. (The helpers under test are
+# pure and need no running Streamlit, only the import to resolve.)
+pytest.importorskip("streamlit", reason="requires the optional [ui] extra (streamlit)")
+
+from mathworkstation.case_manager import CaseManager  # noqa: E402
+from mathworkstation.ui_app import (  # noqa: E402
+    _sessions_for_case,
+    _status_counts,
+    _workflow_rows,
+)
 
 
 def test_ui_reads_case_sessions_and_workflow_rows(tmp_path: Path) -> None:

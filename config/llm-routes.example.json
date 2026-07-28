@@ -1,75 +1,17 @@
 {
-  "max_attempts": 6,
+  "max_attempts": 2,
   "max_total_tokens": 12000,
   "routes": [
     {
-      "name": "testvideo-primary",
-      "base_url": "https://testvideo.site/v1",
-      "api_key_env": "MMW_TESTVIDEO_KEY",
-      "models": ["gpt-5.4-mini", "gpt-5.4", "gpt-5.2"],
+      "name": "openai-compatible-primary",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "models": ["gpt-4o-mini"],
       "priority": 10,
-      "timeout_seconds": 30,
-      "failure_threshold": 1,
-      "cooldown_seconds": 120,
-      "kind": "chat"
-    },
-    {
-      "name": "codexplus-primary",
-      "base_url": "https://codexplus.shop/v1",
-      "api_key_env": "MMW_CODEXPLUS_KEY_1",
-      "models": ["gpt-5.4-mini", "gpt-5.4"],
-      "priority": 30,
-      "timeout_seconds": 30,
-      "failure_threshold": 1,
-      "cooldown_seconds": 300,
-      "kind": "chat",
-      "risk_flags": ["observed_prompt_token_inflation"]
-    },
-    {
-      "name": "codexplus-secondary",
-      "base_url": "https://codexplus.shop/v1",
-      "api_key_env": "MMW_CODEXPLUS_KEY_2",
-      "models": ["gpt-5.4"],
-      "priority": 40,
       "timeout_seconds": 60,
-      "kind": "chat",
-      "risk_flags": ["high_latency"]
-    },
-    {
-      "name": "seekai-fallback-1",
-      "base_url": "https://seekai.cc/v1",
-      "api_key_env": "MMW_SEEKAI_KEY_1",
-      "models": ["gpt-5.4-mini", "gpt-5.4"],
-      "priority": 100,
-      "timeout_seconds": 10,
-      "failure_threshold": 1,
-      "cooldown_seconds": 300,
-      "kind": "chat",
-      "risk_flags": ["generation_timeout_observed"]
-    },
-    {
-      "name": "seekai-fallback-2",
-      "base_url": "https://seekai.cc/v1",
-      "api_key_env": "MMW_SEEKAI_KEY_2",
-      "models": ["gpt-5.4-mini", "gpt-5.4"],
-      "priority": 101,
-      "timeout_seconds": 10,
-      "failure_threshold": 1,
-      "cooldown_seconds": 300,
-      "kind": "chat",
-      "risk_flags": ["generation_timeout_observed"]
-    },
-    {
-      "name": "seekai-fallback-3",
-      "base_url": "https://seekai.cc/v1",
-      "api_key_env": "MMW_SEEKAI_KEY_3",
-      "models": ["gpt-5.4-mini", "gpt-5.4"],
-      "priority": 102,
-      "timeout_seconds": 10,
-      "failure_threshold": 1,
-      "cooldown_seconds": 300,
-      "kind": "chat",
-      "risk_flags": ["generation_timeout_observed"]
+      "failure_threshold": 2,
+      "cooldown_seconds": 30,
+      "kind": "chat"
     }
   ]
 }

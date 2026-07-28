@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -232,7 +233,13 @@ class IssueRegistry:
                 "attempt_count": old.get("attempt_count", 0),
                 "updated_at": now_iso(),
             }
-            append_jsonl(self.path, event)
+            if not (
+                old.get("status") == "OPEN"
+                and old.get("last_seen_stage") == stage
+                and old.get("severity") == event["severity"]
+                and old.get("detail") == event["detail"]
+            ):
+                append_jsonl(self.path, event)
             previous[issue_id] = event
         for issue_id, old in list(previous.items()):
             if old.get("status") == "OPEN" and issue_id not in seen:
@@ -245,6 +252,8 @@ class IssueRegistry:
         current = self.current()
         for issue_id in issue_ids:
             if issue_id not in current:
+                continue
+            if current[issue_id].get("last_attempt_stage") == stage:
                 continue
             event = {
                 **current[issue_id],
@@ -291,6 +300,7 @@ class RefinementService:
             started = self.workflow.start_node(case_id, "refinement_loop", session_id)
         try:
             state, sections, frozen = self._load_or_initialize(case_id, config, started["run"]["run_id"])
+            self._reconcile_stage_commit(case_id, state)
             issues = IssueRegistry(root / "refinement" / "issues.jsonl")
             stop_reason = "MAX_STAGES"
             while state["iteration"] < config.max_stages:
@@ -298,18 +308,25 @@ class RefinementService:
                 current_issues = issues.update(before["findings"], state["iteration"])
                 selected = _select_issues(current_issues, config)
                 if not selected:
-                    stop_reason = "CONVERGED"
+                    stop_reason = "BLOCKED" if any(
+                        item.get("status") == "OPEN" for item in current_issues.values()
+                    ) else "CONVERGED"
                     break
                 if proposer is None:
                     stop_reason = "NO_PROPOSER"
                     break
                 stage = state["iteration"] + 1
                 result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config)
+                effective_findings = result["findings_after"] if result["accepted"] else before["findings"]
+                current_issues = issues.update(effective_findings, stage)
                 issues.record_attempt(result["issue_ids"], stage, result["accepted"])
                 sections = result["sections"]
-                state = self._transition_state(state, result, config)
-                atomic_write_json(root / "memory" / "refinement_state.json", state)
-                append_jsonl(root / "refinement" / "history.jsonl", result["history_event"])
+                next_state = self._transition_state(state, result, config)
+                next_state["open_issue_ids"] = sorted(
+                    issue_id for issue_id, item in issues.current().items() if item.get("status") == "OPEN"
+                )
+                self._commit_stage(case_id, stage, result, next_state)
+                state = next_state
                 if state["rejection_streak"] >= config.max_rejection_streak:
                     if state["strategy_reset_count"] == 0 and state["iteration"] < config.max_stages:
                         state["strategy_reset_count"] = 1
@@ -403,11 +420,20 @@ class RefinementService:
             "quality_ema": evaluation["quality_vector"]["total"],
             "accepted_stages": [],
             "rejected_stages": [],
+            "accepted_patch_ids": [],
+            "rejected_patch_ids": [],
+            "open_issue_ids": sorted(
+                _issue_id(item["section_id"], item["code"])
+                for item in evaluation["findings"]
+            ),
+            "section_attention": {},
             "plateau_count": 0,
             "rejection_streak": 0,
             "no_progress_streak": 0,
             "strategy_reset_count": 0,
             "recent_patch_fingerprints": [],
+            "active_stage": None,
+            "active_stage_run_id": None,
             "config": asdict(config),
             "updated_at": now_iso(),
         }
@@ -428,17 +454,41 @@ class RefinementService:
         config: RefinementConfig,
     ) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
-        stage_root = (
-            root / "refinement" / "stages" / f"stage-{stage:03d}"
-            if int(state.get("epoch", 1)) == 1
-            else root / "refinement" / "epochs" / f"epoch-{int(state['epoch']):03d}" / "stages" / f"stage-{stage:03d}"
-        )
+        stage_root = _stage_root(root, int(state.get("epoch", 1)), stage)
         stage_root.mkdir(parents=True, exist_ok=True)
+        result_path = stage_root / "result.json"
+        if result_path.is_file():
+            return self._hydrate_stage_result(case_id, read_json(result_path), sections)
+
         run = self.runs.start_run(case_id, "refinement_stage", session_id)
+        pending_root = stage_root / ".pending"
+        pending_root.mkdir(parents=True, exist_ok=True)
+        active_state = {
+            **state,
+            "status": "RUNNING",
+            "active_stage": stage,
+            "active_stage_run_id": run["run_id"],
+            "updated_at": now_iso(),
+        }
+        atomic_write_json(root / "memory" / "refinement_state.json", active_state)
         try:
             editable_ids = _editable_sections(selected, frozen["section_order"], config.max_sections_per_stage)
             context = {
                 "stage": stage,
+                "audit_scope": {
+                    "full_paper_required": True,
+                    "section_ids": list(frozen["section_order"]),
+                    "evidence_digest": frozen["evidence"]["digest"],
+                    "checks": [
+                        "problem_and_subproblem_coverage",
+                        "assumptions_and_data_semantics",
+                        "model_formulas_and_implementation_alignment",
+                        "experiment_logs_seeds_and_splits",
+                        "results_tables_figures_and_citations",
+                        "sensitivity_failure_analysis_and_limits",
+                        "submission_and_artifact_integrity",
+                    ],
+                },
                 "quality_vector": before["quality_vector"],
                 "issues": selected,
                 "controller": {
@@ -459,23 +509,46 @@ class RefinementService:
                 "failed_strategies": state.get("failed_strategies", [])[-3:],
                 "current_paper_artifact_id": state["current_paper_artifact_id"],
             }
-            atomic_write_json(stage_root / "input.json", context)
-            atomic_write_json(stage_root / "evaluation.before.json", before)
-            atomic_write_json(stage_root / "selection.json", {"issues": selected, "editable_sections": editable_ids})
+            atomic_write_json(pending_root / "input.json", context)
+            atomic_write_json(pending_root / "evaluation.before.json", before)
+            atomic_write_json(pending_root / "selection.json", {"issues": selected, "editable_sections": editable_ids})
             proposal = proposer(context)
-            atomic_write_json(stage_root / "plan.json", proposal)
+            atomic_write_json(pending_root / "plan.json", proposal)
             candidate_sections, patch_meta = self._apply_proposal(sections, proposal, selected, editable_ids, config)
             candidate_text = _assemble(candidate_sections, frozen["section_order"])
-            atomic_write_text(stage_root / "candidate.md", candidate_text)
+            atomic_write_text(pending_root / "candidate.md", candidate_text)
             after = self.evaluator.evaluate(candidate_sections, frozen, config.targets)
-            atomic_write_json(stage_root / "evaluation.after.json", after)
+            atomic_write_json(pending_root / "evaluation.after.json", after)
             decision = _acceptance_decision(before, after, selected, sections, candidate_sections, config)
             patch_fingerprint = _payload_digest(proposal)
             if patch_fingerprint in state.get("recent_patch_fingerprints", []):
                 decision["accepted"] = False
                 decision["reasons"] = [*decision["reasons"], "repeated patch fingerprint"]
             decision.update({"stage": stage, "run_id": run["run_id"], "patch_fingerprint": patch_fingerprint, "decided_at": now_iso()})
-            atomic_write_json(stage_root / "decision.json", decision)
+            atomic_write_json(pending_root / "decision.json", decision)
+            stage_files = (
+                "input.json",
+                "evaluation.before.json",
+                "selection.json",
+                "plan.json",
+                "candidate.md",
+                "evaluation.after.json",
+                "decision.json",
+            )
+            transaction = {
+                "schema_version": 1,
+                "stage": stage,
+                "run_id": run["run_id"],
+                "status": "VERIFIED",
+                "files": {name: sha256_file(pending_root / name) for name in stage_files},
+                "verified_at": now_iso(),
+            }
+            atomic_write_json(pending_root / "transaction.json", transaction)
+            for name, digest in transaction["files"].items():
+                if sha256_file(pending_root / name) != digest:
+                    raise ValueError(f"pending stage file changed before publication: {name}")
+            for name in (*stage_files, "transaction.json"):
+                os.replace(pending_root / name, stage_root / name)
             candidate_artifact = self.artifacts.register_existing(case_id, (stage_root / "candidate.md").relative_to(root).as_posix(), "paper_refinement_candidate", "llm", run_id=run["run_id"], upstream=[state["current_paper_artifact_id"]], paper_eligible=False)
             decision_artifact = self.artifacts.register_existing(case_id, (stage_root / "decision.json").relative_to(root).as_posix(), "paper_refinement_decision", "python", run_id=run["run_id"], upstream=[candidate_artifact["artifact_id"]], paper_eligible=decision["accepted"])
             if decision["accepted"]:
@@ -486,29 +559,35 @@ class RefinementService:
                 atomic_write_json(sections_path, {"schema_version": 1, "stage": stage, "sections": candidate_sections})
                 atomic_write_text(version_path, candidate_text)
                 atomic_write_json(patch_path, patch_meta)
-                atomic_write_text(root / "paper" / "current.md", candidate_text)
                 version_artifact = self.artifacts.register_existing(case_id, version_path.relative_to(root).as_posix(), "paper_refinement_version", "python", run_id=run["run_id"], upstream=[state["current_paper_artifact_id"], decision_artifact["artifact_id"]], paper_eligible=True)
                 sections_artifact = self.artifacts.register_existing(case_id, sections_path.relative_to(root).as_posix(), "paper_refinement_sections", "python", run_id=run["run_id"], upstream=[version_artifact["artifact_id"]])
                 self.artifacts.register_existing(case_id, patch_path.relative_to(root).as_posix(), "paper_refinement_patch", "python", run_id=run["run_id"], upstream=[decision_artifact["artifact_id"]])
-                current_artifact = self.artifacts.register_existing(case_id, "paper/current.md", "paper_refinement_current", "python", run_id=run["run_id"], upstream=[version_artifact["artifact_id"]], paper_eligible=True)
-                artifact_ids = {"paper": current_artifact["artifact_id"], "sections": sections_artifact["artifact_id"]}
+                artifact_ids = {"paper": version_artifact["artifact_id"], "sections": sections_artifact["artifact_id"]}
                 output_sections = candidate_sections
             else:
                 artifact_ids = {"paper": state["current_paper_artifact_id"], "sections": state["current_sections_artifact_id"]}
                 output_sections = sections
-            self.runs.finish_run(case_id, run["run_id"], "SUCCEEDED")
-            return {
+            persisted_result = {
+                "schema_version": 1,
+                "epoch": int(state.get("epoch", 1)),
+                "stage": stage,
+                "source_paper_artifact_id": state["current_paper_artifact_id"],
                 "accepted": decision["accepted"],
                 "decision": decision,
                 "issue_ids": list(proposal.get("issue_ids", [])),
                 "strategy": proposal.get("strategy", ""),
                 "patch_fingerprint": patch_fingerprint,
+                "patch_id": f"patch-{patch_fingerprint[:12]}",
                 "quality_before": before["quality_vector"],
                 "quality_after": after["quality_vector"],
-                "sections": output_sections,
+                "findings_after": after["findings"],
+                "target_sections": editable_ids,
                 "artifact_ids": artifact_ids,
-                "history_event": {"timestamp": now_iso(), "stage": stage, "accepted": decision["accepted"], "run_id": run["run_id"], "reasons": decision["reasons"], **artifact_ids},
+                "history_event": {"timestamp": now_iso(), "epoch": int(state.get("epoch", 1)), "stage": stage, "accepted": decision["accepted"], "run_id": run["run_id"], "reasons": decision["reasons"], **artifact_ids},
             }
+            atomic_write_json(result_path, persisted_result)
+            self.runs.finish_run(case_id, run["run_id"], "SUCCEEDED")
+            return {**persisted_result, "sections": output_sections}
         except Exception as error:
             self.runs.finish_run(case_id, run["run_id"], "FAILED", {"type": type(error).__name__, "message": str(error)})
             raise
@@ -556,16 +635,109 @@ class RefinementService:
         updated["quality_vector"] = result["quality_after"] if accepted else result["quality_before"]
         updated["quality_ema"] = round(config.quality_ema_beta * state["quality_ema"] + (1 - config.quality_ema_beta) * after, 6)
         updated["rejection_streak"] = 0 if accepted else state["rejection_streak"] + 1
-        updated["no_progress_streak"] = 0 if accepted and delta >= config.min_delta else state["no_progress_streak"] + 1
+        made_progress = accepted and (
+            delta >= config.min_delta or result["decision"].get("route") == "DEFECT_RESOLUTION"
+        )
+        updated["no_progress_streak"] = 0 if made_progress else state["no_progress_streak"] + 1
+        updated["plateau_count"] = updated["no_progress_streak"]
         updated["accepted_stages"] = [*state["accepted_stages"], updated["iteration"]] if accepted else list(state["accepted_stages"])
         updated["rejected_stages"] = list(state["rejected_stages"]) if accepted else [*state["rejected_stages"], updated["iteration"]]
+        updated["accepted_patch_ids"] = (
+            [*state.get("accepted_patch_ids", []), result["patch_id"]]
+            if accepted else list(state.get("accepted_patch_ids", []))
+        )
+        updated["rejected_patch_ids"] = (
+            list(state.get("rejected_patch_ids", []))
+            if accepted else [*state.get("rejected_patch_ids", []), result["patch_id"]]
+        )
+        attention = {key: round(float(value) * 0.8, 6) for key, value in state.get("section_attention", {}).items()}
+        for section_id in result.get("target_sections", []):
+            attention[section_id] = round(attention.get(section_id, 0.0) + 0.2, 6)
+        updated["section_attention"] = attention
         updated["current_paper_artifact_id"] = result["artifact_ids"]["paper"]
         updated["current_sections_artifact_id"] = result["artifact_ids"]["sections"]
         updated["recent_patch_fingerprints"] = [*state.get("recent_patch_fingerprints", []), result["patch_fingerprint"]][-5:]
         if not accepted:
             updated["failed_strategies"] = [*state.get("failed_strategies", []), {"stage": updated["iteration"], "strategy": result["strategy"], "reasons": result["decision"]["reasons"]}][-10:]
+        updated["active_stage"] = None
+        updated["active_stage_run_id"] = None
         updated["updated_at"] = now_iso()
         return updated
+
+    def _hydrate_stage_result(
+        self,
+        case_id: str,
+        persisted: dict[str, Any],
+        current_sections: dict[str, str],
+    ) -> dict[str, Any]:
+        if persisted["accepted"]:
+            sections_artifact = self.artifacts.get(case_id, persisted["artifact_ids"]["sections"])
+            root = self.cases.case_root(case_id)
+            output_sections = read_json(root / sections_artifact["path"])["sections"]
+        else:
+            output_sections = current_sections
+        return {**persisted, "sections": output_sections}
+
+    def _commit_stage(
+        self,
+        case_id: str,
+        stage: int,
+        result: dict[str, Any],
+        state: dict[str, Any],
+    ) -> None:
+        root = self.cases.case_root(case_id)
+        if result["accepted"]:
+            version_artifact = self.artifacts.get(case_id, result["artifact_ids"]["paper"])
+            version_text = (root / version_artifact["path"]).read_text(encoding="utf-8")
+            atomic_write_text(root / "paper" / "current.md", version_text)
+            self.artifacts.register_existing(
+                case_id,
+                "paper/current.md",
+                "paper_refinement_current",
+                "python",
+                run_id=result["history_event"]["run_id"],
+                upstream=[version_artifact["artifact_id"]],
+                paper_eligible=True,
+            )
+        atomic_write_json(root / "memory" / "refinement_state.json", state)
+        _append_history_once(root / "refinement" / "history.jsonl", result["history_event"])
+        stage_root = _stage_root(root, int(state.get("epoch", 1)), stage)
+        atomic_write_json(
+            stage_root / "COMMITTED.json",
+            {
+                "schema_version": 1,
+                "epoch": int(state.get("epoch", 1)),
+                "stage": stage,
+                "run_id": result["history_event"]["run_id"],
+                "result_sha256": sha256_file(stage_root / "result.json"),
+                "committed_at": now_iso(),
+            },
+        )
+
+    def _reconcile_stage_commit(self, case_id: str, state: dict[str, Any]) -> None:
+        stage = int(state.get("iteration", 0))
+        if stage <= 0:
+            return
+        root = self.cases.case_root(case_id)
+        stage_root = _stage_root(root, int(state.get("epoch", 1)), stage)
+        result_path = stage_root / "result.json"
+        committed_path = stage_root / "COMMITTED.json"
+        if committed_path.is_file() or not result_path.is_file():
+            return
+        result = read_json(result_path)
+        _append_history_once(root / "refinement" / "history.jsonl", result["history_event"])
+        atomic_write_json(
+            committed_path,
+            {
+                "schema_version": 1,
+                "epoch": int(state.get("epoch", 1)),
+                "stage": stage,
+                "run_id": result["history_event"]["run_id"],
+                "result_sha256": sha256_file(result_path),
+                "committed_at": now_iso(),
+                "recovered": True,
+            },
+        )
 
     def _freeze(self, case_id: str, sections: dict[str, str], manifest: dict[str, Any]) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
@@ -721,3 +893,25 @@ def _update_gate(issues: list[dict[str, Any]], state: dict[str, Any], config: Re
     confidence = max((severity.get(item["severity"], 0.4) for item in issues), default=0.0)
     remaining = max(0.2, 1 - state["iteration"] / config.max_stages)
     return round(confidence * remaining, 4)
+
+
+def _stage_root(root: Path, epoch: int, stage: int) -> Path:
+    if epoch == 1:
+        return root / "refinement" / "stages" / f"stage-{stage:03d}"
+    return root / "refinement" / "epochs" / f"epoch-{epoch:03d}" / "stages" / f"stage-{stage:03d}"
+
+
+def _append_history_once(path: Path, event: dict[str, Any]) -> None:
+    if path.is_file():
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                current = json.loads(line)
+                if (
+                    current.get("epoch", 1) == event.get("epoch", 1)
+                    and current.get("stage") == event.get("stage")
+                    and current.get("run_id") == event.get("run_id")
+                ):
+                    return
+    append_jsonl(path, event)
