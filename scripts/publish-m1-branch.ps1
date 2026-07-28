@@ -58,6 +58,18 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference    = "SilentlyContinue"
 
+# --- Windows console / Python stream encoding ---
+# On Windows runners the default console stdout is a charmap (e.g. cp1252)
+# that cannot encode the Chinese-language output produced by the modeling
+# agents (cases are created with --language zh). Force UTF-8 for both the
+# console and every Python subprocess so run-agent-pipeline etc. do not die
+# with "'charmap' codec can't encode characters". This is a no-op on UTF-8
+# hosts and required for the CI Windows dry-run to pass.
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
+try { chcp 65001 | Out-Null } catch { }
+
 $repoRoot = (Get-Location).Path
 $log = Join-Path $repoRoot "verification-run.log"
 Start-Transcript -Path $log -Force | Out-Null
