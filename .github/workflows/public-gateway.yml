@@ -1,0 +1,55 @@
+name: public-gateway
+
+# Builds the public, AI-readable audit gateway (scripts/build_public_gateway.py)
+# and publishes it to GitHub Pages. The gateway is generated ONLY from tracked
+# files (git ls-files / git archive) plus explicitly downloaded CI artifacts,
+# and every generated text file is scanned for secret patterns before publish.
+#
+# Prerequisite: enable Pages in repo Settings -> Pages -> Build and deployment
+# -> Source = "GitHub Actions". Until that is set, the deploy job will fail but
+# the build job (and its secret scan) still provides CI evidence.
+
+on:
+  push:
+    branches: [public-ai-audit-gateway]
+    tags: ["m1-*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so `git archive HEAD` resolves
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build public gateway (stdlib only; no pip needed)
+        run: python scripts/build_public_gateway.py --repo-root . --out public-site
+      - name: Assert the secret scan passed (build already fails on violation)
+        run: python -c "import json; s=json.load(open('public-site/BUILD_SUMMARY.json')); assert s['scan_violations']==0, s"
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
