@@ -51,6 +51,68 @@ def _key_variants(key: str, model: type[BaseModel] | None = None) -> list[str]:
     return [v for v in variants if v]
 
 
+#: Fields that can be derived from another field when the LLM omits them.
+#: A real LLM sometimes skips a required field (e.g. objective) while providing
+#: a related one (e.g. title / tasks). Filling it keeps the pipeline alive
+#: instead of dying on a schema omission — the derivation is best-effort text,
+#: never a fabricated number or claim.
+_FIELD_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "objective": ("title", "tasks", "description", "summary"),
+    "title": ("objective", "description", "summary"),
+    "description": ("title", "objective"),
+}
+
+
+def _fill_required_fields(value: Any, model: type[BaseModel]) -> Any:
+    """Best-effort fill of missing required fields from sibling fields.
+
+    After key coercion, a required field may still be missing (the LLM skipped
+    it). For text fields with a known fallback, derive a value from a sibling
+    field so the schema validates and the pipeline continues. Never fabricates
+    numbers/claims — only reuses text the LLM already produced.
+    """
+    if not isinstance(value, dict):
+        return value
+    # Drop keys the model forbids (extra='forbid') — the LLM sometimes adds
+    # fields (e.g. 'tasks') that aren't on the schema. Removing them lets the
+    # model validate; any useful text they carried was already folded into a
+    # fallback field above.
+    for key in [k for k in value if k not in model.model_fields]:
+        value.pop(key, None)
+    present = {k for k in value if value.get(k) not in (None, "", [])}
+    for field_name, field_info in model.model_fields.items():
+        if field_name in present:
+            continue
+        # Only fill optional-satisfying text/list fields; skip complex types.
+        annotation = str(field_info.annotation)
+        is_text = "str" in annotation
+        is_list = "list" in annotation
+        if not (is_text or is_list):
+            continue
+        fallbacks = _FIELD_FALLBACKS.get(field_name)
+        if not fallbacks:
+            continue
+        for fb in fallbacks:
+            if fb in present and value.get(fb):
+                src = value[fb]
+                if isinstance(src, list):
+                    src = "；".join(str(s) for s in src if s)
+                if src:
+                    value[field_name] = str(src)[:200]
+                    break
+    # Recurse into declared sub-model fields only (skip extra keys that are
+    # not on the model — they have no child schema to recurse into).
+    for key, item in list(value.items()):
+        if key not in model.model_fields:
+            continue
+        child = _field_child_model(model, key)
+        if child is not None and isinstance(item, dict):
+            value[key] = _fill_required_fields(item, child)
+        elif child is not None and isinstance(item, list):
+            value[key] = [_fill_required_fields(el, child) for el in item if isinstance(el, dict)]
+    return value
+
+
 def _field_child_model(model: type[BaseModel], field_name: str) -> type[BaseModel] | None:
     """Resolve the pydantic sub-model type for a field, unwrapping Optional/list."""
     import typing
@@ -228,9 +290,12 @@ class StructuredLLM:
             return output_model.model_validate(payload), result
         except ValidationError:
             # Fall back to key normalisation: a real LLM may have emitted
-            # camelCase / alias keys. Map them onto the schema's fields before
-            # re-validating; if that still fails, surface the original error.
+            # camelCase / alias keys or skipped a required field. Map keys onto
+            # the schema's fields, best-effort fill missing required text fields
+            # from siblings, then re-validate. If that still fails, surface the
+            # original error.
             coerced = _coerce_keys(payload, output_model)
+            coerced = _fill_required_fields(coerced, output_model)
             return output_model.model_validate(coerced), result
 
     def markdown_call(
