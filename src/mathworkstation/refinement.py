@@ -86,6 +86,14 @@ class RefinementConfig:
 
 
 class PaperQualityEvaluator:
+    def __init__(self, coherence: bool = False) -> None:
+        """
+        Args:
+            coherence: 为 True 时把 PaperCoherenceChecker 的 P2 发现并入
+                findings(默认 False → 行为与既有完全一致, 不破坏既有测试)。
+        """
+        self.coherence = coherence
+
     def evaluate(
         self,
         sections: dict[str, str],
@@ -148,6 +156,14 @@ class PaperQualityEvaluator:
                         dimension=dimension,
                     )
                 )
+        if self.coherence:
+            from .paper_coherence import PaperCoherenceChecker
+            coherence_findings = PaperCoherenceChecker().check(sections)
+            for item in coherence_findings:
+                if not any(existing.get("code") == item["code"] and existing.get("section_id") == item["section_id"]
+                           for existing in findings):
+                    findings.append(item)
+
         hard_pass = not any(item["severity"] in {"P0", "P1"} for item in findings)
         total = sum(dimensions.values()) / len(dimensions)
         return {
@@ -277,12 +293,17 @@ class RefinementService:
         workflow: WorkflowService,
         runs: RunManager,
         evaluator: PaperQualityEvaluator | None = None,
+        coherence: bool = False,
     ) -> None:
         self.cases = cases
         self.artifacts = artifacts
         self.workflow = workflow
         self.runs = runs
-        self.evaluator = evaluator or PaperQualityEvaluator()
+        if evaluator is not None:
+            self.evaluator = evaluator
+        else:
+            # coherence=True → 注入 PaperCoherenceChecker 的 P2 发现作为打磨 issue
+            self.evaluator = PaperQualityEvaluator(coherence=coherence)
 
     def run(
         self,

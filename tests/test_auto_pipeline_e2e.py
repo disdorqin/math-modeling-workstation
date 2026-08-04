@@ -161,7 +161,10 @@ class DeterministicStructuredLLM:
 def test_auto_pipeline_produces_traceable_refined_export(tmp_path: Path) -> None:
     cases = CaseManager(tmp_path / "output")
     case = cases.create_case("SM", "端到端验收案例")
-    service = AutoPipelineService(cases, None)  # type: ignore[arg-type]
+    # Deterministic fixture proposer cannot resolve coherence (P2) cross-section
+    # issues, so keep the classic non-coherence behaviour here (Skill C is
+    # exercised separately by the coherence tests).
+    service = AutoPipelineService(cases, None, coherence=False)  # type: ignore[arg-type]
     service.llm = DeterministicStructuredLLM(service)  # type: ignore[assignment]
     session = service.sessions.create_session(case["case_id"])
 

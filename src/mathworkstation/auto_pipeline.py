@@ -63,7 +63,22 @@ from .io_utils import append_jsonl, atomic_write_json, atomic_write_text, now_is
 
 
 class AutoPipelineService:
-    def __init__(self, cases: CaseManager, llm_router: LLMRouter, image_router: ImageRouter | None = None) -> None:
+    def __init__(
+        self,
+        cases: CaseManager,
+        llm_router: LLMRouter,
+        image_router: ImageRouter | None = None,
+        coherence: bool = True,
+    ) -> None:
+        """Evidence-first paper pipeline.
+
+        ``coherence`` (Skill C) enables the PaperCoherenceChecker's soft (P2)
+        findings to feed the refinement loop's multi-stage curriculum. It is ON
+        by default for real-LLM pipelines; deterministic tests that use a
+        fixture proposer which cannot resolve cross-section coherence issues
+        may pass ``coherence=False`` to keep the classic behaviour.
+        """
+        self.coherence = coherence
         self.cases = cases
         self.artifacts = ArtifactRegistry(cases)
         self.checkpoints = CheckpointManager(cases)
@@ -114,7 +129,10 @@ class AutoPipelineService:
         self.ingestion = ProblemIngestionService(cases, self.artifacts)
         self.llm = StructuredLLM(CaseLLMService(cases, self.artifacts, self.sessions, self.checkpoints, llm_router))
         self.research = ResearchAuditService(cases, self.artifacts, self.datasets)
-        self.refinement = RefinementService(cases, self.artifacts, self.workflow, self.runs)
+        # Skill C coherence 集成: PaperCoherenceChecker 的 P2 发现并入打磨 issue,
+        # 驱动 5-Stage 课程 (coherence→humanize→figures→notation→final_polish).
+        # 由构造参数 coherence 控制, 确定性 fixture 测试可关闭以保持旧行为。
+        self.refinement = RefinementService(cases, self.artifacts, self.workflow, self.runs, coherence=self.coherence)
         self.task_paper_pipeline = TaskPaperPipelineService(
             cases,
             self.artifacts,

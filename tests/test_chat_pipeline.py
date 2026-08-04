@@ -86,7 +86,7 @@ def test_pipeline_with_inputs_runs_and_reaches_approval(driver, services, tmp_pa
     def service_factory(router):
         from mathworkstation.auto_pipeline import AutoPipelineService
 
-        svc = AutoPipelineService(services["cases"], router)
+        svc = AutoPipelineService(services["cases"], router, coherence=False)
         svc.llm = DeterministicStructuredLLM(svc)  # type: ignore[assignment]
         return svc
 

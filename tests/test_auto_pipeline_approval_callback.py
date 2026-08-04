@@ -23,7 +23,7 @@ from test_auto_pipeline_e2e import DeterministicStructuredLLM
 def _fixture(tmp_path: Path):
     cases = CaseManager(tmp_path / "output")
     case = cases.create_case("SM", "审批回调验收")
-    service = AutoPipelineService(cases, None)  # type: ignore[arg-type]
+    service = AutoPipelineService(cases, None, coherence=False)  # type: ignore[arg-type]
     service.llm = DeterministicStructuredLLM(service)  # type: ignore[assignment]
     session = service.sessions.create_session(case["case_id"])
 
