@@ -4,12 +4,104 @@ import json
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .paper_contracts import SubproblemContract
 
 from .llm.prompts import PromptRegistry
 from .llm.service import CaseLLMService
+
+
+def _camel_to_snake(name: str) -> str:
+    """'subProblemId' -> 'sub_problem_id' (best-effort)."""
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+
+#: Semantic key aliases a real LLM commonly emits for a schema field. This is
+#: a *best-effort* normalisation for structural drift, never a source of truth.
+_SEMANTIC_ALIASES: dict[str, set[str]] = {
+    "description": {"title", "objective", "summary", "detail"},
+    "name": {"title", "label"},
+    "title": {"name", "description"},
+    "objective": {"description", "goal", "purpose"},
+}
+
+
+def _key_variants(key: str, model: type[BaseModel] | None = None) -> list[str]:
+    """Candidate spellings a real LLM might emit for a schema field.
+
+    Handles camelCase drift, the suffix collapse (``subproblem_id`` emitted as
+    ``id``), and a small set of semantic aliases (``description`` -> ``title``).
+    """
+    base = key.strip()
+    variants = {base, _camel_to_snake(base), _camel_to_snake(base).replace("_", "")}
+    if model is not None:
+        for field in model.model_fields:
+            if base in ("id", "name", "description", "title", "objective") and (
+                field == f"{base}_id"
+                or field.endswith(f"_{base}")
+                or field.startswith(f"{base}_")
+            ):
+                variants.add(field)
+        for alias in _SEMANTIC_ALIASES.get(base, ()):
+            if alias in model.model_fields:
+                variants.add(alias)
+    return [v for v in variants if v]
+    return [v for v in variants if v]
+
+
+def _field_child_model(model: type[BaseModel], field_name: str) -> type[BaseModel] | None:
+    """Resolve the pydantic sub-model type for a field, unwrapping Optional/list."""
+    import typing
+
+    annotation = model.model_fields[field_name].annotation
+    if annotation is None:
+        return None
+    # unwrap Optional[...] and list[...] to find a BaseModel
+    args = getattr(annotation, "__args__", ())
+    for candidate in [annotation, *args]:
+        if isinstance(candidate, type) and issubclass(candidate, BaseModel):
+            return candidate
+    return None
+
+
+def _coerce_keys(value: Any, model: type[BaseModel]) -> Any:
+    """Recursively map payload keys onto a pydantic model's fields.
+
+    Real LLMs (e.g. DeepSeek) occasionally return JSON whose keys drift from the
+    schema ('id' instead of 'subproblem_id', camelCase instead of snake_case).
+    When strict validation fails, this normalises keys to the model's declared
+    fields so a formatting slip does not kill a whole evidence pipeline.
+    """
+    fields = set(model.model_fields)
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        # Keys already present as literal payload keys — avoid mapping an alias
+        # onto one of them (e.g. description->title when objective also present).
+        present = {k for k in value if k in fields}
+        for key, item in value.items():
+            target = key
+            if key not in fields:
+                for variant in _key_variants(key, model):
+                    if variant in fields and variant not in present:
+                        target = variant
+                        break
+                else:
+                    # no free alias target; fall back to first matching field
+                    for variant in _key_variants(key, model):
+                        if variant in fields:
+                            target = variant
+                            break
+            child = _field_child_model(model, target) if target in model.model_fields else None
+            if child is not None:
+                item = _coerce_keys(item, child)
+            result[target] = item
+        return result
+    if isinstance(value, list):
+        # Coerce each element against the model (elements may be sub-models).
+        return [_coerce_keys(item, model) for item in value]
+    return value
 
 
 class ProblemAnalysis(BaseModel):
@@ -132,7 +224,14 @@ class StructuredLLM:
             response_format={"type": "json_object"},
         )
         payload = json.loads(_strip_json_fence(result["response"]["content"]))
-        return output_model.model_validate(payload), result
+        try:
+            return output_model.model_validate(payload), result
+        except ValidationError:
+            # Fall back to key normalisation: a real LLM may have emitted
+            # camelCase / alias keys. Map them onto the schema's fields before
+            # re-validating; if that still fails, surface the original error.
+            coerced = _coerce_keys(payload, output_model)
+            return output_model.model_validate(coerced), result
 
     def markdown_call(
         self,

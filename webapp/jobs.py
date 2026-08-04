@@ -9,19 +9,32 @@ store; it adds the two things S1 deliberately left to the web layer:
 * an async **runner** that advances a job, blocks at the approval gate, and
   publishes ``progress`` / ``approval_required`` / ``ledger`` / ``done``.
 
-S1's ``ChatDriver._schedule_pipeline`` currently only *schedules* a pipeline
-("execution lands in S1.1/S3"). Until that lands, the runner advances jobs in
-**rehearsal mode**: the event sequence and the approval gate are real, but no
-Case evidence is written. Every rehearsal job says so in its payload, its logs,
-and its result, so a rehearsal can never be mistaken for a real pipeline run.
+**S1.3 — real events, no simulation.** S1.2 landed real execution: the driver's
+``ChatDriver._schedule_pipeline`` now runs ``AutoPipelineService.run()`` in a
+worker thread. When a job carries real inputs (``problem_source`` +
+``data_source``) the runner no longer *simulates* anything — it installs the
+``progress_callback`` / ``approval_callback`` pair built by
+:meth:`JobRunner.build_pipeline_callbacks`, forwards the pipeline's genuine
+events onto the bus, and blocks the worker thread at each of the four real
+approval nodes (``data_registration``, ``model_selection``, ``paper_ready``,
+``final_review``) until a human approves through the web shell.
+
+The legacy **rehearsal mode** survives only as the no-input demo path (a job
+created without real sources): its event sequence and approval gate are real,
+but no Case evidence is written, and every such job says ``mode=rehearsal`` in
+its payload, logs and result — so it can never be mistaken for a real run.
+Real jobs are tagged ``mode=real``.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
+import threading
 from collections import defaultdict
+from pathlib import Path
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from mathworkstation.chat.jobs import JobManager as CoreJobManager
 
@@ -49,6 +62,24 @@ REHEARSAL_NODES: list[tuple[str, bool]] = [
     ("export", False),
 ]
 
+# Natural order of the real pipeline (mirrors AutoPipelineService); used only to
+# estimate the progress bar for the web shell. The authoritative node state
+# lives in the workflow checkpoints, not here.
+REAL_NODES: list[str] = [
+    "problem_ingest",
+    "data_registration",
+    "problem_analysis",
+    "eda",
+    "model_selection",
+    "model_comparison",
+    "sensitivity",
+    "paper_draft",
+    "paper_ready",
+    "consistency_check",
+    "final_review",
+    "export",
+]
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
@@ -64,9 +95,15 @@ class EventBus:
         self._subscribers: dict[str, list[asyncio.Queue]] = defaultdict(list)
         self._history: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._lock = asyncio.Lock()
+        self._tlock = threading.Lock()
+        self._loop: "asyncio.AbstractEventLoop | None" = None
 
     async def subscribe(self, job_id: str) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
         async with self._lock:
             self._subscribers[job_id].append(queue)
             for event in self._history[job_id]:  # replay for reconnects
@@ -80,6 +117,10 @@ class EventBus:
 
     async def publish(self, job_id: str, event: dict[str, Any]) -> None:
         event = {"ts": _now(), **event}
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
         async with self._lock:
             self._history[job_id].append(event)
             if len(self._history[job_id]) > 500:
@@ -91,6 +132,31 @@ class EventBus:
     def history(self, job_id: str) -> list[dict[str, Any]]:
         return list(self._history.get(job_id, []))
 
+    def publish_sync(self, job_id: str, event: dict[str, Any]) -> None:
+        """Thread-safe publish for callbacks fired from pipeline worker threads.
+
+        The real pipeline (``PipelineRunner``) emits progress/approval events from
+        a worker thread, not the event loop. We append to history under a lock and
+        fan out to subscribers via ``loop.call_soon_threadsafe`` so the WebSocket
+        layer (which lives on the event loop) receives them safely.
+        """
+        event = {"ts": _now(), **event}
+        with self._tlock:
+            self._history[job_id].append(event)
+            if len(self._history[job_id]) > 500:
+                self._history[job_id] = self._history[job_id][-500:]
+            targets = list(self._subscribers.get(job_id, []))
+        loop = self._loop
+        if loop is not None:
+            for queue in targets:
+                loop.call_soon_threadsafe(queue.put_nowait, event)
+        else:
+            for queue in targets:
+                try:
+                    queue.put_nowait(event)
+                except Exception:
+                    pass
+
 
 # --------------------------------------------------------------------------
 # runner
@@ -98,13 +164,18 @@ class EventBus:
 class JobRunner:
     """Drives jobs and streams their events; storage stays in S1's JobManager."""
 
-    def __init__(self, services: Any, bus: EventBus) -> None:
+    def __init__(self, services: Any, bus: EventBus, driver: Any = None) -> None:
         self.services = services
         self.bus = bus
+        self.driver = driver
         self._tasks: dict[str, asyncio.Task] = {}
         self._approvals: dict[str, asyncio.Event] = {}
+        self._thread_approvals: dict[str, threading.Event] = {}
+        self._approvers: dict[str, str] = {}
+        self._done_events: dict[str, asyncio.Event] = {}
         self._cancelled: set[str] = set()
         self._case_of: dict[str, str] = {}
+        self._real_job_of: dict[str, str] = {}
 
     # -- store access -----------------------------------------------------
     def store(self, case_id: str) -> CoreJobManager:
@@ -155,12 +226,21 @@ class JobRunner:
         self._cancelled.discard(job_id)
         self._tasks[job_id] = asyncio.create_task(self._run(job))
 
-    def approve(self, job_id: str) -> bool:
+    def approve(self, job_id: str, approver: str | None = None) -> bool:
+        print(f"[approve] CALLED job_id={job_id} approver={approver} thread={threading.current_thread().name}", flush=True)
+        released = False
         event = self._approvals.get(job_id)
-        if event is None:
-            return False
-        event.set()
-        return True
+        if event is not None:
+            event.set()
+            released = True
+        # Real pipeline approval gate runs in a worker thread (threading.Event).
+        t = self._thread_approvals.get(job_id)
+        if t is not None:
+            if approver:
+                self._approvers[job_id] = approver
+            t.set()
+            released = True
+        return released
 
     def cancel(self, job_id: str) -> None:
         self._cancelled.add(job_id)
@@ -168,11 +248,190 @@ class JobRunner:
         if event:
             event.set()
 
+    # -- real pipeline bridge (S1.3) --------------------------------------
+    def _real_progress_fraction(self, node: str, status: str) -> float:
+        try:
+            idx = REAL_NODES.index(node)
+        except ValueError:
+            idx = len(REAL_NODES) - 1
+        total = len(REAL_NODES)
+        return (
+            round((idx + 1) / total, 3)
+            if status in ("SUCCEEDED", "APPROVED")
+            else round(idx / total, 3)
+        )
+
+    def _resolve_job(self, case_id: str) -> str | None:
+        """Find the live real pipeline job for a case.
+
+        The driver creates the job (status=running) *before* its worker thread
+        emits the first progress event, so by the time any callback fires the
+        job already exists on disk. We resolve it by case id (most recent
+        running/blocked real ``auto_pipeline`` job) — no caller-side hand-off of
+        the job id is needed, which avoids a publish race on the first event.
+        """
+        cached = self._real_job_of.get(case_id)
+        if cached:
+            return cached
+        try:
+            jobs = self.list_for_case(case_id)
+        except Exception:
+            return None
+        for j in reversed(jobs):
+            payload = j.get("payload") or {}
+            if (
+                j.get("kind") == "auto_pipeline"
+                and payload.get("problem_source")
+                and payload.get("data_source")
+                and j.get("status") in ("running", "waiting_approval")
+            ):
+                self._real_job_of[case_id] = j["job_id"]
+                return j["job_id"]
+        return None
+
+    def build_pipeline_callbacks(self, case_id: str) -> tuple[Callable, Callable]:
+        """Return (progress_callback, approval_callback) for the real pipeline.
+
+        They forward the driver-owned pipeline's events onto the EventBus and
+        gate approvals on a human. The job id is resolved lazily from the case
+        (the driver writes the job before its worker thread fires the first
+        event), so no caller-side hand-off is required.
+        """
+        runner = self
+
+        def progress_callback(event: dict[str, Any]) -> None:
+            job_id = runner._resolve_job(case_id)
+            if not job_id:
+                return
+            etype = event.get("type")
+            if etype == "progress":
+                node = event.get("node", "")
+                status = event.get("status", "")
+                frac = runner._real_progress_fraction(node, status)
+                runner.bus.publish_sync(
+                    job_id,
+                    {
+                        "type": "progress",
+                        "node": node,
+                        "status": status,
+                        "progress": frac,
+                        "message": event.get("message", ""),
+                    },
+                )
+                if status in ("SUCCEEDED", "APPROVED"):
+                    store = runner.store(runner._case_of.get(job_id) or case_id)
+                    payload = dict((store.get(job_id) or {}).get("payload") or {})
+                    payload["completed_nodes"] = sorted(
+                        set(payload.get("completed_nodes", [])) | {node}
+                    )
+                    store.update(job_id, progress=frac, payload=payload)
+            elif etype == "done":
+                runner.bus.publish_sync(job_id, {"type": "done", "result": event.get("result")})
+                done = runner._done_events.get(job_id)
+                if done is not None:
+                    done.set()
+            else:
+                runner.bus.publish_sync(job_id, event)
+
+        def approval_callback(cid: str, node_id: str, who: str, note: str) -> str:
+            job_id = runner._resolve_job(case_id)
+            if not job_id:
+                return who
+            store = runner.store(runner._case_of.get(job_id) or case_id)
+            store.update(job_id, status=WAITING_APPROVAL, awaiting_approval=[node_id])
+            store.log(job_id, "warn", f"真实节点 {node_id} 阻塞等待真人审批")
+            runner.bus.publish_sync(
+                job_id, {"type": "approval_required", "nodes": [node_id]}
+            )
+            # Block the pipeline worker thread until a human approves via the
+            # web shell (the /api/cases/{id}/approve endpoint sets this Event).
+            ev = runner._thread_approvals.setdefault(job_id, threading.Event())
+            print(f"[acb] BLOCK job_id={job_id} node={node_id} ev_set={ev.is_set()} thread={threading.current_thread().name}", flush=True)
+            ev.wait()
+            print(f"[acb] UNBLOCK job_id={job_id} node={node_id} thread={threading.current_thread().name}", flush=True)
+            store.update(job_id, status="running", awaiting_approval=None)
+            store.log(
+                job_id,
+                "info",
+                f"真实节点 {node_id} 审批通过 by {runner._approvers.get(job_id, who)}",
+            )
+            return runner._approvers.get(job_id, who)
+
+        return progress_callback, approval_callback
+
+    def attach_real(self, job_id: str, case_id: str) -> None:
+        """Register a driver-created real pipeline job with the runner so the
+        WebSocket / approval layers can find it. Does NOT start a loop — the
+        driver-owned worker thread drives the job.
+        """
+        job = self.get(job_id, case_id)
+        if job is None:
+            return
+        job.setdefault("case_id", case_id)
+        self._case_of[job_id] = case_id
+        self._real_job_of[case_id] = job_id
+        self._thread_approvals.setdefault(job_id, threading.Event())
+        payload = dict((job.get("payload") or {}))
+        if payload.get("problem_source") and payload.get("data_source"):
+            payload["mode"] = "real"
+            self.store(case_id).update(job_id, payload=payload)
+
+    def load_uploaded_inputs(self, case_id: str) -> dict[str, Any] | None:
+        root = self.services.case_root(case_id)
+        path = root / "input" / "uploaded_inputs.json"
+        if not path.is_file():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+
+    def record_uploaded_input(
+        self,
+        case_id: str,
+        file_path: str,
+        kind: str,
+        source_uri: str = "",
+        license_name: str = "",
+    ) -> None:
+        root = self.services.case_root(case_id)
+        upload_dir = root / "input"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        path = upload_dir / "uploaded_inputs.json"
+        data: dict[str, Any] = {}
+        if path.is_file():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+        ext = Path(file_path).suffix.lstrip(".").lower()
+        data_exts = {"csv", "xlsx", "xls", "parquet", "tsv", "json", "feather", "orc"}
+        if kind == "problem" or (kind != "data" and ext not in data_exts):
+            data["problem_source"] = file_path
+        if kind == "data" or ext in data_exts:
+            data["data_source"] = file_path
+            if source_uri:
+                data["source_uri"] = source_uri
+            if license_name:
+                data["license_name"] = license_name
+        if "dataset_name" not in data:
+            data["dataset_name"] = "对话上传数据"
+        if "competition_type" not in data:
+            data["competition_type"] = "SM"
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
     # -- execution --------------------------------------------------------
     async def _run(self, job: dict[str, Any]) -> None:
         job_id = job["job_id"]
         case_id = job.get("case_id") or self._case_of.get(job_id)
         store = self.store(case_id)
+        payload = (store.get(job_id) or job).get("payload") or {}
+        if payload.get("problem_source") and payload.get("data_source"):
+            # Real pipeline job: the driver-owned worker thread drives events;
+            # the runner only awaits completion (see S1.3). This branch only
+            # triggers if something calls start() on a real job.
+            await self._run_real(job)
+            return
         case_root = self.services.case_root(case_id)
         try:
             store.update(job_id, status=RUNNING)
@@ -252,3 +511,15 @@ class JobRunner:
         except Exception as exc:  # pragma: no cover - defensive
             store.update(job_id, status=FAILED, result={"error": str(exc)})
             await self.bus.publish(job_id, {"type": "error", "message": str(exc)})
+
+    async def _run_real(self, job: dict[str, Any]) -> None:
+        """Passive bridge for real pipeline jobs.
+
+        The driver-owned ``PipelineRunner`` runs ``AutoPipelineService.run()`` in
+        a worker thread and pushes events onto the EventBus via the callbacks in
+        :meth:`build_pipeline_callbacks`. This coroutine only waits for the
+        ``done`` event so the task lifecycle stays clean; it performs no work.
+        """
+        job_id = job["job_id"]
+        self._done_events.setdefault(job_id, asyncio.Event())
+        await self._done_events[job_id].wait()

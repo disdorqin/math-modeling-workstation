@@ -432,9 +432,53 @@ class AutoPipelineService:
         columns = list(frame.columns)
         try:
             proposal, response = self.llm.json_call(case_id, session_id, "model_plan", "model_plan", {"case_id": case_id, "dataset_id": dataset_id, "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json")}, ModelPlanProposal, [problem_artifact_id])
-        except Exception as error:
-            self.workflow.fail_node(case_id, "model_plan", FailureCategory.SCHEMA, f"{type(error).__name__}: {error}")
-            raise
+        except Exception as first_error:
+            # Real LLMs sometimes return candidate_models as a list of model
+            # names (strings) instead of objects. Normalise that instead of
+            # failing the whole pipeline on a formatting slip: pull the raw
+            # JSON from the provider response, turn string candidates into
+            # minimal ModelPlanCandidate objects, then validate again.
+            try:
+                from .llm.prompts import PromptRegistry
+                from .structured_llm import _strip_json_fence
+
+                _prompts = PromptRegistry("prompts")
+                _prompt = _prompts.load("model_plan")
+                _messages = _prompt.render(
+                    "model_plan",
+                    {
+                        key: json.dumps(value, ensure_ascii=False, sort_keys=True) if not isinstance(value, str) else value
+                        for key, value in {
+                            "case_id": case_id,
+                            "dataset_id": dataset_id,
+                            "columns_json": columns,
+                            "profile_json": profile,
+                            "problem_analysis_json": analysis.model_dump(mode="json"),
+                        }.items()
+                    },
+                )
+                _raw = self.llm.service.invoke(
+                    case_id, session_id, "model_plan", _messages,
+                    [problem_artifact_id], max_tokens=3000, temperature=0.1,
+                    response_format={"type": "json_object"},
+                )
+                payload_raw = json.loads(_strip_json_fence(_raw["response"]["content"]))
+                candidates = payload_raw.get("candidate_models", [])
+                normalised = []
+                for item in candidates:
+                    if isinstance(item, str):
+                        normalised.append({"name": item})
+                    elif isinstance(item, dict):
+                        normalised.append(item)
+                if len(normalised) >= 2:
+                    payload_raw["candidate_models"] = normalised
+                    proposal = ModelPlanProposal.model_validate(payload_raw)
+                    response = _raw
+                else:
+                    raise first_error
+            except Exception:
+                self.workflow.fail_node(case_id, "model_plan", FailureCategory.SCHEMA, f"{type(first_error).__name__}: {first_error}")
+                raise first_error
         payload = proposal.model_dump(mode="json")
         aliases = {
             "linear_regression": "linear",

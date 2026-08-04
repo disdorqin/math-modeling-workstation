@@ -55,8 +55,8 @@ app.add_middleware(
 
 services = get_services()
 bus = EventBus()
-runner = JobRunner(services, bus)
 driver = ChatDriverAdapter(services)
+runner = JobRunner(services, bus, driver)
 
 
 # --------------------------------------------------------------------------
@@ -164,6 +164,18 @@ async def chat(request: ChatRequest) -> dict[str, Any]:
     else:
         who = "chat-unconfirmed"
 
+    # S1.3: if this message triggers a pipeline, let the real pipeline push its
+    # live events onto the EventBus and gate approvals on a human. The callbacks
+    # resolve the job id from the case, so no caller-side hand-off is needed.
+    # They are harmless for non-pipeline messages (the driver simply ignores them).
+    progress_cb, approval_cb = runner.build_pipeline_callbacks(request.case_id)
+    context.setdefault("pipeline", {})
+    context["pipeline"]["progress_callback"] = progress_cb
+    context["pipeline"]["approval_callback"] = approval_cb
+    uploaded = runner.load_uploaded_inputs(request.case_id) if request.case_id else None
+    if uploaded:
+        context["pipeline"]["inputs"] = {**context["pipeline"].get("inputs", {}), **uploaded}
+
     # driver.chat is synchronous and can be slow; run it off the event loop.
     result = await asyncio.to_thread(
         driver.chat,
@@ -171,9 +183,10 @@ async def chat(request: ChatRequest) -> dict[str, Any]:
     )
 
     # The driver writes its own ledger entry for every audited tool it runs.
-    # Only top up when it did not, so the audit trail never double-counts.
+    # Only top up when it did not, so the audit trail never double-counts. A
+    # pipeline job already logs its own run_auto_pipeline entry, so skip it.
     entry_id = result.ledger_entry_id
-    if entry_id is None and root is not None:
+    if entry_id is None and root is not None and result.job_id is None:
         entry = ledger.record(
             root,
             tool="chat",
@@ -188,13 +201,10 @@ async def chat(request: ChatRequest) -> dict[str, Any]:
         )
         entry_id = entry["entry_id"]
 
-    # A pipeline intent schedules a job inside the driver; attach it to the
-    # runner so the browser gets live events over the WebSocket.
+    # A pipeline intent schedules a real job inside the driver; attach it to the
+    # runner (no rehearsal loop) so the browser gets live events over the WS.
     if result.job_id and request.case_id:
-        job = runner.get(result.job_id, request.case_id)
-        if job is not None:
-            job.setdefault("case_id", request.case_id)
-            runner.start(job)
+        runner.attach_real(result.job_id, request.case_id)
 
     payload = result.as_dict()
     payload["ledger"] = {"entry_id": entry_id, "used_ai": result.used_ai}
@@ -210,7 +220,56 @@ async def chat(request: ChatRequest) -> dict[str, Any]:
 async def create_job(request: JobRequest) -> dict[str, Any]:
     ensure_case(request.case_id)
     who = require_human(request.approved_by)
-    job = runner.create(request.case_id, request.kind, request.payload, who)
+    payload = dict(request.payload or {})
+
+    # S1.3: if the request carries (or the case has uploaded) real inputs,
+    # run the genuine pipeline via the driver with the shell's event/approval
+    # callbacks; otherwise fall back to the deterministic rehearsal demo.
+    has_real = bool(payload.get("problem_source") and payload.get("data_source"))
+    if not has_real:
+        uploaded = runner.load_uploaded_inputs(request.case_id)
+        if uploaded and uploaded.get("problem_source") and uploaded.get("data_source"):
+            payload = {**payload, **uploaded}
+            has_real = True
+
+    if has_real and driver.is_stub is False:
+        progress_cb, approval_cb = runner.build_pipeline_callbacks(request.case_id)
+        message = payload.get("message") or "自动流水线(Web 手动触发)"
+        # The real pipeline requires an active session (LLM responses persist
+        # under <case>/sessions/<session_id>). Create one if none was supplied.
+        session_id = payload.get("session_id")
+        if not session_id:
+            try:
+                session = services.sessions.create_session(request.case_id)
+                session_id = session["session_id"]
+            except Exception:
+                session_id = None
+        context: dict[str, Any] = {
+            "pipeline": {
+                "inputs": {
+                    "problem_source": payload["problem_source"],
+                    "data_source": payload["data_source"],
+                    "dataset_name": payload.get("dataset_name", "Web 触发数据"),
+                    "target_column": payload.get("target_column"),
+                    "competition_type": payload.get("competition_type", "SM"),
+                    "session_id": session_id,
+                    "source_uri": payload.get("source_uri"),
+                    "license_name": payload.get("license_name"),
+                    "data_description": payload.get("data_description", ""),
+                },
+                "progress_callback": progress_cb,
+                "approval_callback": approval_cb,
+            }
+        }
+        job_id = await asyncio.to_thread(
+            driver.schedule_pipeline, request.case_id, message, who, context
+        )
+        if job_id:
+            runner.attach_real(job_id, request.case_id)
+            return {"job_id": job_id, "status": "running", "mode": "real"}
+
+    # Rehearsal demo mode (no real inputs, or real driver unavailable).
+    job = runner.create(request.case_id, request.kind, payload, who)
     runner.start(job)
     return {"job_id": job["job_id"], "status": job["status"]}
 
@@ -293,7 +352,7 @@ async def approve(case_id: str, request: ApproveRequest) -> dict[str, Any]:
     ]
     released = []
     for job in waiting:
-        if runner.approve(job["job_id"]):
+        if runner.approve(job["job_id"], approver=who):
             released.append(job["job_id"])
 
     # 2) Real workflow node approval (only when no rehearsal gate matched).
@@ -472,9 +531,16 @@ def export_pdf(case_id: str, profile: str = Body("SM", embed=True)) -> dict[str,
 async def upload(
     case_id: str = Form(...),
     kind: str = Form("input"),
+    source_uri: str = Form(""),
+    license_name: str = Form(""),
     file: UploadFile = File(...),
 ) -> dict[str, Any]:
-    """Store an uploaded file and register it through ArtifactRegistry."""
+    """Store an uploaded file and register it through ArtifactRegistry.
+
+    ``source_uri`` / ``license_name`` are optional provenance metadata recorded
+    with the input so the research audit can verify the data source (the real
+    pipeline blocks on SOURCE_URI_MISSING otherwise).
+    """
     root = ensure_case(case_id)
     staging = root / "input" / "uploads"
     staging.mkdir(parents=True, exist_ok=True)
@@ -492,6 +558,12 @@ async def upload(
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"注册产物失败: {exc}") from exc
+    # S1.3: remember uploaded problem/data paths per case (with optional
+    # provenance) so a later pipeline intent can run the real pipeline without
+    # the client re-sending them.
+    runner.record_uploaded_input(
+        case_id, str(target), kind, source_uri=source_uri, license_name=license_name
+    )
 
     ledger.record(
         root,

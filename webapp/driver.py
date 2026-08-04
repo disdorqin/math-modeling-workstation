@@ -177,3 +177,29 @@ class ChatDriverAdapter:
             used_ai=bool(led.get("used_ai", not self.is_stub)),
             ledger_entry_id=led.get("entry_id"),
         )
+
+    # -- real pipeline scheduling (S1.3) --------------------------------
+    def schedule_pipeline(
+        self,
+        case_id: str,
+        message: str,
+        approved_by: str,
+        context: dict[str, Any] | None = None,
+    ) -> str | None:
+        """Drive the real pipeline for an already-built context.
+
+        Used by the web shell's job API (and, indirectly, the chat path) to run
+        the genuine ``AutoPipelineService`` with the shell-supplied
+        ``progress_callback`` / ``approval_callback`` from
+        ``JobRunner.build_pipeline_callbacks``. Returns the created job id, or
+        ``None`` when the real driver is unavailable (stub).
+        """
+        if self.is_stub or not hasattr(self._impl, "_schedule_pipeline"):
+            return None
+        try:
+            return self._impl._schedule_pipeline(
+                case_id, message, approved_by, None, context=context or {}
+            )
+        except Exception as exc:  # pragma: no cover - surfaced to the caller
+            self.init_error = f"schedule_pipeline failed: {type(exc).__name__}: {exc}"
+            raise

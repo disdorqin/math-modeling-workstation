@@ -233,6 +233,15 @@ class ChatDriver:
         if pipeline_inputs.get("problem_source") and pipeline_inputs.get("data_source"):
             from .pipeline import PipelineRunner
 
+            # The real pipeline persists LLM responses under
+            # <case>/sessions/<session_id>; create one if the shell didn't.
+            if not pipeline_inputs.get("session_id"):
+                try:
+                    pipeline_inputs["session_id"] = self.services["sessions"].create_session(case_id)["session_id"]
+                    jobs.update(job["job_id"], payload={**job.get("payload", {}), **pipeline_inputs})
+                except Exception:
+                    pass
+
             runner = PipelineRunner(self.services, self.provider)
 
             def _on_start(event: dict[str, Any]) -> None:
@@ -252,6 +261,9 @@ class ChatDriver:
                 dataset_name=pipeline_inputs.get("dataset_name", "对话上传数据"),
                 target_column=pipeline_inputs.get("target_column"),
                 competition_type=pipeline_inputs.get("competition_type", "SM"),
+                source_uri=pipeline_inputs.get("source_uri"),
+                license_name=pipeline_inputs.get("license_name"),
+                data_description=pipeline_inputs.get("data_description", ""),
                 approved_by=approved_by,
                 progress_callback=progress_cb,
                 approval_callback=approval_cb,

@@ -15,6 +15,10 @@ from .paper_outline import section_contract
 CLAIM_REF = re.compile(r"claim-[a-f0-9]{12}")
 FIGURE_REF = re.compile(r"figure-[a-f0-9]{12}")
 NUMBER = re.compile(r"(?<![A-Za-z0-9_-])[-+]?\d+(?:\.\d+)?%?")
+#: Dates / years / case-ids are metadata, not empirical results — scanning them
+#: as unattributed numbers produces pure false positives (e.g. the date embedded
+#: in a case id like 20260804-SM-...). These are stripped before the number scan.
+DATE_OR_YEAR = re.compile(r"\b(?:19|20)\d{2}(?:[-\d]{0,8})\b")
 PLACEHOLDER = re.compile(r"\[(?:SECTION_DRAFT_PENDING|NEEDS_EVIDENCE|TODO|TBD)\]")
 # Inline and display math carry structural digits (subscripts, exponents, norms
 # such as $L_2$ or $\lVert\beta\rVert_1$) that are notation, not empirical
@@ -79,6 +83,7 @@ class PaperConsistencyChecker:
             body_for_number_scan = "\n".join(
                 line for line in content.splitlines() if not line.lstrip().startswith("#")
             )
+            body_for_number_scan = DATE_OR_YEAR.sub(" ", body_for_number_scan)
             numbers = NUMBER.findall(MATH_SPAN.sub(" ", body_for_number_scan))
             for claim_id in sorted(cited_claims):
                 if claim_id not in known_claims:
