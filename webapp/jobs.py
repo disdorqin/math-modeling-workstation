@@ -227,7 +227,6 @@ class JobRunner:
         self._tasks[job_id] = asyncio.create_task(self._run(job))
 
     def approve(self, job_id: str, approver: str | None = None) -> bool:
-        print(f"[approve] CALLED job_id={job_id} approver={approver} thread={threading.current_thread().name}", flush=True)
         released = False
         event = self._approvals.get(job_id)
         if event is not None:
@@ -345,10 +344,12 @@ class JobRunner:
             )
             # Block the pipeline worker thread until a human approves via the
             # web shell (the /api/cases/{id}/approve endpoint sets this Event).
-            ev = runner._thread_approvals.setdefault(job_id, threading.Event())
-            print(f"[acb] BLOCK job_id={job_id} node={node_id} ev_set={ev.is_set()} thread={threading.current_thread().name}", flush=True)
+            # A FRESH Event per node is essential: a single shared Event would
+            # stay set after the first approval and let every later gate pass
+            # without a human decision.
+            ev = threading.Event()
+            runner._thread_approvals[job_id] = ev
             ev.wait()
-            print(f"[acb] UNBLOCK job_id={job_id} node={node_id} thread={threading.current_thread().name}", flush=True)
             store.update(job_id, status="running", awaiting_approval=None)
             store.log(
                 job_id,
