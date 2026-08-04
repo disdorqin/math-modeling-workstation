@@ -123,6 +123,12 @@ function renderDag(dag) {
   Object.values(nodes).forEach((n) => (counts[n.status] = (counts[n.status] || 0) + 1));
   $("dag-counts").textContent = Object.entries(counts).map(([k, v]) => `${k}:${v}`).join("  ");
 
+  // 更新审批徽标
+  updateApprovalBadges(nodes);
+
+  // 检查是否需要显示引导上传
+  checkBlockedHint(nodes);
+
   const rows = Object.entries(nodes).map(([id, rt]) => {
     const d = defs[id] || {};
     const needApprove = rt.status === "NEEDS_REVIEW";
@@ -151,6 +157,52 @@ function renderDag(dag) {
   $("dag-table").querySelectorAll("[data-retry]").forEach((b) =>
     b.addEventListener("click", () => retryNode(b.dataset.retry))
   );
+}
+
+const APPROVAL_NODES = ["data_registration", "model_selection", "paper_ready", "final_review"];
+
+function updateApprovalBadges(nodes) {
+  APPROVAL_NODES.forEach((nodeId) => {
+    const badge = $(`badge-${nodeId}`);
+    const badgeContainer = badge?.closest(".approval-badge");
+    if (!badge || !badgeContainer) return;
+
+    const node = nodes[nodeId];
+    const status = node?.status || "PENDING";
+
+    // 清除旧状态类
+    badgeContainer.classList.remove("blocked", "approved", "pending", "running");
+
+    if (status === "SUCCEEDED") {
+      badge.textContent = "已批准";
+      badgeContainer.classList.add("approved");
+    } else if (status === "NEEDS_REVIEW") {
+      badge.textContent = "待审批";
+      badgeContainer.classList.add("pending");
+    } else if (status === "RUNNING") {
+      badge.textContent = "进行中";
+      badgeContainer.classList.add("running");
+    } else if (status === "BLOCKED" || status === "FAILED") {
+      badge.textContent = "已阻塞";
+      badgeContainer.classList.add("blocked");
+    } else {
+      badge.textContent = status;
+      badgeContainer.classList.add("pending");
+    }
+  });
+}
+
+function checkBlockedHint(nodes) {
+  const hintEl = $("blocked-upload-hint");
+  const hasBlocked = Object.values(nodes).some((n) => n.status === "BLOCKED");
+  const hasDataReg = nodes["data_registration"];
+  const noData = !hasDataReg || hasDataReg.status === "PENDING";
+
+  if (hasBlocked && noData) {
+    hintEl.classList.remove("hidden");
+  } else {
+    hintEl.classList.add("hidden");
+  }
 }
 
 function renderTable(elId, rows, cols) {
@@ -364,7 +416,94 @@ async function loadPaper() {
       p.consistency_gate === "UNKNOWN" ? "badge-idle" : "badge-warn");
     $("paper-meta").textContent = p.source ? `来源: ${p.source}` : "论文尚未生成";
     $("paper-body").textContent = p.markdown || "（论文合并稿尚未生成）";
+
+    // 论文统计信息
+    renderPaperStats(p.markdown);
+
+    // 质量门详情
+    renderConsistencyDetail(p.consistency);
   } catch (e) { toast("加载论文失败: " + e.message, "err"); }
+}
+
+function renderPaperStats(markdown) {
+  const statsEl = $("paper-stats");
+  if (!markdown) {
+    statsEl.classList.add("hidden");
+    return;
+  }
+  statsEl.classList.remove("hidden");
+
+  // 字数统计（中文字符 + 英文单词）
+  const chineseChars = (markdown.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const englishWords = (markdown.match(/[a-zA-Z]+/g) || []).length;
+  const totalWords = chineseChars + englishWords;
+  $("paper-word-count").textContent = `字数: ${totalWords}`;
+
+  // 章节数统计（以 # 开头的行）
+  const chapters = (markdown.match(/^#{1,3}\s+.+$/gm) || []).length;
+  $("paper-chapter-count").textContent = `章节数: ${chapters}`;
+
+  // 生成时间
+  const now = new Date();
+  $("paper-gen-time").textContent = `加载时间: ${now.toLocaleString("zh-CN")}`;
+}
+
+function renderConsistencyDetail(consistency) {
+  const detailEl = $("consistency-detail");
+  const violationsEl = $("consistency-violations");
+  const statusEl = $("consistency-gate-status");
+
+  if (!consistency || consistency.gate === "UNKNOWN") {
+    detailEl.classList.add("hidden");
+    return;
+  }
+
+  detailEl.classList.remove("hidden");
+  statusEl.textContent = "gate: " + (consistency.gate || "-");
+  statusEl.className = "badge " + (consistency.gate === "PASS" ? "badge-ok" : "badge-warn");
+
+  const violations = consistency.violations || [];
+  if (!violations.length) {
+    violationsEl.innerHTML = '<p class="meta">未发现违规项</p>';
+    return;
+  }
+
+  violationsEl.innerHTML = violations.map((v, i) => {
+    const type = v.type || v.rule || "unknown";
+    const chapter = v.chapter || v.section || v.location || "";
+    const desc = v.message || v.description || v.detail || JSON.stringify(v);
+    return `<div class="violation-item" data-idx="${i}">
+      <div class="violation-type">${esc(type)}</div>
+      ${chapter ? `<div class="violation-chapter">命中章节: ${esc(chapter)}</div>` : ""}
+      <div class="violation-desc">${esc(desc)}</div>
+    </div>`;
+  }).join("");
+
+  // 点击跳转到论文对应位置
+  violationsEl.querySelectorAll(".violation-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const v = violations[idx];
+      const chapter = v?.chapter || v?.section;
+      if (chapter) scrollToChapter(chapter);
+    });
+  });
+}
+
+function scrollToChapter(chapterName) {
+  const paperBody = $("paper-body");
+  const text = paperBody.textContent;
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes(chapterName)) {
+      // 计算滚动位置（粗略）
+      const lineHeight = 20; // approx
+      paperBody.scrollTop = i * lineHeight;
+      toast(`跳转到: ${chapterName}`, "ok");
+      return;
+    }
+  }
+  toast(`未找到章节: ${chapterName}`, "err");
 }
 
 async function loadLedger() {

@@ -74,6 +74,38 @@
         </div>
         <div id="job-status" class="job-status">尚未启动任务</div>
         <div class="progress-track"><div id="job-progress" class="progress-bar"></div></div>
+
+        <!-- 审批徽标 -->
+        <div id="approval-badges" class="approval-badges">
+          <div class="approval-badge" data-node="data_registration">
+            <span class="badge-icon">📋</span>
+            <span class="badge-label">数据登记</span>
+            <span class="badge-status" id="badge-data_registration">待定</span>
+          </div>
+          <div class="approval-badge" data-node="model_selection">
+            <span class="badge-icon">🔬</span>
+            <span class="badge-label">模型选择</span>
+            <span class="badge-status" id="badge-model_selection">待定</span>
+          </div>
+          <div class="approval-badge" data-node="paper_ready">
+            <span class="badge-icon">📄</span>
+            <span class="badge-label">论文就绪</span>
+            <span class="badge-status" id="badge-paper_ready">待定</span>
+          </div>
+          <div class="approval-badge" data-node="final_review">
+            <span class="badge-icon">✅</span>
+            <span class="badge-label">最终审核</span>
+            <span class="badge-status" id="badge-final_review">待定</span>
+          </div>
+        </div>
+
+        <!-- 引导上传提示 -->
+        <div id="blocked-upload-hint" class="blocked-hint hidden">
+          <p>⚠️ 任务已阻塞，尚未上传输入文件</p>
+          <p>请先在「证据」标签页上传数据文件，或使用聊天框描述问题</p>
+          <button class="btn btn-primary" onclick="document.querySelector('[data-tab=evidence]').click()">前往上传</button>
+        </div>
+
         <div id="job-approval" class="approval-box hidden">
           <strong>⚠ 需人工审批</strong>
           <span id="approval-node"></span>
@@ -121,8 +153,22 @@
             <button id="paper-export" class="btn btn-primary">生成投稿包</button>
           </div>
         </div>
+        <div id="paper-stats" class="paper-stats hidden">
+          <span id="paper-word-count">字数: -</span>
+          <span id="paper-chapter-count">章节数: -</span>
+          <span id="paper-gen-time">生成时间: -</span>
+        </div>
         <div id="paper-meta" class="meta"></div>
         <pre id="paper-body" class="paper-body">尚未加载</pre>
+      </div>
+
+      <!-- 质量门失败详情 -->
+      <div id="consistency-detail" class="block hidden">
+        <div class="block-head">
+          <h2>质量门检查详情</h2>
+          <span id="consistency-gate-status" class="badge badge-idle">gate: -</span>
+        </div>
+        <div id="consistency-violations" class="violation-list"></div>
       </div>
     </div>
 
