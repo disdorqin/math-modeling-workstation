@@ -63,6 +63,9 @@ def _create_case(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     manifest = ctx["cases"].create_case(
         competition=args.get("competition", "SM"),
         title=args.get("title", "对话创建案例"),
+        problem_type=args.get("problem_type"),
+        year=args.get("year"),
+        version=args.get("version", 1),
     )
     return {"manifest": manifest, "case_id": manifest["case_id"]}
 

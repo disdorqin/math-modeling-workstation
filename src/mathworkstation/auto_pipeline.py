@@ -59,6 +59,9 @@ from .task_executors import TaskExecutionService
 from .task_paper_bridge import TaskPaperEvidenceBridge
 from .task_paper_pipeline import TaskPaperPipelineService
 from .workflow_service import WorkflowService
+from .paper_reflection import PaperReflection
+from .paper_lesson_loader import PaperLessonLoader
+from .paper_lessons import PaperLessonsStore
 from .workflow import FailureCategory
 from .io_utils import append_jsonl, atomic_write_json, atomic_write_text, now_iso, read_json
 
@@ -250,7 +253,16 @@ class AutoPipelineService:
         eda = self.modeling.run_eda(case_id, dataset_id, target_column, session_id)
         if not eda["succeeded"]:
             raise ValueError(f"EDA failed: {eda['error']}")
-        plan_result = self._run_model_plan(case_id, session_id, dataset_id, problem_analysis, problem_artifact_id, target_column, approved_by)
+        # --- Learning Loop: load lessons for model_plan ---
+        lessons_text = ""
+        try:
+            lessons_store = PaperLessonsStore(self.cases.case_root(case_id), case_id)
+            lesson_loader = PaperLessonLoader(lessons_store)
+            lessons_text = lesson_loader.format_for_model_plan(competition_type)
+        except Exception:  # noqa: BLE001 - learning layer, never block
+            pass
+        # --- End Learning Loop ---
+        plan_result = self._run_model_plan(case_id, session_id, dataset_id, problem_analysis, problem_artifact_id, target_column, approved_by, lessons_text=lessons_text)
         plan_artifact_id = plan_result["plan_artifact_id"]
         baseline = self.modeling.run_baseline(case_id, dataset_id, plan_result["plan"]["target_column"], plan_result["plan"]["feature_columns"], plan_result["plan"]["task_type"], plan_result["plan"]["test_size"], plan_result["plan"]["random_seed"], session_id)
         if not baseline["succeeded"]:
@@ -295,13 +307,29 @@ class AutoPipelineService:
         ready = self.paper_ready.approve(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], approved_by, "Automated evidence chain reviewed", additional_evidence)
         approved_by = self._gate(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor")
         self.control.approve(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor", ready["approval_artifact_id"])
-        # Auto-promote DRAFT figures to FINAL after paper_ready approval (Skill B)
+        # Auto-promote DRAFT figures to FINAL after paper_ready approval (Skill B).
+        # Promotion is logged to decisions.jsonl and never silently swallowed:
+        # a failure is recorded (and non-blocking, matching the gate's own
+        # re-runnable design) but the pipeline must not continue blind.
+        promotion_result = None
+        promotion_error: str | None = None
         try:
             promotion_result = self.figure_promoter.promote_all_draft_figures(
                 case_id, ready["approval_artifact_id"], approved_by, "auto-promoted after paper_ready"
             )
-        except Exception:
-            pass  # Non-critical: figure promotion failure should not block pipeline
+        except Exception as error:  # noqa: BLE001 - recorded, not fatal
+            promotion_error = f"{type(error).__name__}: {error}"
+        append_jsonl(
+            self.cases.case_root(case_id) / "decisions.jsonl",
+            {
+                "timestamp": now_iso(),
+                "event": "figures_auto_promoted",
+                "approval_artifact_id": ready["approval_artifact_id"],
+                "promoted_count": promotion_result["promoted_count"] if promotion_result else None,
+                "skipped_count": promotion_result["skipped_count"] if promotion_result else None,
+                "error": promotion_error,
+            },
+        )
         result_records, comparison_table, comparison_table_artifact = self._register_result_evidence(
             case_id, dataset_id, experiment_id, comparison["result"], sensitivity["result"]
         )
@@ -353,7 +381,7 @@ class AutoPipelineService:
         }
         outline = self._create_outline(case_id, section_claims, section_figures, competition_type)
         sections = self.sections.initialize(case_id, outline["outline_artifact_id"])
-        self._generate_sections(case_id, session_id, sections, approved_by)
+        self._generate_sections(case_id, session_id, sections, approved_by, competition_type)
         paper = self.stages.complete_paper_draft(case_id, session_id)
         consistency = self.stages.check_consistency(case_id, self.consistency, session_id)
         consistency_gate = consistency["result"]["report"]["gate"]
@@ -389,6 +417,25 @@ class AutoPipelineService:
         approved_by = self._gate(case_id, "final_review", approved_by, "Complete-paper contract and full review passed")
         self.control.approve(case_id, "final_review", approved_by, "Complete-paper contract and full review passed", complete_paper_artifact["artifact_id"])
         self._complete_review(case_id, session_id, approved_by)
+        # --- Learning Loop: auto-reflect after final_review ---
+        try:
+            reflection = PaperReflection(self.cases.case_root(case_id))
+            # Count refinement stages from the refinement result
+            refinement_stages = len(refinement.get("stages", [])) if refinement else 0
+            reflection.reflect(
+                case_id=case_id,
+                competition=competition_type,
+                paper_content=final_text,
+                refinement_stages=refinement_stages,
+                figures_count=len(additional_evidence),
+                consistency_gate=consistency_gate,
+            )
+        except Exception as _ref_err:  # noqa: BLE001 - learning layer, never block
+            append_jsonl(
+                self.cases.case_root(case_id) / "decisions.jsonl",
+                {"timestamp": now_iso(), "event": "reflection_failed", "error": f"{type(_ref_err).__name__}: {_ref_err}"},
+            )
+        # --- End Learning Loop ---
         submission = self.submission.prepare(case_id, competition_type)
         if submission["preflight"]["gate"] != "PASS":
             raise ValueError(f"submission preflight failed: {submission['preflight']['findings']}")
@@ -465,7 +512,7 @@ class AutoPipelineService:
         self.workflow.approve_node(case_id, "problem_analysis", approved_by, "Structured problem analysis validated")
         return analysis, {**response, "artifact_id": structured["artifact_id"]}
 
-    def _run_model_plan(self, case_id: str, session_id: str, dataset_id: str, analysis: ProblemAnalysis, problem_artifact_id: str, target_column: str | None, approved_by: str) -> dict[str, Any]:
+    def _run_model_plan(self, case_id: str, session_id: str, dataset_id: str, analysis: ProblemAnalysis, problem_artifact_id: str, target_column: str | None, approved_by: str, lessons_text: str = "") -> dict[str, Any]:
         self.workflow.start_node(case_id, "model_plan", session_id)
         dataset = self.datasets.get(case_id, dataset_id)
         profile_path = self.cases.case_root(case_id) / "data" / "dictionaries" / f"{dataset_id}.profile.json"
@@ -476,8 +523,11 @@ class AutoPipelineService:
         # set, so it cannot invent unsupported models (the cause of repeated
         # real-LLM integration failures before this fix).
         catalog = _load_model_catalog()
+        model_plan_context = {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json")}
+        if lessons_text:
+            model_plan_context["paper_lessons"] = lessons_text
         try:
-            proposal, response = self.llm.json_call(case_id, session_id, "model_plan", "model_plan", {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json")}, ModelPlanProposal, [problem_artifact_id])
+            proposal, response = self.llm.json_call(case_id, session_id, "model_plan", "model_plan", model_plan_context, ModelPlanProposal, [problem_artifact_id])
         except Exception as first_error:
             # Real LLMs sometimes return candidate_models as a list of model
             # names (strings) instead of objects. Normalise that instead of
@@ -490,18 +540,21 @@ class AutoPipelineService:
 
                 _prompts = PromptRegistry("prompts")
                 _prompt = _prompts.load("model_plan")
-                _messages = _prompt.render(
-                    "model_plan",
-                    {
-                        key: json.dumps(value, ensure_ascii=False, sort_keys=True) if not isinstance(value, str) else value
-                        for key, value in {
+                _fallback_ctx = {
                             "case_id": case_id,
                             "dataset_id": dataset_id,
                             "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True),
                             "columns_json": columns,
                             "profile_json": profile,
                             "problem_analysis_json": analysis.model_dump(mode="json"),
-                        }.items()
+                        }
+                if lessons_text:
+                    _fallback_ctx["paper_lessons"] = lessons_text
+                _messages = _prompt.render(
+                    "model_plan",
+                    {
+                        key: json.dumps(value, ensure_ascii=False, sort_keys=True) if not isinstance(value, str) else value
+                        for key, value in _fallback_ctx.items()
                     },
                 )
                 _raw = self.llm.service.invoke(
@@ -627,11 +680,23 @@ class AutoPipelineService:
         self.workflow.approve_node(case_id, "paper_outline", "pipeline", "Outline schema and evidence scope validated")
         return result
 
-    def _generate_sections(self, case_id: str, session_id: str, manifest: dict[str, Any], approved_by: str) -> None:
+    def _generate_sections(self, case_id: str, session_id: str, manifest: dict[str, Any], approved_by: str, competition_type: str = "") -> None:
+        # --- Learning Loop: load lessons for paper sections ---
+        section_lessons_text = ""
+        try:
+            lessons_store = PaperLessonsStore(self.cases.case_root(case_id), case_id)
+            section_loader = PaperLessonLoader(lessons_store)
+            section_lessons_text = section_loader.format_for_paper_section(competition_type, "")
+        except Exception:  # noqa: BLE001 - learning layer, never block
+            pass
+        # --- End Learning Loop ---
         for item in manifest["manifest"]["sections"]:
             section_id = item["section_id"]
             context_path = self.cases.case_root(case_id) / "paper" / "sections" / section_id / "context.json"
             context = json.loads(context_path.read_text(encoding="utf-8"))
+            # Inject lessons into section context
+            if section_lessons_text:
+                context["paper_lessons"] = section_lessons_text
             content, _ = self.llm.markdown_call(case_id, session_id, "paper_draft", "paper_section", {"case_id": case_id, "section_id": section_id, "language": "zh", "context_json": context}, [item["context_artifact_id"]])
             content = content.replace("[SECTION_DRAFT_PENDING]", "本节尚未登记可用证据，保留结构性说明。")
             content = content.replace("[NEEDS_EVIDENCE]", "本节暂无已登记证据，保留结构性说明，不作外推结论。")

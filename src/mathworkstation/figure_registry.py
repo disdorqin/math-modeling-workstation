@@ -100,7 +100,12 @@ class FigureRegistry:
             )
         if figure["status"] == "FINAL":
             return figure
-        self.artifacts.promote_to_paper(case_id, figure["artifact_id"], approval_artifact_id)
+        # Idempotent promotion: paper_ready.approve already promotes the
+        # figure's artifact (it is part of the evidence chain), so skip the
+        # duplicate registry write instead of appending a redundant record.
+        artifact = self.artifacts.get(case_id, figure["artifact_id"])
+        if not artifact.get("paper_eligible", False):
+            self.artifacts.promote_to_paper(case_id, figure["artifact_id"], approval_artifact_id)
         promoted = {
             **figure,
             "status": "FINAL",
