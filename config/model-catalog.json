@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "description": "HMML-style hierarchical modeling method catalog. LLM 模型方案生成时只能从这里选择受支持模型，禁止自由发挥目录之外的模型。权威支持集见 src/mathworkstation/model_plan.py (REGRESSION_MODELS / CLASSIFICATION_MODELS)。",
+  "task_types": {
+    "regression": {
+      "allowed_models": ["linear", "ridge", "lasso", "elastic_net", "random_forest", "gradient_boosting"],
+      "allowed_metrics": ["rmse", "mae", "r2"]
+    },
+    "classification": {
+      "allowed_models": ["logistic", "random_forest", "gradient_boosting"],
+      "allowed_metrics": ["macro_f1", "accuracy"]
+    }
+  },
+  "methods": [
+    {
+      "name": "linear",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "普通最小二乘线性回归。特征与目标近似线性时优先；简单、可解释、是默认基线。",
+      "equation": "y = wᵀx + b + ε",
+      "key_parameters": {},
+      "when_to_use": "特征少、共线性低、需要可解释系数",
+      "when_not_to_use": "特征强共线、严重离群值、特征数>样本数"
+    },
+    {
+      "name": "ridge",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "L2 正则线性回归，缓解共线性与过拟合。",
+      "equation": "min_w ||y - Xw||² + α||w||²",
+      "key_parameters": {"alpha": 1.0},
+      "when_to_use": "存在多重共线性（如强相关特征对）",
+      "when_not_to_use": "需要特征稀疏解"
+    },
+    {
+      "name": "lasso",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "L1 正则线性回归，倾向稀疏解，可做特征选择。",
+      "equation": "min_w ||y - Xw||² + α||w||₁",
+      "key_parameters": {"alpha": 1.0},
+      "when_to_use": "特征多、希望自动筛选重要特征",
+      "when_not_to_use": "特征强相关时解不稳定（选岭回归）"
+    },
+    {
+      "name": "elastic_net",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "L1+L2 混合正则，兼具 lasso 稀疏性与 ridge 稳定性。",
+      "equation": "min_w ||y - Xw||² + α·l1_ratio·||w||₁ + α(1-l1_ratio)||w||²",
+      "key_parameters": {"alpha": 1.0, "l1_ratio": 0.5},
+      "when_to_use": "特征强相关且希望稀疏，lasso 不稳定时",
+      "when_not_to_use": "特征少且线性良好（直接用 linear）"
+    },
+    {
+      "name": "random_forest",
+      "family": "tree",
+      "task_types": ["regression", "classification"],
+      "description": "随机森林，集成决策树，可处理非线性与特征交互。",
+      "equation": "ŷ = (1/T) Σₜ fₜ(x)",
+      "key_parameters": {"n_estimators": 200, "random_state": 42},
+      "when_to_use": "非线性关系、特征交互、对可解释性要求不高",
+      "when_not_to_use": "小样本、需要精确概率校准、强线性可解释需求"
+    },
+    {
+      "name": "gradient_boosting",
+      "family": "tree",
+      "task_types": ["regression", "classification"],
+      "description": "梯度提升树，逐步拟合残差，精度通常最高但需调参。",
+      "equation": "Fₘ(x) = Fₘ₋₁(x) + η·hₘ(x)",
+      "key_parameters": {"random_state": 42},
+      "when_to_use": "数据量大、追求最高精度、有调参预算",
+      "when_not_to_use": "小样本（易过拟合）、解释性优先"
+    },
+    {
+      "name": "logistic",
+      "family": "linear",
+      "task_types": ["classification"],
+      "description": "逻辑回归，输出类别概率，线性决策边界。",
+      "equation": "P(y=1|x) = σ(wᵀx + b)",
+      "key_parameters": {"max_iter": 2000, "random_state": 42},
+      "when_to_use": "二分类、需概率输出与可解释系数、线性可分",
+      "when_not_to_use": "强非线性决策边界"
+    }
+  ]
+}

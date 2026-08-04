@@ -444,8 +444,12 @@ class AutoPipelineService:
         profile = read_json(profile_path) if profile_path.is_file() else {}
         frame = read_table(self.cases.case_root(case_id) / self.artifacts.get(case_id, dataset["artifact_id"])["path"])
         columns = list(frame.columns)
+        # HMML-style method catalog: constrains the LLM to the supported model
+        # set, so it cannot invent unsupported models (the cause of repeated
+        # real-LLM integration failures before this fix).
+        catalog = _load_model_catalog()
         try:
-            proposal, response = self.llm.json_call(case_id, session_id, "model_plan", "model_plan", {"case_id": case_id, "dataset_id": dataset_id, "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json")}, ModelPlanProposal, [problem_artifact_id])
+            proposal, response = self.llm.json_call(case_id, session_id, "model_plan", "model_plan", {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json")}, ModelPlanProposal, [problem_artifact_id])
         except Exception as first_error:
             # Real LLMs sometimes return candidate_models as a list of model
             # names (strings) instead of objects. Normalise that instead of
@@ -465,6 +469,7 @@ class AutoPipelineService:
                         for key, value in {
                             "case_id": case_id,
                             "dataset_id": dataset_id,
+                            "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True),
                             "columns_json": columns,
                             "profile_json": profile,
                             "problem_analysis_json": analysis.model_dump(mode="json"),
@@ -870,6 +875,26 @@ def _inject_typed_evidence(content: str, context: dict[str, Any]) -> str:
     if not blocks:
         return content
     return content.rstrip() + "\n\n" + "\n\n".join(blocks) + "\n"
+
+
+_MODEL_CATALOG_CACHE: dict[str, Any] | None = None
+
+
+def _load_model_catalog() -> dict[str, Any]:
+    """Load the HMML-style method catalog (config/model-catalog.json).
+
+    Cached for the process lifetime; a missing file degrades to an empty
+    catalog so the pipeline never hard-fails on config.
+    """
+    global _MODEL_CATALOG_CACHE
+    if _MODEL_CATALOG_CACHE is not None:
+        return _MODEL_CATALOG_CACHE
+    try:
+        path = Path(__file__).resolve().parents[2] / "config" / "model-catalog.json"
+        _MODEL_CATALOG_CACHE = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - missing/invalid catalog must not block
+        _MODEL_CATALOG_CACHE = {"methods": [], "task_types": {}}
+    return _MODEL_CATALOG_CACHE
 
 
 def _sanitize_internal_refs(content: str, context: dict[str, Any]) -> str:

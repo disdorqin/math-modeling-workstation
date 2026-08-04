@@ -87,3 +87,26 @@ def test_approval_callback_fires_at_four_real_nodes(tmp_path: Path) -> None:
     # Real artifacts were produced end-to-end.
     assert (root / "paper" / "final.md").is_file()
     assert result["case_id"] == case["case_id"]
+
+
+def test_model_catalog_matches_authority_supported_set() -> None:
+    """The HMML-style method catalog must cover exactly the supported models.
+
+    config/model-catalog.json is what constrains the LLM to legal candidates.
+    If it drifts from the authority set in model_plan.py, DeepSeek could invent
+    unsupported models and the pipeline would break. Lock the correspondence.
+    """
+    import json
+    from pathlib import Path
+
+    from mathworkstation.auto_pipeline import _load_model_catalog
+    from mathworkstation.model_plan import CLASSIFICATION_MODELS, REGRESSION_MODELS
+
+    catalog = _load_model_catalog()
+    names = {m["name"] for m in catalog["methods"]}
+    assert names == REGRESSION_MODELS | CLASSIFICATION_MODELS, (
+        f"catalog methods {names} != authority {REGRESSION_MODELS | CLASSIFICATION_MODELS}"
+    )
+    # every catalog method declares a non-empty description and allowed task_types
+    for m in catalog["methods"]:
+        assert m.get("description") and m.get("task_types"), f"method {m['name']} missing metadata"
