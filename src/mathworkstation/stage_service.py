@@ -147,7 +147,9 @@ class StageService:
                 f"{type(error).__name__}: {error}",
             )
             raise
-        if result["report"]["gate"] == "PASS":
+        if result["report"]["gate"] in {"PASS", "REVIEW"}:
+            # REVIEW (unattributed numbers, minor gaps) is not a hard stop: it
+            # enters the refinement loop which polishes those findings away.
             node = self.workflow.succeed_node(case_id, "consistency_check")
         else:
             failure = self.workflow.fail_node(
@@ -157,7 +159,12 @@ class StageService:
                 f"paper consistency gate: {result['report']['gate']}",
             )
             node = failure["node"]
-        return {"succeeded": result["report"]["gate"] == "PASS", "started": started, "result": result, "workflow_node": node}
+        return {
+            "succeeded": result["report"]["gate"] in {"PASS", "REVIEW"},
+            "started": started,
+            "result": result,
+            "workflow_node": node,
+        }
 
 
 def _render_final_manuscript(

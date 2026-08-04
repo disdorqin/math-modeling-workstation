@@ -19,6 +19,13 @@ NUMBER = re.compile(r"(?<![A-Za-z0-9_-])[-+]?\d+(?:\.\d+)?%?")
 #: as unattributed numbers produces pure false positives (e.g. the date embedded
 #: in a case id like 20260804-SM-...). These are stripped before the number scan.
 DATE_OR_YEAR = re.compile(r"\b(?:19|20)\d{2}(?:[-\d]{0,8})\b")
+#: Structural numbering (assumption 1, constraint 2, step 3, condition 4, 假设 1,
+#: 约束 2, 条件 3 ...) is enumeration, not an empirical value — likewise stripped
+#: before the unattributed-number scan.
+STRUCTURAL_ORDINAL = re.compile(
+    r"(?:假设|约束|条件|步骤|阶段|问题|问|条件|编号|第)\s*\d+|\b(?:assumption|constraint|step|condition|phase|item|section|q)\s*\d+\b",
+    re.IGNORECASE,
+)
 PLACEHOLDER = re.compile(r"\[(?:SECTION_DRAFT_PENDING|NEEDS_EVIDENCE|TODO|TBD)\]")
 # Inline and display math carry structural digits (subscripts, exponents, norms
 # such as $L_2$ or $\lVert\beta\rVert_1$) that are notation, not empirical
@@ -84,6 +91,7 @@ class PaperConsistencyChecker:
                 line for line in content.splitlines() if not line.lstrip().startswith("#")
             )
             body_for_number_scan = DATE_OR_YEAR.sub(" ", body_for_number_scan)
+            body_for_number_scan = STRUCTURAL_ORDINAL.sub(" ", body_for_number_scan)
             numbers = NUMBER.findall(MATH_SPAN.sub(" ", body_for_number_scan))
             for claim_id in sorted(cited_claims):
                 if claim_id not in known_claims:
