@@ -26,28 +26,69 @@ class CaseManager:
         self.output_root.mkdir(parents=True, exist_ok=True)
 
     def case_root(self, case_id: str) -> Path:
+        # Try legacy path first: output/<case_id>/
         root = resolve_within(self.output_root, case_id)
-        if not root.is_dir():
-            raise CaseNotFoundError(f"case not found: {case_id}")
-        return root
+        if root.is_dir():
+            return root
+        # Try structured path: output/<comp>-<type>-<year>/v<N>/<case_id>/
+        for folder in self.output_root.iterdir():
+            if folder.is_dir() and folder.name.startswith("_"):
+                continue  # skip _archive, etc.
+            if folder.is_dir():
+                for version_folder in folder.iterdir():
+                    if version_folder.is_dir() and version_folder.name.startswith("v"):
+                        candidate = version_folder / case_id
+                        if candidate.is_dir():
+                            return candidate
+        raise CaseNotFoundError(f"case not found: {case_id}")
 
     def create_case(
         self,
         competition: str,
         title: str,
         language: str = "zh",
+        problem_type: str | None = None,
+        year: int | None = None,
+        version: int = 1,
     ) -> dict[str, Any]:
+        """Create a new case.
+
+        New structure: output/<comp>-<type>-<year>/v<N>/<case_id>/
+        Legacy: output/<case_id>/ (when problem_type or year is None)
+        """
         competition = normalize_competition(competition)
-        for _ in range(20):
-            case_id = next_case_id(self.output_root, competition)
-            case_root = resolve_within(self.output_root, case_id)
-            try:
-                case_root.mkdir(parents=False, exist_ok=False)
-                break
-            except FileExistsError:
-                continue
+        use_new_structure = problem_type is not None and year is not None
+
+        if use_new_structure:
+            # New structured path: output/mcm-c-2024/v1/<case_id>/
+            problem_type = problem_type.strip().lower()
+            folder_name = f"{competition.lower()}-{problem_type}-{year}"
+            version_folder = f"v{version}"
+            for _ in range(20):
+                case_id = next_case_id(self.output_root, competition)
+                case_root = self.output_root / folder_name / version_folder / case_id
+                try:
+                    # New structured path has parent folders (mcm-c-2024/v1) that
+                    # may not exist yet — create them, then the case dir itself.
+                    case_root.parent.mkdir(parents=True, exist_ok=True)
+                    case_root.mkdir(parents=False, exist_ok=False)
+                    break
+                except FileExistsError:
+                    continue
+            else:
+                raise InvalidCaseError("could not allocate a unique case id")
         else:
-            raise InvalidCaseError("could not allocate a unique case id")
+            # Legacy path: output/<case_id>/
+            for _ in range(20):
+                case_id = next_case_id(self.output_root, competition)
+                case_root = resolve_within(self.output_root, case_id)
+                try:
+                    case_root.mkdir(parents=False, exist_ok=False)
+                    break
+                except FileExistsError:
+                    continue
+            else:
+                raise InvalidCaseError("could not allocate a unique case id")
 
         try:
             create_case_tree(case_root)
@@ -63,6 +104,11 @@ class CaseManager:
                 "updated_at": created_at,
                 "archived": False,
             }
+            if use_new_structure:
+                manifest["problem_type"] = problem_type
+                manifest["year"] = year
+                manifest["version"] = version
+                manifest["directory_structure"] = "structured"
             status = {
                 "schema_version": 1,
                 "case_id": case_id,
@@ -110,12 +156,32 @@ class CaseManager:
 
     def list_cases(self, include_archived: bool = False) -> list[dict[str, Any]]:
         cases: list[dict[str, Any]] = []
+        # Scan legacy structure: output/<case_id>/
         for entry in sorted(self.output_root.iterdir()):
+            if not entry.is_dir() or entry.name.startswith("_"):
+                continue
             manifest_path = entry / "manifest.json"
-            if entry.is_dir() and manifest_path.is_file():
+            if manifest_path.is_file():
                 manifest = read_json(manifest_path)
                 if include_archived or not manifest.get("archived", False):
                     cases.append(manifest)
+        # Scan structured paths: output/<comp>-<type>-<year>/v<N>/<case_id>/
+        for folder in sorted(self.output_root.iterdir()):
+            if not folder.is_dir() or folder.name.startswith("_"):
+                continue
+            if not any(c.isalpha() for c in folder.name):
+                continue  # skip non-competition folders
+            for version_folder in sorted(folder.iterdir()):
+                if not version_folder.is_dir() or not version_folder.name.startswith("v"):
+                    continue
+                for case_folder in sorted(version_folder.iterdir()):
+                    if not case_folder.is_dir():
+                        continue
+                    manifest_path = case_folder / "manifest.json"
+                    if manifest_path.is_file():
+                        manifest = read_json(manifest_path)
+                        if include_archived or not manifest.get("archived", False):
+                            cases.append(manifest)
         return cases
 
     def show_case(self, case_id: str) -> dict[str, Any]:
