@@ -1,0 +1,263 @@
+% ===========================================================================
+% CUMCM 数学建模论文 LaTeX 模板
+% 全国大学生数学建模竞赛 (CUMCM) 中文论文格式
+%
+% 格式规范:
+%   - 摘要单独成页，不超过1页
+%   - 三线表 (booktabs: toprule/midrule/bottomrule, 1.5磅, 无竖线)
+%   - 图题在下，表题在上
+%   - 图 600dpi, 黑白可区分 (线型+图例, 非颜色)
+%   - 公式居中，右对齐编号
+%   - 参考文献5-10篇，[J][M][D][EB/OL]
+%   - 宋体正文 + Times New Roman 英文/数学
+%   - 页边距 2.5cm
+%   - 正文不超过20页
+% ===========================================================================
+
+\documentclass[12pt,a4paper]{article}
+
+% ---------- 中文支持 ----------
+\usepackage[UTF8,heading=true]{ctex}
+\ctexset{
+    section = {
+        format = \heiti\zihao{4}\centering,
+        beforeskip = 12pt,
+        afterskip = 6pt,
+    },
+    subsection = {
+        format = \heiti\zihao{-4},
+        beforeskip = 8pt,
+        afterskip = 4pt,
+    },
+}
+
+% ---------- 页面设置: 2.5cm 页边距 ----------
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
+
+% ---------- 三线表 (booktabs, 1.5磅) ----------
+\usepackage{booktabs}
+\renewcommand{\toprule}{\specialrule{1.5pt}{0pt}{0pt}}
+\renewcommand{\midrule}{\specialrule{1.5pt}{0pt}{0pt}}
+\renewcommand{\bottomrule}{\specialrule{1.5pt}{0pt}{0pt}}
+
+% ---------- 数学与符号 ----------
+\usepackage{amsmath,amssymb}
+
+% ---------- 图形支持 ----------
+\usepackage{graphicx}
+\usepackage[font=small,labelfont=bf,labelsep=space]{caption}
+% 图题在图片下方 (默认设置)
+\captionsetup[figure]{position=below}
+% 表题在表格上方
+\captionsetup[table]{position=above}
+
+% ---------- 超链接 ----------
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
+
+% ---------- 参考文献 ----------
+\usepackage[numbers,sort&compress]{natbib}
+
+% ---------- 行距: 1.5倍 ----------
+\usepackage{setspace}
+\onehalfspacing
+
+% ---------- 附录 ----------
+\usepackage[titletoc]{appendix}
+
+% ---------- 代码展示 ----------
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+}
+
+% ===========================================================================
+% 论文信息 (请在此填写)
+% ===========================================================================
+\newcommand{\cumcmtitle}{论文标题}
+\newcommand{\cumcmkeywords}{关键词1；关键词2；关键词3；关键词4}
+
+% ===========================================================================
+% 正文开始
+% ===========================================================================
+\begin{document}
+
+% ===================================================================
+% 摘要页 (单独成页)
+% ===================================================================
+\begin{center}
+    {\heiti\zihao{3} \cumcmtitle}
+
+    \vspace{12pt}
+    {\heiti\zihao{4} 摘\quad 要}
+\end{center}
+
+\vspace{6pt}
+
+% --- 注意事项 ---
+% 摘要要求:
+%   1. 含5要素: 模型归类 / 建模思想 / 算法思想 / 模型特色 / 主要结果
+%   2. 3-5个关键词
+%   3. 不得包含公式、表格、图片
+%   4. 不超过1页
+
+本文针对\underline{\hspace{2cm}}问题，建立了\underline{\hspace{2cm}}模型。
+首先，\underline{\hspace{4cm}}。
+其次，\underline{\hspace{4cm}}。
+最后，\underline{\hspace{4cm}}。
+
+主要结果如下:
+\begin{enumerate}
+    \item 问题一: \underline{\hspace{6cm}}
+    \item 问题二: \underline{\hspace{6cm}}
+    \item 问题三: \underline{\hspace{6cm}}
+\end{enumerate}
+
+\vspace{12pt}
+\noindent {\heiti 关键词:} \cumcmkeywords
+
+\newpage
+
+% ===================================================================
+% 正文从此页开始 (不超过20页)
+% ===================================================================
+
+% ===================================================================
+% 1. 问题重述
+% ===================================================================
+\section{问题重述}
+% 将原问题用自己的语言重新描述，列出需解决的问题。
+
+\subsection{问题背景}
+% 问题背景介绍
+
+\subsection{问题的提出}
+% 具体问题表述
+
+\subsection{需要解决的问题}
+% 列出需要解决的所有问题
+
+% ===================================================================
+% 2. 问题分析
+% ===================================================================
+\section{问题分析}
+% 对每个问题的分析思路、涉及的数学方法
+
+\subsection{问题一的分析}
+\subsection{问题二的分析}
+\subsection{问题三的分析}
+
+% ===================================================================
+% 3. 模型假设与符号说明
+% ===================================================================
+\section{模型假设与符号说明}
+
+\subsection{基本假设}
+\begin{enumerate}
+    \item 假设题目所给数据真实可靠。
+    \item \underline{\hspace{6cm}}
+    \item \underline{\hspace{6cm}}
+\end{enumerate}
+
+\subsection{符号说明}
+% 使用三线表列出符号
+\begin{table}[htbp]
+    \centering
+    \caption{符号说明}
+    \label{tab:symbols}
+    \begin{tabular}{ccc}
+        \toprule
+        符号 & 含义 & 单位 \\
+        \midrule
+        $x$ & \underline{\hspace{3cm}} & \underline{\hspace{2cm}} \\
+        $y$ & \underline{\hspace{3cm}} & \underline{\hspace{2cm}} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ===================================================================
+% 4. 模型建立与求解
+% ===================================================================
+\section{模型建立与求解}
+
+\subsection{模型一: \underline{\hspace{3cm}}}
+% 模型建立
+% 公式 (居中, 后文引用才编号)
+% 求解方法
+% 结果
+% 结果展示用三线表 (表题在上)
+
+\begin{table}[htbp]
+    \centering
+    \caption{模型一结果}
+    \label{tab:model1}
+    \begin{tabular}{ccc}
+        \toprule
+        指标 & 数值 & 备注 \\
+        \midrule
+        \underline{\hspace{2cm}} & \underline{\hspace{2cm}} & \underline{\hspace{2cm}} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% 示例公式 (后文引用才编号)
+\begin{equation}
+    y = f(x) = ax + b
+    \label{eq:linear}
+\end{equation}
+
+\subsection{模型二: \underline{\hspace{3cm}}}
+% 模型建立、求解、结果
+
+% ===================================================================
+% 5. 模型评价与改进
+% ===================================================================
+\section{模型评价与改进}
+
+\subsection{模型的优点}
+\subsection{模型的缺点}
+\subsection{模型的改进方向}
+
+% ===================================================================
+% 6. 模型推广
+% ===================================================================
+\section{模型推广}
+
+% ===================================================================
+% 参考文献 (5-10篇)
+% 格式: [J]期刊文章 [M]专著 [D]学位论文 [EB/OL]电子文献
+% 使用英文标点+空格
+% ===================================================================
+\begin{thebibliography}{99}
+
+\bibitem{ref1} 作者1, 作者2. 文章标题[J]. 期刊名, 年份, 卷(期): 页码.
+
+\bibitem{ref2} 作者. 书名[M]. 出版地: 出版社, 年份.
+
+\bibitem{ref3} 作者. 论文标题[D]. 学校, 年份.
+
+\bibitem{ref4} 作者. 文献标题[EB/OL]. URL, 访问日期.
+
+\bibitem{ref5} 作者1, 作者2. 文章标题[J]. 期刊名, 年份, 卷(期): 页码.
+
+\end{thebibliography}
+
+% ===================================================================
+% 附录 (单独成页, 含全部可运行代码)
+% ===================================================================
+\newpage
+\appendix
+\section{附录A: 程序代码}
+
+% ------ 示例代码 ------
+% \begin{lstlisting}[caption={主程序},label=lst:main]
+% import numpy as np
+% import pandas as pd
+% # ... your code here
+% \end{lstlisting}
+
+\end{document}

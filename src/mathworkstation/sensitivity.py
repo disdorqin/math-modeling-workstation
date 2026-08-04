@@ -23,7 +23,10 @@ from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso
 from .model_plan import ModelPlan
 from .paths import resolve_within
+from .plot_style import apply_style, get_colors, get_line_cycle, get_figsize, save_figure
 from .tabular import read_table
+
+apply_style()
 
 
 class SensitivityEngine:
@@ -202,16 +205,25 @@ def _summarize(plan: ModelPlan, best_model: str, rows: list[dict[str, Any]]) -> 
 
 def _plot_sensitivity(plan: ModelPlan, rows: list[dict[str, Any]], path: Path) -> None:
     frame = pd.DataFrame(rows)
-    figure, axis = plt.subplots(figsize=(7.5, 5))
-    for seed, group in frame.groupby("seed"):
+    colors = get_colors()
+    line_cycle = get_line_cycle()
+    figsize = get_figsize("sensitivity")
+    figure, axis = plt.subplots(figsize=figsize)
+    for idx, (seed, group) in enumerate(frame.groupby("seed")):
         ordered = group.sort_values("fraction")
-        axis.plot(ordered["fraction"], ordered[plan.primary_metric], marker="o", label=f"seed={seed}")
-    axis.set_xlabel("Data Fraction")
-    axis.set_ylabel(plan.primary_metric)
-    axis.set_title("Sensitivity Analysis")
-    axis.legend()
+        linestyle, marker = line_cycle[idx % len(line_cycle)]
+        color = colors[idx % len(colors)]
+        axis.plot(ordered["fraction"], ordered[plan.primary_metric],
+                  linestyle=linestyle, marker=marker, label=f"seed={seed}",
+                  color=color, linewidth=2.0, markersize=6,
+                  markerfacecolor="white", markeredgecolor=color, markeredgewidth=1.5)
+    axis.set_xlabel("Data Fraction", fontweight="bold")
+    axis.set_ylabel(plan.primary_metric, fontweight="bold")
+    axis.set_title("Sensitivity Analysis", fontweight="bold")
+    axis.legend(frameon=True, framealpha=0.9, edgecolor="#cccccc")
+    axis.grid(True, alpha=0.3, linestyle="--")
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 

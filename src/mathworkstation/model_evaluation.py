@@ -25,7 +25,10 @@ from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso
 from .model_plan import ModelPlan
 from .paths import resolve_within
+from .plot_style import apply_style, get_colors, get_line_cycle, get_figsize, save_figure
 from .tabular import read_table
+
+apply_style()
 
 
 class ModelEvaluationEngine:
@@ -282,13 +285,18 @@ def _plot_comparison(plan: ModelPlan, results: dict[str, Any], path: Path) -> No
     names = list(results)
     means = [results[name][f"{plan.primary_metric}_mean"] for name in names]
     errors = [results[name][f"{plan.primary_metric}_std"] for name in names]
-    figure, axis = plt.subplots(figsize=(max(7, len(names) * 1.5), 5))
-    axis.bar(names, means, yerr=errors, capsize=5)
-    axis.set_ylabel(plan.primary_metric)
-    axis.set_title(f"{plan.cv_folds}-Fold Cross-Validation")
+    colors = get_colors()
+    figsize = get_figsize("comparison")
+    figure, axis = plt.subplots(figsize=(max(figsize[0], len(names) * 1.5), figsize[1]))
+    bars = axis.bar(names, means, yerr=errors, capsize=5,
+                    color=[colors[i % len(colors)] for i in range(len(names))],
+                    edgecolor="white", linewidth=0.5)
+    axis.set_ylabel(plan.primary_metric, fontweight="bold")
+    axis.set_title(f"{plan.cv_folds}-Fold Cross-Validation", fontweight="bold")
     axis.tick_params(axis="x", rotation=30)
+    axis.grid(True, axis="y", alpha=0.3, linestyle="--")
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 

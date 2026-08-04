@@ -1,0 +1,152 @@
+{
+  "description": "数学建模论文统一绘图风格配置",
+  "version": "1.0.0",
+  "matplotlib": {
+    "font": {
+      "sans-serif": ["SimHei", "Microsoft YaHei", "Noto Sans SC", "DejaVu Sans"],
+      "serif": ["Times New Roman", "SimSun", "DejaVu Serif"],
+      "monospace": ["Courier New", "SimHei", "DejaVu Sans Mono"],
+      "size": 11,
+      "family": "sans-serif"
+    },
+    "axes": {
+      "unicode_minus": false,
+      "linewidth": 1.0,
+      "edgecolor": "#333333",
+      "grid": true,
+      "grid.linestyle": "--",
+      "labelsize": 12,
+      "titlesize": 14,
+      "titleweight": "bold",
+      "labelweight": "bold"
+    },
+    "figure": {
+      "dpi": 600,
+      "figsize": [8, 5],
+      "facecolor": "white",
+      "edgecolor": "white",
+      "titlesize": 16,
+      "titleweight": "bold"
+    },
+    "savefig": {
+      "dpi": 600,
+      "bbox_inches": "tight",
+      "facecolor": "white",
+      "edgecolor": "white",
+      "pad_inches": 0.1
+    },
+    "legend": {
+      "fontsize": 10,
+      "frameon": true,
+      "framealpha": 0.9,
+      "edgecolor": "#cccccc",
+      "loc": "best"
+    },
+    "xtick": {
+      "labelsize": 10,
+      "direction": "out"
+    },
+    "ytick": {
+      "labelsize": 10,
+      "direction": "out"
+    },
+    "lines": {
+      "linewidth": 2.0,
+      "markersize": 6
+    },
+    "hatch": {
+      "linewidth": 0.5,
+      "color": "#333333"
+    }
+  },
+  "colors": {
+    "palette": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"],
+    "primary": "#1f77b4",
+    "secondary": "#ff7f0e",
+    "success": "#2ca02c",
+    "danger": "#d62728",
+    "info": "#9467bd",
+    "grid": "#e0e0e0",
+    "text": "#333333",
+    "background": "#ffffff"
+  },
+  "linestyles": {
+    "cycle": ["-", "--", "-.", ":"],
+    "solid": "-",
+    "dashed": "--",
+    "dashdot": "-.",
+    "dotted": ":",
+    "description": "实线/虚线/点划线/点线循环，保证黑白打印可区分"
+  },
+  "markers": {
+    "cycle": ["o", "s", "^", "D", "v", "p", "*", "h", "+", "x"],
+    "description": "标记点循环，配合线型使用"
+  },
+  "figsize_presets": {
+    "distribution": [10, 6],
+    "heatmap": [8, 7],
+    "comparison": [10, 5],
+    "sensitivity": [8, 5],
+    "workflow": [16, 4.6],
+    "single": [8, 5],
+    "wide": [12, 5],
+    "tall": [8, 8]
+  },
+  "chart_templates": {
+    "histogram": {
+      "bins": 30,
+      "edgecolor": "white",
+      "linewidth": 0.5,
+      "alpha": 0.8
+    },
+    "bar": {
+      "width": 0.6,
+      "edgecolor": "white",
+      "linewidth": 0.5
+    },
+    "line": {
+      "linewidth": 2.0,
+      "marker": "o",
+      "markersize": 5,
+      "markerfacecolor": "white",
+      "markeredgecolor": "auto",
+      "markeredgewidth": 1.5
+    },
+    "scatter": {
+      "s": 50,
+      "alpha": 0.7,
+      "edgecolors": "white",
+      "linewidths": 0.5
+    },
+    "heatmap": {
+      "cmap": "RdBu_r",
+      "center": 0,
+      "annot": true,
+      "fmt": ".2f",
+      "linewidths": 0.5,
+      "linecolor": "white"
+    }
+  },
+  "figure_categories": {
+    "distribution": {
+      "target_section": "data_analysis",
+      "keywords": ["分布", "distribution", "histogram", "hist", "EDA", "numeric", "categorical", "correlation", "相关性", "热力图", "heatmap"],
+      "description": "数据分布图→数据分折章节"
+    },
+    "comparison": {
+      "target_section": "results",
+      "keywords": ["比较", "comparison", "对比", "模型", "model", "CV", "cross-validation", "cross", "验证", "bar", "柱状"],
+      "description": "模型对比图→结果章节"
+    },
+    "sensitivity": {
+      "target_section": "sensitivity",
+      "keywords": ["敏感", "sensitivity", "robust", "稳健", "fraction", "比例"],
+      "description": "敏感性分析图→敏感性章节"
+    },
+    "workflow": {
+      "target_section": "overview",
+      "keywords": ["流程", "workflow", "overview", "总览", "process", "flow", "pipeline", "步骤"],
+      "description": "工作流图→概述章节"
+    }
+  }
+}
