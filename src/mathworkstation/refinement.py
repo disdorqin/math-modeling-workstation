@@ -15,6 +15,7 @@ from .case_manager import CaseManager
 from .io_utils import append_jsonl, atomic_write_json, atomic_write_text, now_iso, read_json, sha256_file
 from .paper_consistency import CLAIM_REF, FIGURE_REF, INTERNAL_ARTIFACT_REF, NUMBER, PLACEHOLDER
 from .paper_outline import section_contract
+from .refinement_hidden_state import HiddenState, StageFocusPolicy
 from .run_manager import RunManager
 from .stage_service import _render_final_manuscript
 from .workflow import FailureCategory
@@ -289,9 +290,21 @@ class RefinementService:
         session_id: str | None,
         proposer: ProposalFunction | None,
         config: RefinementConfig | None = None,
+        focus_policy: StageFocusPolicy | None = None,
     ) -> dict[str, Any]:
+        """Run the refinement loop.
+
+        ``focus_policy`` (optional) enables the RNN-style hidden state: each
+        Stage is told which *focus* to work on (coherence → humanize →
+        figures/tables → notation/LaTeX → final polish) via the proposer
+        context, and the inter-stage hidden state is updated in place
+        (``refinement/hidden_state.json``). When ``None`` the loop behaves
+        exactly as before — hidden state is not written and existing tests are
+        unaffected.
+        """
         config = config or RefinementConfig()
         root = self.cases.case_root(case_id)
+        hidden = HiddenState(root, focus_policy) if focus_policy is not None else None
         controller = self.workflow.checkpoints.load(case_id)
         runtime = controller.runtimes["refinement_loop"]
         if runtime.status.value == "RUNNING" and runtime.active_run_id:
@@ -316,7 +329,7 @@ class RefinementService:
                     stop_reason = "NO_PROPOSER"
                     break
                 stage = state["iteration"] + 1
-                result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config)
+                result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config, hidden)
                 effective_findings = result["findings_after"] if result["accepted"] else before["findings"]
                 current_issues = issues.update(effective_findings, stage)
                 issues.record_attempt(result["issue_ids"], stage, result["accepted"])
@@ -326,6 +339,17 @@ class RefinementService:
                     issue_id for issue_id, item in issues.current().items() if item.get("status") == "OPEN"
                 )
                 self._commit_stage(case_id, stage, result, next_state)
+                if hidden is not None:
+                    note = self._hidden_note(stage, result, before)
+                    hidden.record(
+                        stage=stage,
+                        accepted=result["accepted"],
+                        focus=hidden.focus_policy.focus_for(stage),
+                        quality_before=before,
+                        quality_after={"quality_vector": result.get("quality_after") or before["quality_vector"]},
+                        note=note,
+                        frozen={"evidence_digest": frozen.get("evidence", {}).get("digest")},
+                    )
                 state = next_state
                 if state["rejection_streak"] >= config.max_rejection_streak:
                     if state["strategy_reset_count"] == 0 and state["iteration"] < config.max_stages:
@@ -452,6 +476,7 @@ class RefinementService:
         selected: list[dict[str, Any]],
         proposer: ProposalFunction,
         config: RefinementConfig,
+        hidden: HiddenState | None = None,
     ) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
         stage_root = _stage_root(root, int(state.get("epoch", 1)), stage)
@@ -508,6 +533,7 @@ class RefinementService:
                 },
                 "failed_strategies": state.get("failed_strategies", [])[-3:],
                 "current_paper_artifact_id": state["current_paper_artifact_id"],
+                "hidden": hidden.summary() if hidden is not None else None,
             }
             atomic_write_json(pending_root / "input.json", context)
             atomic_write_json(pending_root / "evaluation.before.json", before)
@@ -591,6 +617,24 @@ class RefinementService:
         except Exception as error:
             self.runs.finish_run(case_id, run["run_id"], "FAILED", {"type": type(error).__name__, "message": str(error)})
             raise
+
+    @staticmethod
+    def _hidden_note(stage: int, result: dict[str, Any], before: dict[str, Any]) -> str:
+        """One-sentence LSTM-cell-state memory summary for the hidden state.
+
+        Summarises what this Stage did and where the paper stands, so the next
+        Stage knows what to focus on without re-reading the whole paper.
+        """
+        accepted = result["accepted"]
+        total_before = before["quality_vector"].get("total", 0.0)
+        total_after = result.get("quality_after") or before["quality_vector"].get("total", 0.0)
+        delta = round(total_after - total_before, 6)
+        status = "已接受" if accepted else "被拒绝"
+        return (
+            f"第 {stage} 次打磨({status}):质量 {total_before:.3f}→{total_after:.3f} "
+            f"(Δ{delta:+.3f})。焦点 {before.get('focus', 'coherence')} 处理完毕，"
+            f"下一步进入 {before.get('focus', 'coherence')} 的下一阶段。已冻结数字与证据。"
+        )
 
     def _apply_proposal(
         self,

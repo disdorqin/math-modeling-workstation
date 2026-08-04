@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>数学建模工作站 · Web 外壳</title>
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◈</span>
+    <div>
+      <h1>数学建模辅助工作站</h1>
+      <p class="tagline">Evidence-first · Case-isolated · DAG-controlled</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="driver-badge" class="badge badge-warn">驱动检测中…</span>
+    <span id="ws-badge" class="badge badge-idle">WS 未连接</span>
+    <label class="human-field">
+      审批人
+      <input id="human-id" type="text" placeholder="你的真名/工号" autocomplete="off" />
+    </label>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- 左栏：Case + 聊天 -->
+  <section class="pane pane-left">
+    <div class="block">
+      <div class="block-head">
+        <h2>Case</h2>
+        <button id="refresh-cases" class="btn btn-ghost" title="刷新">⟳</button>
+      </div>
+      <select id="case-select"></select>
+      <div id="case-meta" class="meta"></div>
+    </div>
+
+    <div class="block block-grow">
+      <div class="block-head">
+        <h2>聊天驱动</h2>
+        <span class="hint">POST /api/chat</span>
+      </div>
+      <div id="chat-log" class="chat-log"></div>
+      <div class="chat-input">
+        <textarea id="chat-message" rows="3" placeholder="例如：帮我把这个案例的自动流水线跑起来"></textarea>
+        <button id="chat-send" class="btn btn-primary">发送</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右栏：视图 -->
+  <section class="pane pane-right">
+    <nav class="tabs">
+      <button class="tab active" data-tab="dag">工作流 / 任务</button>
+      <button class="tab" data-tab="evidence">证据</button>
+      <button class="tab" data-tab="paper">论文</button>
+      <button class="tab" data-tab="ledger">AI 台账</button>
+    </nav>
+
+    <!-- DAG -->
+    <div class="tab-panel active" id="panel-dag">
+      <div class="block">
+        <div class="block-head">
+          <h2>后台任务</h2>
+          <div class="row-actions">
+            <select id="job-kind">
+              <option value="auto_pipeline">auto_pipeline</option>
+              <option value="task_paper">task_paper</option>
+            </select>
+            <button id="job-start" class="btn btn-primary">启动任务</button>
+          </div>
+        </div>
+        <div id="job-status" class="job-status">尚未启动任务</div>
+        <div class="progress-track"><div id="job-progress" class="progress-bar"></div></div>
+        <div id="job-approval" class="approval-box hidden">
+          <strong>⚠ 需人工审批</strong>
+          <span id="approval-node"></span>
+          <input id="approval-note" type="text" placeholder="审批备注（证据已复核…）" />
+          <button id="approval-go" class="btn btn-approve">批准并继续</button>
+        </div>
+        <div id="job-events" class="event-log"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-head">
+          <h2>工作流节点</h2>
+          <span id="dag-counts" class="hint"></span>
+        </div>
+        <div id="dag-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- 证据 -->
+    <div class="tab-panel" id="panel-evidence">
+      <div class="block">
+        <div class="block-head">
+          <h2>上传输入</h2>
+          <span class="hint">POST /api/upload → ArtifactRegistry</span>
+        </div>
+        <div class="row-actions">
+          <input id="upload-file" type="file" />
+          <button id="upload-go" class="btn">上传并注册</button>
+        </div>
+        <div id="upload-result" class="meta"></div>
+      </div>
+      <div class="block"><h2>Artifacts</h2><div id="artifacts-table" class="table-wrap"></div></div>
+      <div class="block"><h2>Claims</h2><div id="claims-table" class="table-wrap"></div></div>
+      <div class="block"><h2>Figures</h2><div id="figures-grid" class="figures"></div></div>
+    </div>
+
+    <!-- 论文 -->
+    <div class="tab-panel" id="panel-paper">
+      <div class="block">
+        <div class="block-head">
+          <h2>论文预览</h2>
+          <div class="row-actions">
+            <span id="gate-badge" class="badge badge-idle">gate: -</span>
+            <button id="paper-download" class="btn">下载 Markdown</button>
+            <button id="paper-export" class="btn btn-primary">生成投稿包</button>
+          </div>
+        </div>
+        <div id="paper-meta" class="meta"></div>
+        <pre id="paper-body" class="paper-body">尚未加载</pre>
+      </div>
+    </div>
+
+    <!-- 台账 -->
+    <div class="tab-panel" id="panel-ledger">
+      <div class="block">
+        <div class="block-head">
+          <h2>AI 使用台账</h2>
+          <span id="ledger-summary" class="hint"></span>
+        </div>
+        <div id="ledger-table" class="table-wrap"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -35,3 +35,6 @@ public-site/
 
 # WorkBuddy project memory / session data -- local only, never commit.
 .workbuddy/
+
+# web shell runtime logs (generated, not source)
+webapp/logs/

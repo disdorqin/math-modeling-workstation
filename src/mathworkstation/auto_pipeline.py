@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .artifact_registry import ArtifactRegistry
 from .baseline import BaselineEngine
@@ -185,7 +185,20 @@ class AutoPipelineService:
         license_name: str | None = None,
         data_description: str = "",
         refinement_config: RefinementConfig | None = None,
+        approval_callback: Callable[[str, str, str, str], str] | None = None,
     ) -> dict[str, Any]:
+        """Run the full evidence-first paper pipeline.
+
+        ``approval_callback`` is an optional human-in-the-loop hook. When
+        provided it is called at the four real approval nodes
+        (``data_registration``, ``model_selection``, ``paper_ready``,
+        ``final_review``) and must **block** until a human approves, then
+        return the human's real identity to record in the audit trail. When
+        ``None`` the pipeline keeps its CLI behaviour (auto-approves with the
+        caller-supplied ``approved_by`` identity), so existing callers and
+        tests are unchanged.
+        """
+        self._approval_callback = approval_callback
         self.control.initialize_budget(case_id)
         problem = self.ingestion.ingest(case_id, problem_source)
         data = self.data.register_uploaded(
@@ -209,7 +222,7 @@ class AutoPipelineService:
             _complete_subproblem_contracts(problem_analysis.subproblems, problem_analysis_artifact_id),
         )
         self.data.complete_registration(case_id, session_id)
-        self.workflow.approve_node(case_id, "data_registration", approved_by, "Dataset provenance reviewed")
+        approved_by = self._approve(case_id, "data_registration", approved_by, "Dataset provenance reviewed")
         profile = self.data.profile_dataset(case_id, dataset_id, target_column, session_id)
         if profile["workflow_node"]["status"] != "SUCCEEDED":
             raise ValueError(f"data quality gate did not pass: {profile['workflow_node']['status']}")
@@ -224,6 +237,7 @@ class AutoPipelineService:
         self.control.consume(case_id, experiments=1, artifacts=1)
         comparison = self.evaluation.run_comparison(case_id, plan_artifact_id, session_id)
         experiment_id = comparison["result"]["experiment_id"]
+        approved_by = self._gate(case_id, "model_selection", approved_by, "Review comparison before selecting model")
         selection = self.evaluation.select_model(case_id, experiment_id, comparison["result"]["best_model"], comparison["result"]["comparison_artifact_id"], approved_by, "Selected best validated primary metric result", session_id)
         sensitivity = self.evaluation.run_sensitivity(case_id, experiment_id, plan_artifact_id, None, session_id)
         self.control.consume(case_id, experiments=2, artifacts=2)
@@ -258,6 +272,7 @@ class AutoPipelineService:
         if not assessment["eligible"]:
             raise ValueError(f"paper ready gate failed: {assessment['reasons']}")
         ready = self.paper_ready.approve(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], approved_by, "Automated evidence chain reviewed", additional_evidence)
+        approved_by = self._gate(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor")
         self.control.approve(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor", ready["approval_artifact_id"])
         result_records, comparison_table, comparison_table_artifact = self._register_result_evidence(
             case_id, dataset_id, experiment_id, comparison["result"], sensitivity["result"]
@@ -329,6 +344,7 @@ class AutoPipelineService:
         if review["report"]["gate"] == "BLOCK":
             raise ValueError(f"final review blocked: {[item['code'] for item in review['report']['issues']]}")
         repair_requests = self.reviews.create_repair_requests(case_id, review["report"]["issues"])
+        approved_by = self._gate(case_id, "final_review", approved_by, "Complete-paper contract and full review passed")
         self.control.approve(case_id, "final_review", approved_by, "Complete-paper contract and full review passed", complete_paper_artifact["artifact_id"])
         self._complete_review(case_id, session_id, approved_by)
         submission = self.submission.prepare(case_id, competition_type)
@@ -352,6 +368,37 @@ class AutoPipelineService:
             "refinement": refinement,
             "export": export,
         }
+
+    def _gate(
+        self,
+        case_id: str,
+        node_id: str,
+        approved_by: str,
+        note: str,
+    ) -> str:
+        """Block (if a callback is registered) and return the human identity.
+
+        When ``approval_callback`` is set, it must block until a human approves
+        this node and then return the human's real identity; that identity is
+        used for the audit record so approvals can never be attributed to the
+        pipeline or the model. Without a callback this is a no-op returning the
+        caller-supplied identity (CLI behaviour).
+        """
+        if self._approval_callback is not None:
+            return self._approval_callback(case_id, node_id, approved_by, note)
+        return approved_by
+
+    def _approve(
+        self,
+        case_id: str,
+        node_id: str,
+        approved_by: str,
+        note: str,
+    ) -> str:
+        """Gate then record an approval with the returned human identity."""
+        approved_by = self._gate(case_id, node_id, approved_by, note)
+        self.workflow.approve_node(case_id, node_id, approved_by, note)
+        return approved_by
 
     def _complete_simple(self, node_id: str, case_id: str, session_id: str) -> None:
         self.workflow.start_node(case_id, node_id, session_id)

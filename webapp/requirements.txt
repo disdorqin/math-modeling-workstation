@@ -1,0 +1,14 @@
+# Web shell only. Kept out of pyproject.toml on purpose: the core package and
+# its 60+ tests must not gain a web dependency. Install separately:
+#   python -m pip install -r webapp/requirements.txt
+#
+# Rationale for each entry (iron rule: new dependencies must be justified):
+#   fastapi  - the contract in docs/web-chat-driver-contract.md specifies an
+#              HTTP + WebSocket API; FastAPI provides both natively.
+#   uvicorn  - ASGI server required to serve FastAPI, incl. the WebSocket route.
+#   python-multipart - required by FastAPI to parse multipart/form-data for
+#              POST /api/upload (contract 2.4).
+# No frontend framework and no build toolchain: the UI is plain HTML/CSS/JS.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+python-multipart>=0.0.9
