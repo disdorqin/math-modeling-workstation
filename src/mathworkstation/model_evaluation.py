@@ -13,7 +13,7 @@ import pandas as pd
 from scipy import stats
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold, StratifiedKFold, cross_validate
+from sklearn.model_selection import KFold, StratifiedKFold, TimeSeriesSplit, cross_validate
 from sklearn.pipeline import Pipeline
 
 from .artifact_registry import ArtifactRegistry
@@ -127,11 +127,18 @@ class ModelEvaluationEngine:
     ) -> dict[str, Any]:
         features = frame[plan.feature_columns]
         target = frame[plan.target_column]
-        splitter = (
-            KFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
-            if plan.task_type == "regression"
-            else StratifiedKFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
-        )
+        # Use time-ordered split for temporal data to prevent leakage
+        if plan.split_strategy == "time_ordered":
+            # Sort by temporal column if specified
+            if plan.temporal_column and plan.temporal_column in frame.columns:
+                sorted_indices = frame[plan.temporal_column].argsort(kind="mergesort")
+                features = features.iloc[sorted_indices].reset_index(drop=True)
+                target = target.iloc[sorted_indices].reset_index(drop=True)
+            splitter = TimeSeriesSplit(n_splits=plan.cv_folds)
+        elif plan.task_type == "classification":
+            splitter = StratifiedKFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
+        else:
+            splitter = KFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
         scoring = _scoring(plan.task_type)
         model_results: dict[str, Any] = {}
         fitted_pipelines: dict[str, Pipeline] = {}

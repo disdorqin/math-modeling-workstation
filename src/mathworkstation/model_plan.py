@@ -49,6 +49,8 @@ class ModelPlan(BaseModel):
     test_size: float = Field(default=0.2, gt=0.05, lt=0.5)
     random_seed: int = Field(default=42, ge=0)
     sensitivity_fractions: list[float] = Field(default_factory=lambda: [0.7, 0.85, 1.0])
+    split_strategy: Literal["random", "time_ordered"] = "random"
+    temporal_column: str | None = None
     paper_eligible: Literal[False] = False
 
     @model_validator(mode="after")
@@ -57,6 +59,9 @@ class ModelPlan(BaseModel):
             raise ValueError("feature_columns contains duplicates")
         if self.target_column in self.feature_columns:
             raise ValueError("target_column cannot be a feature")
+        if self.split_strategy == "time_ordered" and self.temporal_column:
+            if self.temporal_column not in self.feature_columns and self.temporal_column != self.target_column:
+                pass  # temporal_column can be outside feature set (used only for sorting)
         names = [candidate.name for candidate in self.candidate_models]
         if len(names) != len(set(names)):
             raise ValueError("candidate model names must be unique")
@@ -137,6 +142,9 @@ def _render_plan(plan: ModelPlan, artifact_id: str) -> str:
         f"- `{candidate.name}`：{candidate.rationale}；参数 `{json.dumps(candidate.parameters, ensure_ascii=False)}`"
         for candidate in plan.candidate_models
     )
+    split_info = f"- 切分策略：`{plan.split_strategy}`\n"
+    if plan.temporal_column:
+        split_info += f"- 时间列：`{plan.temporal_column}`\n"
     return (
         "# 模型方案\n\n"
         f"- Plan Artifact：`{artifact_id}`\n"
@@ -145,7 +153,8 @@ def _render_plan(plan: ModelPlan, artifact_id: str) -> str:
         f"- 目标变量：`{plan.target_column}`\n"
         f"- 特征：`{', '.join(plan.feature_columns)}`\n"
         f"- 主指标：`{plan.primary_metric}`\n"
-        f"- 交叉验证：`{plan.cv_folds}` 折\n\n"
+        f"- 交叉验证：`{plan.cv_folds}` 折\n"
+        f"{split_info}\n"
         "## 候选模型\n\n"
         f"{candidates}\n\n"
         "该方案通过结构验证，但仍需人工审批后才能运行正式实验。\n"

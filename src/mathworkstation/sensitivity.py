@@ -65,6 +65,9 @@ class SensitivityEngine:
         source_artifact = self.artifacts.get(case_id, dataset["artifact_id"])
         frame = read_table(resolve_within(self.cases.case_root(case_id), source_artifact["path"]))
         modeling = frame[[*plan.feature_columns, plan.target_column]].dropna(subset=[plan.target_column])
+        # Sort by temporal column for time-ordered splitting
+        if plan.split_strategy == "time_ordered" and plan.temporal_column and plan.temporal_column in modeling.columns:
+            modeling = modeling.sort_values(by=plan.temporal_column, kind="mergesort").reset_index(drop=True)
         features = modeling[plan.feature_columns]
         target = modeling[plan.target_column]
         seeds = seeds or [plan.random_seed, plan.random_seed + 17, plan.random_seed + 41]
@@ -77,14 +80,22 @@ class SensitivityEngine:
                     test_size = len(modeling) - train_size
                 if test_size < 1:
                     continue
-                x_train, x_test, y_train, y_test = train_test_split(
-                    features,
-                    target,
-                    train_size=train_size,
-                    test_size=test_size,
-                    random_state=seed,
-                    stratify=_safe_stratify(target, plan.task_type, test_size),
-                )
+                # For time-ordered split, use sequential split (no shuffle)
+                if plan.split_strategy == "time_ordered":
+                    split_point = train_size
+                    x_train = features.iloc[:split_point]
+                    x_test = features.iloc[split_point:split_point + test_size]
+                    y_train = target.iloc[:split_point]
+                    y_test = target.iloc[split_point:split_point + test_size]
+                else:
+                    x_train, x_test, y_train, y_test = train_test_split(
+                        features,
+                        target,
+                        train_size=train_size,
+                        test_size=test_size,
+                        random_state=seed,
+                        stratify=_safe_stratify(target, plan.task_type, test_size),
+                    )
                 pipeline = Pipeline(
                     [
                         ("preprocessor", _preprocessor(features)),

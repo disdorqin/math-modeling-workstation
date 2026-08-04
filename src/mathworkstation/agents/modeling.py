@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import HuberRegressor, LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
 
@@ -79,6 +79,8 @@ def build_modeling_protocol(
     n_splits: int = 5,
     random_state: int = 42,
     created_by: str = "modeling_protocol_builder",
+    split_strategy: str = "random",
+    temporal_column: str | None = None,
 ) -> dict[str, Any]:
     """Register one immutable, hashed modeling protocol.
 
@@ -88,9 +90,17 @@ def build_modeling_protocol(
     by comparing lists, not by trusting that two runs of KFold agree), which
     metric, and which direction is "better". Nothing downstream may silently
     redefine any of this; it may only cite this artifact by id and hash.
+
+    Args:
+        split_strategy: "random" (default KFold with shuffle) or "time_ordered"
+            (TimeSeriesSplit for temporal data to prevent leakage).
+        temporal_column: Column name to sort by when split_strategy="time_ordered".
+            If None and split_strategy="time_ordered", uses original row order.
     """
     if primary_metric not in _METRIC_DIRECTION:
         raise ValueError(f"unsupported primary_metric: {primary_metric!r}")
+    if split_strategy not in ("random", "time_ordered"):
+        raise ValueError(f"unsupported split_strategy: {split_strategy!r}")
     dataset = datasets.get(case_id, dataset_id)
     source_artifact = artifacts.get(case_id, dataset["artifact_id"])
     case_root = cases.case_root(case_id)
@@ -102,8 +112,16 @@ def build_modeling_protocol(
     if len(modeling) < n_splits * 2:
         raise ValueError("insufficient rows for the requested fold count")
 
-    splitter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    fold_test_indices = [test_idx.tolist() for _, test_idx in splitter.split(modeling)]
+    # Sort by temporal column for time-ordered splitting (prevents data leakage)
+    if split_strategy == "time_ordered":
+        if temporal_column and temporal_column in modeling.columns:
+            modeling = modeling.sort_values(by=temporal_column, kind="mergesort").reset_index(drop=True)
+        # TimeSeriesSplit: train on past, test on future (no shuffle)
+        splitter = TimeSeriesSplit(n_splits=n_splits)
+        fold_test_indices = [test_idx.tolist() for _, test_idx in splitter.split(modeling)]
+    else:
+        splitter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        fold_test_indices = [test_idx.tolist() for _, test_idx in splitter.split(modeling)]
 
     protocol = {
         "schema_version": 1,
@@ -118,6 +136,8 @@ def build_modeling_protocol(
         "metric_direction": _METRIC_DIRECTION[primary_metric],
         "n_splits": n_splits,
         "random_state": random_state,
+        "split_strategy": split_strategy,
+        "temporal_column": temporal_column,
         "fold_test_indices": fold_test_indices,
         "n_rows": int(len(modeling)),
         "created_by": created_by,

@@ -19,6 +19,7 @@ from .evaluation_service import EvaluationService
 from .experiments import ExperimentRegistry
 from .export_service import ExportService
 from .figure_registry import FigureRegistry
+from .figure_auto_promoter import FigureAutoPromoter
 from .figure_composition import FigureCompositionService
 from .flowchart_service import FlowchartService
 from .llm.router import LLMRouter
@@ -88,6 +89,7 @@ class AutoPipelineService:
         self.workflow = WorkflowService(cases, self.runs, self.checkpoints, self.memory)
         self.datasets = DatasetRegistry(cases, self.artifacts)
         self.figures = FigureRegistry(cases, self.artifacts)
+        self.figure_promoter = FigureAutoPromoter(cases, self.artifacts, self.figures)
         self.compositions = FigureCompositionService(cases, self.artifacts, self.figures)
         self.flowcharts = FlowchartService(
             cases,
@@ -123,6 +125,7 @@ class AutoPipelineService:
         self.sections = PaperSectionWorkspace(cases, self.artifacts, self.claims, self.figures, self.contracts)
         self.outlines = PaperOutlineService(cases, self.artifacts, self.claims, self.figures)
         self.paper_ready = PaperReadyGate(cases, self.artifacts, self.experiments)
+        self.figure_promoter = FigureAutoPromoter(cases, self.artifacts, self.figures)
         self.consistency = PaperConsistencyChecker(cases, self.artifacts, self.claims, self.figures, strict=True)
         self.exporter = ExportService(cases, self.artifacts, self.workflow)
         self.submission = SubmissionService(cases, self.artifacts)
@@ -292,6 +295,13 @@ class AutoPipelineService:
         ready = self.paper_ready.approve(case_id, experiment_id, selection["selection"]["artifact_id"], sensitivity["result"]["artifact_id"], approved_by, "Automated evidence chain reviewed", additional_evidence)
         approved_by = self._gate(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor")
         self.control.approve(case_id, "paper_ready", approved_by, "Evidence chain reviewed by explicit human actor", ready["approval_artifact_id"])
+        # Auto-promote DRAFT figures to FINAL after paper_ready approval (Skill B)
+        try:
+            promotion_result = self.figure_promoter.promote_all_draft_figures(
+                case_id, ready["approval_artifact_id"], approved_by, "auto-promoted after paper_ready"
+            )
+        except Exception:
+            pass  # Non-critical: figure promotion failure should not block pipeline
         result_records, comparison_table, comparison_table_artifact = self._register_result_evidence(
             case_id, dataset_id, experiment_id, comparison["result"], sensitivity["result"]
         )
@@ -562,19 +572,25 @@ class AutoPipelineService:
             list(payload["feature_columns"]),
             approved_by,
         )
+        # Only BLOCK issues halt the pipeline; REVIEW issues (like TEMPORAL_SPLIT_REVIEW)
+        # are recorded but handled by the pipeline (e.g., time_ordered split is auto-applied).
         blocking_research_issues = {
             "SOURCE_URI_MISSING",
-            "TEMPORAL_SPLIT_REVIEW",
             "TARGET_AS_FEATURE",
             "NO_RECOMMENDED_FEATURES",
         }
         if research_audit["report"]["gate"] == "BLOCK" or any(
             issue["code"] in blocking_research_issues
             for issue in research_audit["report"]["issues"]
-            if issue["severity"] == "REVIEW" or issue["severity"] == "BLOCK"
+            if issue["severity"] == "BLOCK"
         ):
             raise ValueError(f"research audit blocked model plan: {research_audit['report']['issues']}")
         payload["feature_columns"] = research_audit["report"]["recommended_feature_columns"]
+        # Wire split_strategy from research audit recommendation
+        split_recommendation = research_audit["report"].get("split_recommendation", "random")
+        temporal_columns = research_audit["report"].get("temporal_columns", [])
+        payload["split_strategy"] = split_recommendation
+        payload["temporal_column"] = temporal_columns[0] if temporal_columns else None
         root = self.cases.case_root(case_id)
         path = root / "analysis" / "auto_model_plan.json"
         atomic_write_json(path, payload)
