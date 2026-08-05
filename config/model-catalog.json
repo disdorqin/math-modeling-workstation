@@ -12,8 +12,24 @@
       "allowed_metrics": ["macro_f1", "accuracy", "auc_roc"]
     },
     "optimization": {
-      "allowed_models": ["linear_programming", "integer_programming", "nonlinear_optimization"],
+      "allowed_models": ["linear_programming", "integer_programming", "nonlinear_optimization", "dynamic_programming"],
       "allowed_metrics": ["optimal_value", "shadow_price"]
+    },
+    "interpolation": {
+      "allowed_models": ["interpolation"],
+      "allowed_metrics": ["rmse", "mae", "max_abs_error"]
+    },
+    "stochastic_process": {
+      "allowed_models": ["markov_chain"],
+      "allowed_metrics": ["stationary_distribution", "absorbing_probability"]
+    },
+    "graph_optimization": {
+      "allowed_models": ["graph_network"],
+      "allowed_metrics": ["shortest_path_length", "max_flow", "min_cost"]
+    },
+    "differential_equation": {
+      "allowed_models": ["ode_modeling"],
+      "allowed_metrics": ["residual_error", "solution_convergence"]
     },
     "evaluation": {
       "allowed_models": ["ahp", "entropy_weight", "topsis", "entropy_topsis"],
@@ -314,6 +330,56 @@
       "key_parameters": {"rho": 0.5},
       "when_to_use": "小样本影响因素排序（4-20对象）、与目标变量的趋势相似性分析",
       "when_not_to_use": "样本量>30(用Pearson/Spearman)、把关联当因果"
+    },
+    {
+      "name": "dynamic_programming",
+      "family": "optimization",
+      "task_types": ["optimization"],
+      "description": "动态规划(DP)：多阶段决策问题的全局最优求解（Bellman最优性原理）。逆序递推，将多阶段问题化为单阶段递推求解。",
+      "equation": "f_k(s_k) = opt_{u_k ∈ D_k} { v_k(s_k, u_k) + f_{k+1}(s_{k+1}) },  终端 f_N = 0",
+      "key_parameters": {},
+      "when_to_use": "最短路线、生产计划、资源分配、背包问题等可拆成多阶段递推的问题",
+      "when_not_to_use": "状态空间维数灾难(高维DP)、最优策略不满足无后效性"
+    },
+    {
+      "name": "interpolation",
+      "family": "interpolation",
+      "task_types": ["interpolation"],
+      "description": "插值与拟合：由已知数据点构造连续曲线。插值要求曲线严格过数据点（拉格朗日/牛顿/分段线性/Hermite/三次样条），拟合按最小二乘准则逼近（多项式/指数等）。",
+      "equation": "拉格朗日: L_n(x) = Σ yᵢ lᵢ(x); 三次样条 S(x) 分段三次多项式且 C² 连续; 拟合: min Σ (y_i - φ(x_i))²",
+      "key_parameters": {"method": "cubic_spline"},
+      "when_to_use": "数据点可靠需还原连续曲线、绘图平滑、数值求导积分；噪声数据用拟合而非插值",
+      "when_not_to_use": "高次多项式插值(龙格现象)、数据噪声大、样本量足够时优先机器学习"
+    },
+    {
+      "name": "markov_chain",
+      "family": "stochastic_process",
+      "task_types": ["stochastic_process"],
+      "description": "马氏链模型：无后效性随机序列的状态转移分析。用转移概率矩阵刻画状态演化，求 n 步转移概率与稳态分布。",
+      "equation": "P(X_{n+1}=j|X_n=i,...)=P(X_{n+1}=j|X_n=i);  π^(n+1)=π^(n)P;  稳态: πP=π, Σπ=1",
+      "key_parameters": {"states": null},
+      "when_to_use": "随机过程满足无后效性：随机游走、库存、天气、销售份额、人口结构等",
+      "when_not_to_use": "状态依赖历史多步(非一阶)、转移概率时变或由外部干预决定"
+    },
+    {
+      "name": "graph_network",
+      "family": "graph_optimization",
+      "task_types": ["graph_optimization"],
+      "description": "图与网络优化：最短路(标号法/Floyd)、最小生成树、最大流/最小费用流、中国邮递员问题、TSP 等，将实际问题抽象为图/网络上的组合优化。",
+      "equation": "最短路: min Σ w(e); 最大流: max v(f) s.t. 0≤f≤c; 最小费用流: min Σ c(e)f(e)",
+      "key_parameters": {},
+      "when_to_use": "道路网络最短路、物流配送、通信网络流、布线等图结构上的决策问题",
+      "when_not_to_use": "连续决策变量为主的问题(用规划/DP)、图规模极大且无有效算法"
+    },
+    {
+      "name": "ode_modeling",
+      "family": "differential_equation",
+      "task_types": ["differential_equation"],
+      "description": "微分方程建模：用常/偏微分方程(初值问题)描述系统动态演化。建模手段含直接列方程、微元分析法、模拟近似；求解用数值方法(四阶龙格-库塔)。",
+      "equation": "dy/dt = f(t, y),  y(t₀) = y₀;  四阶RK: y_{n+1} = y_n + h/6 (k₁+2k₂+2k₃+k₄)",
+      "key_parameters": {"solver": "rk4"},
+      "when_to_use": "系统演化规律由机理决定(人口增长、传染病、战争模型、动力学、生态捕食)",
+      "when_not_to_use": "机理未知纯数据驱动(用统计/机器学习)、变量离散或需整期决策(用规划/DP)"
     }
   ]
 }
