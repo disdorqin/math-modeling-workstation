@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .figure_analysis import coherence_findings
+
 # ---------------------------------------------------------------------------
 # 数学建模论文连贯性检查器 (Skill C)
 #
@@ -87,6 +89,8 @@ class PaperCoherenceChecker:
         findings.extend(self._section_openings())
         findings.extend(self._notation_presence())
         findings.extend(self._figures_cited())
+        # 图表分析段落质量(O 奖四要素, figure_analysis 层, P2 软发现)
+        findings.extend(coherence_findings(sections))
         return findings
 
     # -- 1. 摘要五要素覆盖 ------------------------------------------------
