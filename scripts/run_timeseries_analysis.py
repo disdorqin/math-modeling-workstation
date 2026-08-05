@@ -73,8 +73,12 @@ def main() -> int:
     figs_dir.mkdir(parents=True, exist_ok=True)
     fig_paths: list[str] = []
     all_reports: dict[str, dict] = {}
+    case_dirs: dict[str, Path] = {}  # case -> case/analysis/timeseries
     for case, cfg in CASES.items():
         root = base / cfg["root"]
+        case_out = root / "analysis" / "timeseries"
+        case_out.mkdir(parents=True, exist_ok=True)
+        case_dirs[case] = case_out
         df = _load_data(root, cfg["data"], cfg["frequency"])
         xcol = "Date" if cfg["frequency"] == "daily" else "Year"
         for col, key, lags, window in cfg["series"]:
@@ -88,7 +92,6 @@ def main() -> int:
             d = ts.to_json_dict(report)
             all_reports[f"{case}::{key}"] = d
             print(f"[{case}] {report.summary}")
-            # figure: series + rolling trend + change-point markers
             if plt is not None:
                 fig, ax = plt.subplots(figsize=(9, 4.5))
                 x = df[xcol] if xcol == "Date" else df[xcol].astype(int)
@@ -143,7 +146,38 @@ def main() -> int:
         lines.append(f"- 归一化趋势斜率：{sw['trend_slope']:+.3f}/step")
         lines.append(f"- 结论：{d['summary']}\n")
     (out / "timeseries_summary.md").write_text("\n".join(lines), encoding="utf-8")
+    # Per-case copy: write JSON/summary into each case's analysis/timeseries/ and
+    # archive all of that case's figures there too.
+    for case, case_out in case_dirs.items():
+        case_reports = {k: v for k, v in all_reports.items() if k.startswith(f"{case}::")}
+        with open(case_out / "timeseries_reports.json", "w", encoding="utf-8") as f:
+            json.dump(case_reports, f, ensure_ascii=False, indent=2)
+        case_lines = [
+            f"# {case} 时序分析结果（task tc299a729）\n",
+            "由 `src/mathworkstation/timeseries_analysis.py` 生成。\n",
+        ]
+        for key, d in case_reports.items():
+            ac = d["autocorrelation"]
+            st = d["stationarity"]
+            cp = d["change_points"]
+            sw = d["sliding"]
+            case_lines.append(f"## {key}\n")
+            case_lines.append(f"- 序列：{d['series_name']}（{d['frequency']}，n={d['n_points']}）")
+            case_lines.append(f"- Ljung-Box Q({ac['lb_lags']}) = {ac['lb_stat']:.2f}，p = {ac['lb_pvalue']:.4f}，Durbin-Watson = {ac['durbin_watson']:.2f}")
+            case_lines.append(f"- ADF = {st['adf_stat']:.3f}，p = {st['pvalue']:.4f}（{'平稳' if st['is_stationary'] else '非平稳/带趋势'}）")
+            case_lines.append(f"- 结构断点：{len(cp['change_points'])} 个，最大段间相对跳变 {cp['max_relative_jump']:.1%}")
+            case_lines.append(f"- 归一化趋势斜率：{sw['trend_slope']:+.3f}/step")
+            case_lines.append(f"- 结论：{d['summary']}\n")
+        (case_out / "timeseries_summary.md").write_text("\n".join(case_lines), encoding="utf-8")
+        for fp in fig_paths:
+            name = Path(fp).name
+            if name.startswith(f"{case}_"):
+                import shutil
+
+                shutil.copy2(fp, case_out / name)
     print(f"\n✅ 结果写入 {out}")
+    for case, case_out in case_dirs.items():
+        print(f"   [{case}] -> {case_out}")
     if fig_paths:
         print(f"   {len(fig_paths)} 张图：{fig_paths[0]} ...")
     return 0
