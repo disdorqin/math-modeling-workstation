@@ -381,7 +381,7 @@ class AutoPipelineService:
         }
         outline = self._create_outline(case_id, section_claims, section_figures, competition_type)
         sections = self.sections.initialize(case_id, outline["outline_artifact_id"])
-        self._generate_sections(case_id, session_id, sections, approved_by, competition_type)
+        self._generate_sections(case_id, session_id, sections, approved_by, competition_type, dataset_id=dataset_id)
         paper = self.stages.complete_paper_draft(case_id, session_id)
         consistency = self.stages.check_consistency(case_id, self.consistency, session_id)
         consistency_gate = consistency["result"]["report"]["gate"]
@@ -682,13 +682,10 @@ class AutoPipelineService:
         competition: str,
     ) -> dict[str, Any]:
         self.workflow.start_node(case_id, "paper_outline")
-        # Get problem_type from case manifest
-        problem_type = ""
-        try:
-            case_manifest = self.cases.get_manifest(case_id)
-            problem_type = case_manifest.get("problem_type", "")
-        except Exception:
-            pass
+        # Get problem_type from case manifest so C-type competitions keep the
+        # timeseries/momentum sections stable regardless of how competition_type
+        # was spelled ("C", "MCM", "MCM-C", ...).
+        problem_type = self._case_problem_type(case_id)
         outline = default_outline("自动生成数学建模论文", competition, problem_type=problem_type)
         payload = outline.model_dump(mode="json")
         for section in payload["sections"]:
@@ -702,7 +699,62 @@ class AutoPipelineService:
         self.workflow.approve_node(case_id, "paper_outline", "pipeline", "Outline schema and evidence scope validated")
         return result
 
-    def _generate_sections(self, case_id: str, session_id: str, manifest: dict[str, Any], approved_by: str, competition_type: str = "") -> None:
+    def _case_problem_type(self, case_id: str) -> str:
+        """Read ``problem_type`` from the case manifest ('' when unavailable).
+
+        ``CaseManager`` exposes the manifest through ``show_case()``; there is
+        no ``get_manifest`` method, so a helper keeps the two call sites (outline
+        creation and section generation) in sync and never crashes on a missing
+        or malformed manifest.
+        """
+        try:
+            return str(
+                (self.cases.show_case(case_id).get("manifest") or {}).get("problem_type", "")
+            )
+        except Exception:  # noqa: BLE001 - manifest is advisory, never block
+            return ""
+
+    def _is_c_type(self, case_id: str, competition_type: str = "") -> bool:
+        """C-type detection: competition_type spelling OR manifest problem_type."""
+        comp = (competition_type or "").upper()
+        if comp == "C" or comp.endswith("-C") or comp.endswith("_C"):
+            return True
+        return self._case_problem_type(case_id).lower() == "c"
+
+    def _load_momentum_frame(self, case_id: str, dataset_id: str | None = None):
+        """Best-effort table load for momentum analysis (DataFrame or None)."""
+        root = self.cases.case_root(case_id)
+        candidates: list[Path] = []
+        if dataset_id:
+            try:
+                dataset = self.datasets.get(case_id, dataset_id)
+                artifact = self.artifacts.get(case_id, dataset["artifact_id"])
+                candidates.append(root / artifact["path"])
+            except Exception:  # noqa: BLE001 - fall through to uploads dir
+                pass
+        uploaded = root / "input" / "data" / "uploaded"
+        if uploaded.is_dir():
+            candidates.extend(
+                [p for p in uploaded.iterdir() if p.suffix.lower() in (".csv", ".xlsx", ".xls", ".xlsm", ".json", ".parquet", ".pq")]
+            )
+        for candidate in candidates:
+            if not candidate.is_file():
+                continue
+            try:
+                return read_table(candidate)
+            except Exception:  # noqa: BLE001 - try next candidate
+                continue
+        return None
+
+    def _generate_sections(
+        self,
+        case_id: str,
+        session_id: str,
+        manifest: dict[str, Any],
+        approved_by: str,
+        competition_type: str = "",
+        dataset_id: str | None = None,
+    ) -> None:
         # --- Learning Loop: load lessons for paper sections ---
         section_lessons_text = ""
         try:
@@ -715,41 +767,67 @@ class AutoPipelineService:
         # --- Momentum Analysis: generate momentum section for C-type competitions ---
         momentum_analysis_data = None
         # Check if this is a C-type competition (problem_type is 'c' or competition_type ends with 'C')
-        is_c_type = False
-        if competition_type:
-            comp_upper = competition_type.upper()
-            if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
-                is_c_type = True
-        # Also check the case manifest for problem_type
-        try:
-            case_manifest = self.cases.get_manifest(case_id)
-            if case_manifest.get("problem_type", "").lower() == "c":
-                is_c_type = True
-        except Exception:
-            pass
-        
+        is_c_type = self._is_c_type(case_id, competition_type)
         if is_c_type:
             try:
                 from .momentum_analysis import full_momentum_analysis, format_report_markdown
-                import pandas as pd
-                # Load the dataset for momentum analysis
-                dataset_root = self.cases.case_root(case_id) / "input" / "data" / "uploaded"
-                csv_files = list(dataset_root.glob("*.csv"))
-                if csv_files:
-                    df = pd.read_csv(csv_files[0])
+                # Load the dataset for momentum analysis. Prefer the registered
+                # dataset artifact (the actual file the pipeline used), fall back
+                # to the uploads directory. This removes the hard-coded path that
+                # silently skipped non-csv uploads and made momentum flaky.
+                frame = self._load_momentum_frame(case_id, dataset_id)
+                if frame is not None:
                     # Run momentum analysis
-                    momentum_report = full_momentum_analysis(df)
+                    momentum_report = full_momentum_analysis(frame)
                     momentum_analysis_data = format_report_markdown(momentum_report)
                     # Save momentum analysis report
                     report_path = self.cases.case_root(case_id) / "analysis" / "momentum_analysis.md"
                     report_path.parent.mkdir(parents=True, exist_ok=True)
                     report_path.write_text(momentum_analysis_data, encoding="utf-8")
+                else:
+                    # Never fail silently: a C-type case with no loadable frame
+                    # must leave an audit trail so flakiness is diagnosable.
+                    append_jsonl(
+                        self.cases.case_root(case_id) / "decisions.jsonl",
+                        {"timestamp": now_iso(), "event": "momentum_analysis_failed", "error": "no loadable data frame for momentum analysis"},
+                    )
             except Exception as _mom_err:  # noqa: BLE001 - momentum layer, never block
                 append_jsonl(
                     self.cases.case_root(case_id) / "decisions.jsonl",
                     {"timestamp": now_iso(), "event": "momentum_analysis_failed", "error": f"{type(_mom_err).__name__}: {_mom_err}"},
                 )
         # --- End Momentum Analysis ---
+        # --- TimeSeries Analysis: generate timeseries section for C-type competitions ---
+        timeseries_analysis_data = None
+        if is_c_type:
+            try:
+                from .timeseries_analysis import analyze_series, format_report_markdown
+                import pandas as pd
+                # Load the dataset for timeseries analysis
+                dataset_root = self.cases.case_root(case_id) / "input" / "data" / "uploaded"
+                csv_files = list(dataset_root.glob("*.csv"))
+                if csv_files:
+                    df = pd.read_csv(csv_files[0])
+                    # Find the first numeric column for timeseries analysis
+                    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                    if numeric_cols:
+                        series_col = numeric_cols[0]
+                        series = df[series_col].dropna()
+                        if len(series) > 10:  # Need enough data points
+                            # Determine frequency based on data
+                            frequency = "daily" if len(series) > 100 else "yearly"
+                            ts_report = analyze_series(series, series_col, frequency=frequency)
+                            timeseries_analysis_data = format_report_markdown(ts_report)
+                            # Save timeseries analysis report
+                            report_path = self.cases.case_root(case_id) / "analysis" / "timeseries_analysis.md"
+                            report_path.parent.mkdir(parents=True, exist_ok=True)
+                            report_path.write_text(timeseries_analysis_data, encoding="utf-8")
+            except Exception as _ts_err:  # noqa: BLE001 - timeseries layer, never block
+                append_jsonl(
+                    self.cases.case_root(case_id) / "decisions.jsonl",
+                    {"timestamp": now_iso(), "event": "timeseries_analysis_failed", "error": f"{type(_ts_err).__name__}: {_ts_err}"},
+                )
+        # --- End TimeSeries Analysis ---
         for item in manifest["manifest"]["sections"]:
             section_id = item["section_id"]
             context_path = self.cases.case_root(case_id) / "paper" / "sections" / section_id / "context.json"
@@ -760,6 +838,9 @@ class AutoPipelineService:
             # Inject momentum analysis data for momentum_analysis section
             if section_id == "momentum_analysis" and momentum_analysis_data:
                 context["momentum_analysis_data"] = momentum_analysis_data
+            # Inject timeseries analysis data for timeseries_analysis section
+            if section_id == "timeseries_analysis" and timeseries_analysis_data:
+                context["timeseries_analysis_data"] = timeseries_analysis_data
             content, _ = self.llm.markdown_call(case_id, session_id, "paper_draft", "paper_section", {"case_id": case_id, "section_id": section_id, "language": "zh", "context_json": context}, [item["context_artifact_id"]])
             content = content.replace("[SECTION_DRAFT_PENDING]", "本节尚未登记可用证据，保留结构性说明。")
             content = content.replace("[NEEDS_EVIDENCE]", "本节暂无已登记证据，保留结构性说明，不作外推结论。")

@@ -153,12 +153,14 @@ class PaperOutlineService:
 
 
 def default_outline(title: str, competition_type: str, language: str = "zh", problem_type: str = "") -> PaperOutline:
-    # Detect C-type competitions (time-series / dynamic data)
+    # Detect C-type competitions (time-series / dynamic data). Accept any
+    # spelling of the competition: "C", "MCM-C", "MCM_C", "MCM" combined with
+    # a manifest problem_type="c". The previous len>=2 guard silently dropped
+    # the bare "C" spelling, making the timeseries/momentum sections flaky.
     is_c_type = False
-    if competition_type and len(competition_type) >= 2:
-        comp_upper = competition_type.upper()
-        if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
-            is_c_type = True
+    comp_upper = (competition_type or "").upper().strip()
+    if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
+        is_c_type = True
     if problem_type and problem_type.lower() == "c":
         is_c_type = True
 

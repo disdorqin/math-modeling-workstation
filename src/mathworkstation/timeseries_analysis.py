@@ -358,3 +358,58 @@ def to_json_dict(report: SeriesReport) -> Dict[str, Any]:
 
     return _clean(asdict(report))
 
+
+def format_report_markdown(report: SeriesReport) -> str:
+    """Format a SeriesReport as a Markdown report."""
+    lines = []
+    lines.append(f"# 时序分析报告: {report.series_name}")
+    lines.append(f"")
+    lines.append(f"**数据点数**: {report.n_points}")
+    lines.append(f"**频率**: {report.frequency}")
+    lines.append(f"")
+    lines.append(f"## 摘要")
+    lines.append(f"{report.summary}")
+    lines.append(f"")
+    
+    # Trend decomposition
+    lines.append(f"## 趋势分解")
+    lines.append(f"- 方法: {report.trend.method}")
+    lines.append(f"- 残差标准差: {report.trend.residual_std:.4f}")
+    lines.append(f"- 变异系数: {report.trend.coefficient_of_variation:.4f}")
+    lines.append(f"")
+    
+    # Autocorrelation
+    lines.append(f"## 自相关检验")
+    lines.append(f"- Ljung-Box统计量: {report.autocorrelation.lb_stat:.4f}")
+    lines.append(f"- Ljung-Box p值: {report.autocorrelation.lb_pvalue:.4f}")
+    lines.append(f"- Durbin-Watson统计量: {report.autocorrelation.durbin_watson:.4f}")
+    lines.append(f"- 存在自相关: {'是' if report.autocorrelation.has_serial_correlation else '否'}")
+    lines.append(f"- 解释: {report.autocorrelation.interpretation}")
+    lines.append(f"")
+    
+    # Stationarity
+    lines.append(f"## 平稳性检验")
+    lines.append(f"- ADF统计量: {report.stationarity.adf_stat:.4f}")
+    lines.append(f"- p值: {report.stationarity.pvalue:.4f}")
+    lines.append(f"- 平稳: {'是' if report.stationarity.is_stationary else '否'}")
+    lines.append(f"- 解释: {report.stationarity.interpretation}")
+    lines.append(f"")
+    
+    # Change points
+    lines.append(f"## 结构断点检测")
+    lines.append(f"- 窗口大小: {report.change_points.window}")
+    lines.append(f"- 断点数量: {len(report.change_points.change_points)}")
+    lines.append(f"- 最大相对跳跃: {report.change_points.max_relative_jump:.2%}")
+    lines.append(f"- 解释: {report.change_points.interpretation}")
+    lines.append(f"")
+    
+    # Sliding stats
+    lines.append(f"## 滑动统计")
+    lines.append(f"- 窗口大小: {report.sliding.window}")
+    lines.append(f"- 总体均值: {report.sliding.overall_mean:.4f}")
+    lines.append(f"- 总体标准差: {report.sliding.overall_std:.4f}")
+    lines.append(f"- 趋势斜率(归一化): {report.sliding.trend_slope:+.4f}/step")
+    lines.append(f"")
+    
+    return "\n".join(lines)
+

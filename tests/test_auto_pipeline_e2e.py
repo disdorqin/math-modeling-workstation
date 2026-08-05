@@ -255,3 +255,48 @@ def test_auto_pipeline_produces_traceable_refined_export(tmp_path: Path) -> None
         submission_names = set(submission.namelist())
     assert "paper/final.md" in submission_names
     assert not any(name.startswith(prefix) for name in submission_names for prefix in ("memory/", "refinement/", "sessions/", "evidence/raw_responses/"))
+
+
+def test_c_type_detection_stable_across_spellings(tmp_path: Path) -> None:
+    """C-type detection must not depend on a magic competition spelling.
+
+    Regression test for the flaky momentum integration (t3a5a988f): the old
+    code called a non-existent ``CaseManager.get_manifest`` inside a swallowed
+    ``except: pass``, so ``problem_type`` was always empty and the C-type
+    sections appeared only when ``competition_type`` happened to be spelled
+    "MCM-C"/"MCM_C". ``show_case()["manifest"]`` is the real accessor.
+    """
+    cases = CaseManager(tmp_path / "output")
+    service = AutoPipelineService(cases, None, coherence=False)  # type: ignore[arg-type]
+
+    # Bare "C" spelling with manifest problem_type="c"
+    case = cases.create_case("MCM", "C 题", problem_type="c", year=2024)
+    case_id = case["case_id"]
+    assert service._is_c_type(case_id, "C") is True
+    assert service._is_c_type(case_id, "MCM-C") is True
+    assert service._is_c_type(case_id, "MCM") is True  # manifest drives it
+    assert service._case_problem_type(case_id) == "c"
+
+    # Non-C case must stay negative even when spelled with a trailing C
+    non_c = cases.create_case("MCM", "A 题", problem_type="a", year=2024)
+    assert service._is_c_type(non_c["case_id"], "MCM") is False
+
+
+def test_momentum_frame_loader_falls_back_to_uploads(tmp_path: Path) -> None:
+    """Momentum data loader finds the uploaded csv even without a dataset id."""
+    import pandas as pd
+
+    cases = CaseManager(tmp_path / "output")
+    service = AutoPipelineService(cases, None, coherence=False)  # type: ignore[arg-type]
+    case = cases.create_case("MCM", "C 题", problem_type="c", year=2024)
+    case_id = case["case_id"]
+    root = cases.case_root(case_id)
+    uploaded = root / "input" / "data" / "uploaded"
+    uploaded.mkdir(parents=True, exist_ok=True)
+    (uploaded / "wimbledon_data.csv").write_text(
+        "server,point_victor,elapsed_time\n1,1,0\n2,2,1\n1,1,2\n2,2,3\n",
+        encoding="utf-8",
+    )
+    frame = service._load_momentum_frame(case_id, None)
+    assert frame is not None
+    assert list(frame.columns) == ["server", "point_victor", "elapsed_time"]

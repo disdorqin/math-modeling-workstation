@@ -67,3 +67,37 @@ def test_outline_accepts_windows_utf8_bom(tmp_path: Path) -> None:
         FigureRegistry(cases, artifacts),
     ).validate_file(case["case_id"], source)
     assert result["outline_artifact_id"]
+
+
+def _section_ids(outline) -> list[str]:
+    return [s.section_id for s in outline.sections]
+
+
+def test_default_outline_mcm_c_spelling_gets_c_type_sections() -> None:
+    """"MCM-C" spelling must trigger the timeseries/momentum sections.
+
+    Regression test for the flaky momentum integration (t3a5a988f): the old
+    ``len(competition_type) >= 2`` guard plus a pydantic ``min_length=2`` made
+    C-type detection depend on the exact spelling, so the sections appeared
+    only sometimes.
+    """
+    outline = default_outline("C 题论文", "MCM-C")
+    ids = _section_ids(outline)
+    assert "timeseries_analysis" in ids
+    assert "momentum_analysis" in ids
+
+
+def test_default_outline_problem_type_c_triggers_c_type_sections() -> None:
+    """problem_type='c' alone (e.g. from the case manifest) must enable C-type
+    sections even when competition_type is the generic "MCM" spelling."""
+    outline = default_outline("C 题论文", "MCM", problem_type="c")
+    ids = _section_ids(outline)
+    assert "timeseries_analysis" in ids
+    assert "momentum_analysis" in ids
+
+
+def test_default_outline_non_c_has_no_c_type_sections() -> None:
+    outline = default_outline("A 题论文", "MCM")
+    ids = _section_ids(outline)
+    assert "momentum_analysis" not in ids
+    assert "timeseries_analysis" not in ids
