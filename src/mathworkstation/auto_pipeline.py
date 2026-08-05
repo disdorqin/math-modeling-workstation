@@ -339,6 +339,42 @@ class AutoPipelineService:
                 "error": promotion_error,
             },
         )
+        # ---- figure_tracking integration: after every promotion pass, run
+        # the PaperQA-style tracking consistency check. At this point the
+        # paper text is not yet drafted, so referenced-label checks are
+        # deferred; the key signal here is whether promoted figures carry
+        # sources[] entries (no REVIEW FIGURE_WITHOUT_SOURCE). ------------
+        tracking_gate: str = "PASS"
+        tracking_findings: list[dict[str, Any]] = []
+        tracking_figures: int = 0
+        try:
+            from .figure_tracking import check_figure_tracking, write_tracking_report
+
+            tracking_report = check_figure_tracking(case_id, "", self.figures)
+            tracking_gate = tracking_report["gate"]
+            tracking_findings = tracking_report["findings"]
+            tracking_figures = tracking_report["tracked_figures"]
+            write_tracking_report(case_id, tracking_report, self.figures)
+        except Exception as error:  # noqa: BLE001 - recorded, never fatal
+            tracking_gate = "ERROR"
+            tracking_findings = [
+                {
+                    "severity": "BLOCK",
+                    "section_id": "global",
+                    "code": "TRACKING_CHECK_FAILED",
+                    "detail": f"{type(error).__name__}: {error}",
+                }
+            ]
+        append_jsonl(
+            self.cases.case_root(case_id) / "decisions.jsonl",
+            {
+                "timestamp": now_iso(),
+                "event": "figures_tracking_checked",
+                "gate": tracking_gate,
+                "tracked_figures": tracking_figures,
+                "findings": tracking_findings,
+            },
+        )
         result_records, comparison_table, comparison_table_artifact = self._register_result_evidence(
             case_id, dataset_id, experiment_id, comparison["result"], sensitivity["result"]
         )
@@ -564,7 +600,12 @@ class AutoPipelineService:
         # set, so it cannot invent unsupported models (the cause of repeated
         # real-LLM integration failures before this fix).
         catalog = _load_model_catalog()
-        model_plan_context = {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json")}
+        # --- HMML fusion (tc6aff945): retrieve top modelling methods from the
+        # tri-level HMML library for this problem and hand them to the model-
+        # plan LLM as additional guidance. Best-effort and never blocking — the
+        # method catalog remains the authoritative constraint.
+        hmml_retrieved = _load_hmml_retrieval(analysis) or "（无）"
+        model_plan_context = {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json"), "hmml_retrieved": hmml_retrieved}
         if lessons_text:
             model_plan_context["paper_lessons"] = lessons_text
         try:
@@ -588,6 +629,7 @@ class AutoPipelineService:
                             "columns_json": columns,
                             "profile_json": profile,
                             "problem_analysis_json": analysis.model_dump(mode="json"),
+                            "hmml_retrieved": hmml_retrieved,
                         }
                 if lessons_text:
                     _fallback_ctx["paper_lessons"] = lessons_text
@@ -828,17 +870,15 @@ class AutoPipelineService:
         if is_c_type:
             try:
                 from .timeseries_analysis import analyze_series, format_report_markdown
-                import pandas as pd
-                # Load the dataset for timeseries analysis
-                dataset_root = self.cases.case_root(case_id) / "input" / "data" / "uploaded"
-                csv_files = list(dataset_root.glob("*.csv"))
-                if csv_files:
-                    df = pd.read_csv(csv_files[0])
-                    # Find the first numeric column for timeseries analysis
-                    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                # Load the dataset for timeseries analysis. Prefer the registered
+                # dataset artifact (the actual file the pipeline used), fall back
+                # to the uploads directory — same rule as momentum analysis.
+                frame = self._load_momentum_frame(case_id, dataset_id)
+                if frame is not None:
+                    numeric_cols = frame.select_dtypes(include=["number"]).columns.tolist()
                     if numeric_cols:
                         series_col = numeric_cols[0]
-                        series = df[series_col].dropna()
+                        series = frame[series_col].dropna()
                         if len(series) > 10:  # Need enough data points
                             # Determine frequency based on data
                             frequency = "daily" if len(series) > 100 else "yearly"
@@ -848,6 +888,13 @@ class AutoPipelineService:
                             report_path = self.cases.case_root(case_id) / "analysis" / "timeseries_analysis.md"
                             report_path.parent.mkdir(parents=True, exist_ok=True)
                             report_path.write_text(timeseries_analysis_data, encoding="utf-8")
+                else:
+                    # Never fail silently: a C-type case with no loadable frame
+                    # must leave an audit trail so flakiness is diagnosable.
+                    append_jsonl(
+                        self.cases.case_root(case_id) / "decisions.jsonl",
+                        {"timestamp": now_iso(), "event": "timeseries_analysis_failed", "error": "no loadable data frame for timeseries analysis"},
+                    )
             except Exception as _ts_err:  # noqa: BLE001 - timeseries layer, never block
                 append_jsonl(
                     self.cases.case_root(case_id) / "decisions.jsonl",
@@ -1173,6 +1220,34 @@ def _inject_typed_evidence(content: str, context: dict[str, Any]) -> str:
 
 
 _MODEL_CATALOG_CACHE: dict[str, Any] | None = None
+_HMML_RETRIEVAL_CACHE: dict[str, str] | None = None
+
+
+def _load_hmml_retrieval(analysis: Any) -> str:
+    """HMML top-k method retrieval for the model-plan stage (best-effort).
+
+    Cached per problem objective string so repeated runs in one process do not
+    re-scan the tree. Returns the formatted ``**Method:** description`` block
+    (or empty string when the HMML config is missing/unreadable, so the
+    pipeline never hard-fails on the fusion layer).
+    """
+    global _HMML_RETRIEVAL_CACHE
+    try:
+        from .hmml import MethodRetriever, get_library
+
+        objectives = analysis.objectives if hasattr(analysis, "objectives") else []
+        query = "；".join(objectives) if objectives else (analysis.purpose if hasattr(analysis, "purpose") else "")
+        if not query:
+            return ""
+        if _HMML_RETRIEVAL_CACHE is not None and _HMML_RETRIEVAL_CACHE[0] == query:
+            return _HMML_RETRIEVAL_CACHE[1]
+        retriever = MethodRetriever(library=get_library(), score_func="lexical", top_k=5)
+        methods = retriever.retrieve(query)
+        formatted = retriever.format_methods(methods)
+        _HMML_RETRIEVAL_CACHE = (query, formatted)
+        return formatted
+    except Exception:  # noqa: BLE001 - HMML layer is advisory, never block
+        return ""
 
 
 def _load_model_catalog() -> dict[str, Any]:
