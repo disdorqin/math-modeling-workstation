@@ -21,6 +21,14 @@ from .export_service import ExportService
 from .figure_registry import FigureRegistry
 from .figure_auto_promoter import FigureAutoPromoter
 from .figure_composition import FigureCompositionService
+from .figure_numbering import (
+    assign_figure_numbers,
+    check_figure_numbering,
+    load_figure_numbering,
+    render_figure_block,
+    render_figure_reference,
+    write_numbering_report,
+)
 from .flowchart_service import FlowchartService
 from .llm.router import LLMRouter
 from .llm.image_router import ImageRouter
@@ -85,6 +93,7 @@ class AutoPipelineService:
         self.coherence = coherence
         self.cases = cases
         self.artifacts = ArtifactRegistry(cases)
+        self._figure_numbering_report_artifact = None
         self.checkpoints = CheckpointManager(cases)
         self.memory = MemoryManager(cases, self.artifacts)
         self.sessions = SessionManager(cases)
@@ -407,6 +416,20 @@ class AutoPipelineService:
             refinement_config,
         )
         final_text = (self.cases.case_root(case_id) / "paper" / "final.md").read_text(encoding="utf-8")
+        # --- Figure numbering: verify the assembled paper against the registry
+        # (Sphinx numfig style warnings: orphan figures / unresolved 图N labels).
+        # Best-effort, never blocks the pipeline. ---
+        try:
+            numbering_map = load_figure_numbering(case_id, self.cases)
+            if numbering_map:
+                report = check_figure_numbering(case_id, final_text, numbering_map)
+                self._figure_numbering_report_artifact = write_numbering_report(case_id, report, self.figures)
+        except Exception as _fnum_err:  # noqa: BLE001 - numbering layer, never block
+            append_jsonl(
+                self.cases.case_root(case_id) / "decisions.jsonl",
+                {"timestamp": now_iso(), "event": "figure_numbering_check_failed", "error": f"{type(_fnum_err).__name__}: {_fnum_err}"},
+            )
+        # --- End Figure numbering check ---
         complete_paper, complete_paper_artifact = self.contracts.write_assessment(case_id, final_text)
         if complete_paper.gate != "PASS":
             raise ValueError(f"complete paper contract failed: {complete_paper.issue_codes}")
@@ -465,6 +488,9 @@ class AutoPipelineService:
             "paper_artifact_id": paper["artifact"]["artifact_id"],
             "paper_final_artifact_id": refinement["paper_final_artifact_id"],
             "consistency_artifact_id": consistency["result"]["report_artifact_id"],
+            "figure_numbering_report_artifact_id": (
+                (self._figure_numbering_report_artifact or {}).get("report_artifact_id")
+            ),
             "complete_paper_artifact_id": complete_paper_artifact["artifact_id"],
             "full_review_artifact_id": review["artifact"]["artifact_id"],
             "repair_request_ids": [item.request_id for item in repair_requests],
@@ -828,6 +854,19 @@ class AutoPipelineService:
                     {"timestamp": now_iso(), "event": "timeseries_analysis_failed", "error": f"{type(_ts_err).__name__}: {_ts_err}"},
                 )
         # --- End TimeSeries Analysis ---
+        # --- Figure numbering: 图N in document order (Sphinx numfig semantics) ---
+        numbering: dict[str, dict[str, Any]] = {}
+        try:
+            outline_path = self.cases.case_root(case_id) / "paper" / "outline" / "auto-outline.json"
+            if outline_path.is_file():
+                outline_payload = json.loads(outline_path.read_text(encoding="utf-8"))
+                numbering, _ = assign_figure_numbers(case_id, outline_payload.get("sections", []), self.figures)
+        except Exception as _num_err:  # noqa: BLE001 - numbering layer, never block
+            append_jsonl(
+                self.cases.case_root(case_id) / "decisions.jsonl",
+                {"timestamp": now_iso(), "event": "figure_numbering_failed", "error": f"{type(_num_err).__name__}: {_num_err}"},
+            )
+        # --- End Figure numbering ---
         for item in manifest["manifest"]["sections"]:
             section_id = item["section_id"]
             context_path = self.cases.case_root(case_id) / "paper" / "sections" / section_id / "context.json"
@@ -835,6 +874,12 @@ class AutoPipelineService:
             # Inject lessons into section context
             if section_lessons_text:
                 context["paper_lessons"] = section_lessons_text
+            # Inject figure numbering so the LLM references 图N (not raw figure_id)
+            if numbering:
+                context["figure_numbering"] = {
+                    figure["figure_id"]: render_figure_reference(figure["figure_id"], numbering)
+                    for figure in context["allowed_figures"]
+                }
             # Inject momentum analysis data for momentum_analysis section
             if section_id == "momentum_analysis" and momentum_analysis_data:
                 context["momentum_analysis_data"] = momentum_analysis_data
@@ -859,8 +904,8 @@ class AutoPipelineService:
                 content = f"## {context['title']}\n\n{content}"
             for figure in context["allowed_figures"]:
                 figure_ref = figure["figure_id"]
-                if figure_ref not in content:
-                    content += f"\n\n图表证据：{figure['title']} [{figure_ref}]\n\n![{figure['title']}](../{figure['path']})\n"
+                if figure_ref not in content and figure_ref not in _figure_id_anchors(content):
+                    content += render_figure_block(figure, numbering)
             if any("synthetic_data_claim" in claim.get("restrictions", []) for claim in context["allowed_claims"]) and "SYNTHETIC" not in content.upper() and "合成" not in content:
                 content += "\n\n本节基于明确标注的 SYNTHETIC 数据，相关结论不外推至真实竞赛数据。"
             self.sections.update_draft(case_id, section_id, content, "llm")
@@ -1038,6 +1083,13 @@ class AutoPipelineService:
             max_tokens=6000,
         )
         return {**proposal.model_dump(mode="json"), "llm_response_artifact_id": response["artifact_id"]}
+
+
+def _figure_id_anchors(content: str) -> set[str]:
+    """已注入图块里保留的 figure_id 集合(不可见锚点 + 旧式方括号引用)。"""
+    anchors = set(re.findall(r'data-figure-id="([^"]+)"', content))
+    anchors.update(re.findall(r"\[figure-[A-Za-z0-9_-]+\]", content))
+    return anchors
 
 
 def _scalarize_parameters(value: Any) -> Any:

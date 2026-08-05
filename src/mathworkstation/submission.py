@@ -160,6 +160,7 @@ def markdown_to_latex(markdown: str, profile: SubmissionProfile) -> str:
 
 def sanitize_submission_markdown(markdown: str) -> str:
     """Remove internal evidence anchors from the user-facing manuscript copy."""
+    cleaned = re.sub(r"<!-- data-figure-id=\"[^\"]*\" -->", "", markdown)
     cleaned = re.sub(r"\[(?:claim|figure|artifact|result|table|answer-subproblem)-[A-Za-z0-9_-]+\]", "", markdown, flags=re.I)
     cleaned = re.sub(r"\[数学建模研究工作流总览\]|\[数值变量分布\]|\[数值变量相关性热力图\]|\[目标变量[^]]*\]|\[候选模型[^]]*\]|\[Baseline[^]]*\]|\[模型样本比例[^]]*\]", "", cleaned)
     return re.sub(r"[ \t]{2,}", " ", cleaned)
