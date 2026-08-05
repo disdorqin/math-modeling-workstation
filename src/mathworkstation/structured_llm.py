@@ -104,6 +104,33 @@ def _fill_required_fields(value: Any, model: type[BaseModel]) -> Any:
                     else:
                         coerced = coerced.zfill(min_len)
                 value[field_name] = coerced
+    # Literal-constrained fields: if the LLM echoed a value outside the allowed
+    # literal set (e.g. schema_version 2 when the schema pins Literal[1], or
+    # task_type "classification" vs a regression-only literal), fall back to
+    # the field's default — a drift that otherwise hard-fails validation.
+    for field_name, field_info in model.model_fields.items():
+        if field_name not in value:
+            continue
+        annotation = str(field_info.annotation)
+        if "Literal" not in annotation:
+            continue
+        allowed = tuple(
+            item for item in getattr(field_info.annotation, "__args__", ()) if not isinstance(item, type)
+        )
+        current = value[field_name]
+        if current in allowed:
+            continue
+        if not field_info.is_required() and field_info.default is not None:
+            value[field_name] = field_info.default
+        elif allowed:
+            # No usable default: pick the first declared literal so the model
+            # validates and the pipeline continues (best-effort, never invents).
+            # ``__args__`` is a tuple, so it preserves the schema's declaration
+            # order — that is the deterministic, schema-respecting choice (a
+            # set/sorted fallback would be order-dependent or alphabetic).
+            first = next((item for item in allowed if item is not None), None)
+            if first is not None:
+                value[field_name] = first
     present = {k for k in value if value.get(k) not in (None, "", [])}
     for field_name, field_info in model.model_fields.items():
         if field_name in present:

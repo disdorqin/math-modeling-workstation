@@ -94,6 +94,7 @@ class AutoPipelineService:
         self.cases = cases
         self.artifacts = ArtifactRegistry(cases)
         self._figure_numbering_report_artifact = None
+        self._figure_analysis_report_artifact = None
         self.checkpoints = CheckpointManager(cases)
         self.memory = MemoryManager(cases, self.artifacts)
         self.sessions = SessionManager(cases)
@@ -466,6 +467,39 @@ class AutoPipelineService:
                 {"timestamp": now_iso(), "event": "figure_numbering_check_failed", "error": f"{type(_fnum_err).__name__}: {_fnum_err}"},
             )
         # --- End Figure numbering check ---
+        # --- Figure analysis: verify each embedded figure has an O-award
+        # analysis paragraph (lead / observation / interpretation / takeaway),
+        # per the figure-improvement plan (t8859f1f6). Best-effort, never
+        # blocks the pipeline; REVIEW findings feed the refinement loop via
+        # PaperCoherenceChecker already, and here we persist the standalone
+        # report under review/figure_analysis/ (the third leg of the figure
+        # trio: numbering / tracking / analysis). ---
+        try:
+            from .figure_analysis import (
+                check_figure_analysis_paragraphs,
+                write_analysis_report,
+            )
+
+            sections_dir = self.cases.case_root(case_id) / "paper" / "sections"
+            section_markdown = {}
+            if sections_dir.is_dir():
+                for section_dir in sections_dir.iterdir():
+                    if not section_dir.is_dir():
+                        continue
+                    draft = section_dir / "draft.md"
+                    if draft.is_file():
+                        section_markdown[section_dir.name] = draft.read_text(encoding="utf-8")
+            if section_markdown:
+                analysis_report = check_figure_analysis_paragraphs(section_markdown)
+                self._figure_analysis_report_artifact = write_analysis_report(
+                    case_id, analysis_report, self.figures, kind="paragraphs"
+                )
+        except Exception as _fana_err:  # noqa: BLE001 - figure analysis layer, never block
+            append_jsonl(
+                self.cases.case_root(case_id) / "decisions.jsonl",
+                {"timestamp": now_iso(), "event": "figure_analysis_check_failed", "error": f"{type(_fana_err).__name__}: {_fana_err}"},
+            )
+        # --- End Figure analysis check ---
         complete_paper, complete_paper_artifact = self.contracts.write_assessment(case_id, final_text)
         if complete_paper.gate != "PASS":
             raise ValueError(f"complete paper contract failed: {complete_paper.issue_codes}")
@@ -526,6 +560,9 @@ class AutoPipelineService:
             "consistency_artifact_id": consistency["result"]["report_artifact_id"],
             "figure_numbering_report_artifact_id": (
                 (self._figure_numbering_report_artifact or {}).get("report_artifact_id")
+            ),
+            "figure_analysis_report_artifact_id": (
+                (self._figure_analysis_report_artifact or {}).get("report_artifact_id")
             ),
             "complete_paper_artifact_id": complete_paper_artifact["artifact_id"],
             "full_review_artifact_id": review["artifact"]["artifact_id"],
@@ -663,6 +700,11 @@ class AutoPipelineService:
                 self.workflow.fail_node(case_id, "model_plan", FailureCategory.SCHEMA, f"{type(first_error).__name__}: {first_error}")
                 raise first_error
         payload = proposal.model_dump(mode="json")
+        # The LLM sometimes echoes the Method Catalog's own schema_version
+        # (the catalog is schema_version 2) into the plan payload. The
+        # strict ModelPlan schema pins schema_version to Literal[1], so
+        # normalise here before validation instead of dying on the drift.
+        payload["schema_version"] = 1
         aliases = {
             "linear_regression": "linear",
             "ridge_regression": "ridge",

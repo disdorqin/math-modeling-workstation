@@ -1,6 +1,46 @@
 """Tests for _fill_required_fields type coercion."""
 from mathworkstation.structured_llm import _fill_required_fields
 from mathworkstation.paper_contracts import SubproblemContract
+from mathworkstation.model_plan import ModelPlan
+
+
+def test_literal_schema_version_drift_falls_back_to_default():
+    """schema_version 2 (echoed from the catalog) -> Literal[1] default."""
+    data = {
+        "schema_version": 2,
+        "purpose": "Plan",
+        "dataset_id": "d1",
+        "task_type": "regression",
+        "target_column": "y",
+        "feature_columns": ["a", "b"],
+        "candidate_models": [
+            {"name": "linear", "rationale": "baseline"},
+            {"name": "ridge", "rationale": "regularised"},
+        ],
+        "primary_metric": "rmse",
+    }
+    result = _fill_required_fields(data, ModelPlan)
+    assert result["schema_version"] == 1
+
+
+def test_literal_task_type_drift_picks_first_allowed():
+    """Invalid task_type (no default) -> first allowed literal, pipeline lives."""
+    data = {
+        "schema_version": 1,
+        "purpose": "Plan",
+        "dataset_id": "d1",
+        "task_type": "clustering",
+        "target_column": "y",
+        "feature_columns": ["a", "b"],
+        "candidate_models": [
+            {"name": "linear", "rationale": "baseline"},
+            {"name": "ridge", "rationale": "regularised"},
+        ],
+        "primary_metric": "rmse",
+    }
+    result = _fill_required_fields(data, ModelPlan)
+    assert result["task_type"] == "regression"  # first allowed literal
+
 
 
 def test_integer_subproblem_id_coerced_and_padded():
