@@ -79,6 +79,31 @@ def _fill_required_fields(value: Any, model: type[BaseModel]) -> Any:
     # fallback field above.
     for key in [k for k in value if k not in model.model_fields]:
         value.pop(key, None)
+    # Coerce integer/float values to strings for fields expecting str type.
+    # DeepSeek (and other LLMs) sometimes return subproblem_id as int (1)
+    # instead of str ("1"). This generic coercion handles all *_id and str fields.
+    # Also enforces min_length: if the coerced string is too short, pad it
+    # (e.g. "1" → "SP1" for subproblem_id with min_length=3).
+    for field_name, field_info in model.model_fields.items():
+        if field_name not in value:
+            continue
+        annotation = str(field_info.annotation)
+        if "str" in annotation and not isinstance(value[field_name], str):
+            if isinstance(value[field_name], (int, float)):
+                coerced = str(value[field_name])
+                # Extract min_length from Pydantic metadata (MinLen constraint)
+                min_len = 0
+                for meta in getattr(field_info, "metadata", []):
+                    if hasattr(meta, "min_length"):
+                        min_len = meta.min_length
+                        break
+                if min_len and len(coerced) < min_len:
+                    if field_name.endswith("_id"):
+                        prefix = "".join(w[0].upper() for w in field_name.rstrip("_").split("_") if w)
+                        coerced = prefix + coerced.zfill(max(1, min_len - len(prefix)))
+                    else:
+                        coerced = coerced.zfill(min_len)
+                value[field_name] = coerced
     present = {k for k in value if value.get(k) not in (None, "", [])}
     for field_name, field_info in model.model_fields.items():
         if field_name in present:

@@ -201,7 +201,7 @@ class TaskPaperPipelineService:
             table = next((item for item in pack.tables if item.table_id == table_id), None)
             table_markdown = _render_table(table) if table is not None else ""
             if section_id == "abstract":
-                content = f"## 摘要\n\n研究目的：围绕 {family} 任务建立可复现模型。研究方法：遵循已登记协议完成确定性执行。主要结果：{metrics}。稳健性与边界：{pack.diagnostics[0].limitation if pack.diagnostics else '结论受协议和数据范围约束。'}\n\n{claim['text']} [{claim['claim_id']}]"
+                content = f"## 摘要\n\n围绕 {family} 任务，本文在已登记协议下完成可复现的确定性执行，主要结果如下：{metrics}。{pack.diagnostics[0].limitation if pack.diagnostics else '结论受协议和数据范围约束。'}\n\n{claim['text']} [{claim['claim_id']}]"
             elif section_id == "problem_restated":
                 content = f"## 引言与问题重述\n\n研究概述：本研究将 {family} 任务拆分为协议定义、模型执行和结果稳健性三个子问题。目标是产生可复现且可审查的结果。"
             elif section_id == "assumptions":

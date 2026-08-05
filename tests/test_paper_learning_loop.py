@@ -289,3 +289,13 @@ class TestEndToEnd:
         # 4. Export markdown
         md = store.export_markdown()
         assert len(md) > 0
+
+    def test_no_double_nesting_when_root_is_case_dir(self, tmp_path: Path):
+        """PaperLessonsStore should not double-nest when root already ends with case_id."""
+        case_dir = tmp_path / "my-case-001"
+        case_dir.mkdir()
+        store = PaperLessonsStore(case_dir, "my-case-001")
+        # Should be at <case_dir>/memory/paper_lessons.json, NOT <case_dir>/my-case-001/memory/...
+        assert store.lessons_path == case_dir / "memory" / "paper_lessons.json"
+        store.add_lesson("always", "mcm-c", "test", "my-case-001")
+        assert store.lessons_path.is_file()

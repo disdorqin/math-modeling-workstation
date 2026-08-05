@@ -61,7 +61,11 @@ class PaperLessonsStore:
         self.root = root
         self.case_id = case_id
         if case_id:
-            self.lessons_path = root / case_id / "memory" / "paper_lessons.json"
+            # Avoid double-nesting: if root already ends with case_id, don't append again
+            if root.name == case_id:
+                self.lessons_path = root / "memory" / "paper_lessons.json"
+            else:
+                self.lessons_path = root / case_id / "memory" / "paper_lessons.json"
         else:
             self.lessons_path = root / "paper_lessons.json"
         self.lessons_path.parent.mkdir(parents=True, exist_ok=True)

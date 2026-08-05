@@ -59,6 +59,7 @@ class RefinementConfig:
     max_sections_per_stage: int = 2
     max_issues_per_stage: int = 3
     max_changed_ratio: float = 0.12
+    max_stage_failures: int = 2
     quality_ema_beta: float = 0.6
     targets: dict[str, float] = field(
         default_factory=lambda: {
@@ -337,6 +338,7 @@ class RefinementService:
             self._reconcile_stage_commit(case_id, state)
             issues = IssueRegistry(root / "refinement" / "issues.jsonl")
             stop_reason = "MAX_STAGES"
+            stage_failures = 0
             while state["iteration"] < config.max_stages:
                 before = self.evaluator.evaluate(sections, frozen, config.targets)
                 current_issues = issues.update(before["findings"], state["iteration"])
@@ -350,7 +352,24 @@ class RefinementService:
                     stop_reason = "NO_PROPOSER"
                     break
                 stage = state["iteration"] + 1
-                result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config, hidden)
+                try:
+                    result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config, hidden)
+                except Exception as stage_error:
+                    # Stage-level failure (e.g., LLM timeout/budget) should not crash the loop.
+                    # Record the failure, increment iteration, and continue to next stage.
+                    stage_failures += 1
+                    append_jsonl(
+                        root / "refinement" / "history.jsonl",
+                        {"stage": stage, "error": f"{type(stage_error).__name__}: {stage_error}", "ts": now_iso()},
+                    )
+                    state["iteration"] = stage
+                    state["no_progress_streak"] = state.get("no_progress_streak", 0) + 1
+                    atomic_write_json(root / "memory" / "refinement_state.json", state)
+                    if stage_failures >= config.max_stage_failures:
+                        stop_reason = "TOO_MANY_STAGE_FAILURES"
+                        break
+                    continue
+                stage_failures = 0  # reset on success
                 effective_findings = result["findings_after"] if result["accepted"] else before["findings"]
                 current_issues = issues.update(effective_findings, stage)
                 issues.record_attempt(result["issue_ids"], stage, result["accepted"])

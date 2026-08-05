@@ -31,6 +31,69 @@
 
 **红线:** API Key 禁止写进代码/日志/记忆;邮箱只用 fleet/mailbox;任务单以 acceptance_criteria 为准;**失败必须如实报告,不许"默认通过"**。
 
+## 三·B、广播机制设计原理(v3 健壮版, 2026-08-05)
+
+> 回答“老师怎么直接把消息送到 freebuff 聊天框、干完活怎么直接回给老师”。
+
+### 消息从哪来(写入端)
+
+所有消息是**追加写 JSONL**,不建库、不加锁表、断点续读:
+
+| 通道 | 位置 | 写入方 |
+|---|---|---|
+| 邮箱 | `fleet/mailbox/<agent>.jsonl` | `hub.agent_send` / `fleet_broadcast` / `report_to_claude` / `fleet_notify` |
+| 广播 | `fleet/notify/broadcast.jsonl` | 同上(同一消息会双写到邮箱+广播) |
+| 任务单 | `fleet/tasks/{pending,doing,done}/<id>.json` | `hub.task_create` |
+
+**schema 统一(去重的前提):** 每条记录必须有
+`msg_id`(来自+to+subject+body+timestamp 的 sha1 前16位,邮箱与广播两副本**相同**)
+和 `type`(mail/broadcast)。写方保证双写同 id。
+
+### 消息怎么到聊天框(投递端)
+
+`inbox_bridge.py`(守护进程,3s 轮询)是唯一投递者:
+
+```
+邮箱新行 / 广播新行 / 任务新单 → 算 msg_id → 查 delivered 集合
+  → 已投递则跳过(跨通道去重) → 未投递则 chat_inject 注入聊天框
+  → 发送成功(delivered=true)才记入 delivered
+  → 失败进 retry 队列,重试最多 6 次;仍失败写 undelivered.jsonl(绝不静默丢)
+```
+
+`chat_inject.py`(CDP)是注入器:跨进程发送锁 + 最小发送间隔(1.2s) +
+React flush 等待 + 发送按钮轮询(空输入 disabled→输入后 enabled) +
+**发送后回读输入框已清空才算 delivered**。剪贴板兜底只复制不发送,
+返回 delivered=false,由桥重试,不再伪装“投递成功”。
+
+### 消息怎么回给老师(上报端)
+
+freebuff 干活完成后调用 `report_to_claude.py` / `fleet_notify.notify_task_complete`:
+同样带 msg_id 双写 claude_code 邮箱 + 广播。老师侧监听器读自己的邮箱/广播即可。
+
+**直达聊天界面(2026-08-05 实测):**
+若需要消息直接出现在 claude_code 的 Claude Code 聊天界面(不走邮箱),用控制台注入:
+```
+python D:\AI_Memory\shared_memory\claude_chat_inject.py "消息内容"
+# 原理: AttachConsole 到 claude.exe → 向 CONIN$ 写 KEY_EVENT(逐字符+回车)
+python D:\AI_Memory\shared_memory\claude_chat_inject.py --check   # 连通性检查
+python D:\AI_Memory\shared_memory\probe_console.py <pid>         # 读取目标控制台屏幕(验证已显示)
+```
+实测:freebuff 消息成功注入 claude_code 聊天界面,导师确认收到并验证了 v3 机制。
+
+### 诊断命令(遇到“没收到/时断时错”先用它)
+
+```
+python D:\AI_Memory\shared_memory\chat_inject.py --check   # CDP/标签页/输入框/发送按钮
+python D:\AI_Memory\shared_memory\inbox_bridge.py --status  # 守护进程/重试队列/undelivered
+python D:\AI_Memory\shared_memory\inbox_bridge.py --check  # 一键体检(桥+CDP+状态)
+```
+
+### 已知边界(为什么不能 100% 可靠,以及兜底)
+
+- 依赖 Chrome `--remote-debugging-port=9222` + freebuff 标签页开着;标签页关/刷/登录态过期 → 注入失败 → 自动重试 6 次 → 进 `undelivered.jsonl`(人工可查)。
+- 聊天界面 DOM 改版会改变按钮/输入框选择器;`--check` 能立刻报出缺哪一环。
+- 任务注入由 `freebuff_task_poller.ps1` **独占**(bridge 不再 watch tasks),避免双重注入。
+
 ## 四、当前代码状态(2026-08-04)
 
 - 分支 `m2-contest-grade-paper`,git 干净
