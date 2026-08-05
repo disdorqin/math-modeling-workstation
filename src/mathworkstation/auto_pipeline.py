@@ -682,7 +682,14 @@ class AutoPipelineService:
         competition: str,
     ) -> dict[str, Any]:
         self.workflow.start_node(case_id, "paper_outline")
-        outline = default_outline("自动生成数学建模论文", competition)
+        # Get problem_type from case manifest
+        problem_type = ""
+        try:
+            case_manifest = self.cases.get_manifest(case_id)
+            problem_type = case_manifest.get("problem_type", "")
+        except Exception:
+            pass
+        outline = default_outline("自动生成数学建模论文", competition, problem_type=problem_type)
         payload = outline.model_dump(mode="json")
         for section in payload["sections"]:
             assigned = claim_ids.get(section["section_id"], [])
@@ -707,7 +714,21 @@ class AutoPipelineService:
         # --- End Learning Loop ---
         # --- Momentum Analysis: generate momentum section for C-type competitions ---
         momentum_analysis_data = None
-        if competition_type and competition_type.upper() in ("C", "MCM-C", "ICM-C"):
+        # Check if this is a C-type competition (problem_type is 'c' or competition_type ends with 'C')
+        is_c_type = False
+        if competition_type:
+            comp_upper = competition_type.upper()
+            if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
+                is_c_type = True
+        # Also check the case manifest for problem_type
+        try:
+            case_manifest = self.cases.get_manifest(case_id)
+            if case_manifest.get("problem_type", "").lower() == "c":
+                is_c_type = True
+        except Exception:
+            pass
+        
+        if is_c_type:
             try:
                 from .momentum_analysis import full_momentum_analysis, format_report_markdown
                 import pandas as pd

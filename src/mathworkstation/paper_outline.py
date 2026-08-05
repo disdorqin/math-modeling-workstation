@@ -150,7 +150,7 @@ class PaperOutlineService:
         }
 
 
-def default_outline(title: str, competition_type: str, language: str = "zh") -> PaperOutline:
+def default_outline(title: str, competition_type: str, language: str = "zh", problem_type: str = "") -> PaperOutline:
     definitions = [
         ("abstract", "摘要", "概括问题、方法、结果和关键词"),
         ("problem_restated", "引言与问题重述", "说明研究背景、题目价值，并准确重述题目目标与约束"),
@@ -163,13 +163,20 @@ def default_outline(title: str, competition_type: str, language: str = "zh") -> 
     ]
     
     # Add momentum_analysis section for C-type competitions (time series/dynamic analysis)
+    is_c_type = False
     if competition_type and len(competition_type) >= 2:
         # Check if competition type ends with 'C' or is exactly 'C' (MCM-C, ICM-C, etc.)
         comp_upper = competition_type.upper()
         if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
-            definitions.append(
-                ("momentum_analysis", "动量分析", "分析势头存在性、假设检验、滑动窗口与发球方加权")
-            )
+            is_c_type = True
+    # Also check problem_type parameter
+    if problem_type and problem_type.lower() == "c":
+        is_c_type = True
+    
+    if is_c_type:
+        definitions.append(
+            ("momentum_analysis", "动量分析", "分析势头存在性、假设检验、滑动窗口与发球方加权")
+        )
     
     definitions.extend([
         ("sensitivity", "敏感性与稳健性", "报告敏感性门及限制"),
