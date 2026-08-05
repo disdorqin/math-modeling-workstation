@@ -31,6 +31,7 @@ REQUIRED_SECTIONS = {
 # Optional sections that may be added for specific competition types
 OPTIONAL_SECTIONS = {
     "momentum_analysis",
+    "timeseries_analysis",
 }
 
 SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
@@ -43,6 +44,7 @@ SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
     "model_solution": {"required_any": [["求解", "训练"], ["交叉验证", "指标"]]},
     "results": {"required_any": [["结果", "模型"], ["图表证据", "图", "表"]]},
     "momentum_analysis": {"required_any": [["动量", "势头", "momentum"], ["假设检验", "Ljung-Box", "游程"], ["滑动窗口", "时序"]]},
+    "timeseries_analysis": {"required_any": [["时序", "时间序列", "趋势"], ["自相关", "Ljung-Box", "ACF"], ["平稳性", "ADF", "单位根"], ["断点", "滑动", "趋势分解"]]},
     "sensitivity": {"required_any": [["敏感性", "稳健性"], ["比例", "随机种子", "波动"]]},
     "strengths_weaknesses": {"required_any": [["优点", "优势"], ["局限", "缺点"]]},
     "conclusion": {"required_any": [["结论"], ["适用", "外推", "限制"]]},
@@ -151,33 +153,42 @@ class PaperOutlineService:
 
 
 def default_outline(title: str, competition_type: str, language: str = "zh", problem_type: str = "") -> PaperOutline:
+    # Detect C-type competitions (time-series / dynamic data)
+    is_c_type = False
+    if competition_type and len(competition_type) >= 2:
+        comp_upper = competition_type.upper()
+        if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
+            is_c_type = True
+    if problem_type and problem_type.lower() == "c":
+        is_c_type = True
+
     definitions = [
         ("abstract", "摘要", "概括问题、方法、结果和关键词"),
         ("problem_restated", "引言与问题重述", "说明研究背景、题目价值，并准确重述题目目标与约束"),
         ("assumptions", "模型假设", "列出假设及其适用范围"),
         ("notation", "符号说明", "统一变量、参数和单位"),
         ("data_analysis", "数据分析", "说明来源、质量与探索性结果"),
+    ]
+
+    # For C-type: timeseries_analysis goes after data_analysis to deepen the
+    # time-structured EDA (trend / autocorrelation / stationarity / breakpoints)
+    if is_c_type:
+        definitions.append(
+            ("timeseries_analysis", "时序分析", "趋势分解、自相关检验、平稳性检验与结构断点分析")
+        )
+
+    definitions.extend([
         ("model_construction", "模型建立", "给出模型结构、公式和依据"),
         ("model_solution", "模型求解", "记录算法、参数和执行过程"),
         ("results", "结果分析", "基于已批准证据报告结果"),
-    ]
-    
-    # Add momentum_analysis section for C-type competitions (time series/dynamic analysis)
-    is_c_type = False
-    if competition_type and len(competition_type) >= 2:
-        # Check if competition type ends with 'C' or is exactly 'C' (MCM-C, ICM-C, etc.)
-        comp_upper = competition_type.upper()
-        if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
-            is_c_type = True
-    # Also check problem_type parameter
-    if problem_type and problem_type.lower() == "c":
-        is_c_type = True
-    
+    ])
+
+    # For C-type: momentum_analysis (momentum existence / hypothesis / sliding window)
     if is_c_type:
         definitions.append(
             ("momentum_analysis", "动量分析", "分析势头存在性、假设检验、滑动窗口与发球方加权")
         )
-    
+
     definitions.extend([
         ("sensitivity", "敏感性与稳健性", "报告敏感性门及限制"),
         ("strengths_weaknesses", "模型优缺点", "评价适用性与局限"),
