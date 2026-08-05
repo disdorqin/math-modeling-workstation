@@ -21,6 +21,17 @@ class SubmissionProfile:
     required_sections: tuple[str, ...] = ()
 
 
+# Language aliases for required section names.
+# When a Chinese-language paper is submitted under an English-named profile (MCM/ICM),
+# the preflight check should also recognise Chinese section headings.
+_SECTION_CN_ALIASES: dict[str, str] = {
+    "Abstract": "摘要",
+    "Model": "模型建立",
+    "Results": "结果分析",
+    "Conclusion": "结论",
+}
+
+
 PROFILES = {
     "SM": SubmissionProfile("SM", paper_title="数学建模论文", required_sections=("摘要", "模型建立", "结果分析", "结论")),
     "CUMCM": SubmissionProfile("CUMCM", paper_title="数学建模论文", required_sections=("摘要", "模型建立", "结果分析", "结论")),
@@ -67,7 +78,9 @@ class SubmissionService:
         findings: list[dict[str, str]] = []
         for section in profile.required_sections:
             if section not in markdown:
-                findings.append({"code": "REQUIRED_SECTION_MISSING", "severity": "P1", "message": section})
+                cn_alias = _SECTION_CN_ALIASES.get(section)
+                if cn_alias is None or cn_alias not in markdown:
+                    findings.append({"code": "REQUIRED_SECTION_MISSING", "severity": "P1", "message": section})
         if re.search(r"\[(?:CLAIM|FIGURE|ARTIFACT|RESULT)[-_][A-Za-z0-9]+\]", markdown, re.I):
             findings.append({"code": "INTERNAL_REFERENCE_LEAK", "severity": "P1", "message": "internal evidence marker remains in final paper"})
         if "[SECTION_DRAFT_PENDING]" in markdown or "[NEEDS_EVIDENCE]" in markdown:
