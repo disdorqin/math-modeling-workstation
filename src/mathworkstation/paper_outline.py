@@ -28,6 +28,11 @@ REQUIRED_SECTIONS = {
     "references",
 }
 
+# Optional sections that may be added for specific competition types
+OPTIONAL_SECTIONS = {
+    "momentum_analysis",
+}
+
 SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
     "abstract": {"required_any": [["研究目的", "研究目标"], ["研究方法", "方法"], ["主要结果", "结果"], ["稳健性", "边界"]]},
     "problem_restated": {"required_any": [["研究概述", "研究背景", "问题"], ["目标", "子问题"]]},
@@ -37,6 +42,7 @@ SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
     "model_construction": {"required_any": [["模型"], ["目标函数", "$", "损失"]]},
     "model_solution": {"required_any": [["求解", "训练"], ["交叉验证", "指标"]]},
     "results": {"required_any": [["结果", "模型"], ["图表证据", "图", "表"]]},
+    "momentum_analysis": {"required_any": [["动量", "势头", "momentum"], ["假设检验", "Ljung-Box", "游程"], ["滑动窗口", "时序"]]},
     "sensitivity": {"required_any": [["敏感性", "稳健性"], ["比例", "随机种子", "波动"]]},
     "strengths_weaknesses": {"required_any": [["优点", "优势"], ["局限", "缺点"]]},
     "conclusion": {"required_any": [["结论"], ["适用", "外推", "限制"]]},
@@ -154,11 +160,23 @@ def default_outline(title: str, competition_type: str, language: str = "zh") -> 
         ("model_construction", "模型建立", "给出模型结构、公式和依据"),
         ("model_solution", "模型求解", "记录算法、参数和执行过程"),
         ("results", "结果分析", "基于已批准证据报告结果"),
+    ]
+    
+    # Add momentum_analysis section for C-type competitions (time series/dynamic analysis)
+    if competition_type and len(competition_type) >= 2:
+        # Check if competition type ends with 'C' or is exactly 'C' (MCM-C, ICM-C, etc.)
+        comp_upper = competition_type.upper()
+        if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
+            definitions.append(
+                ("momentum_analysis", "动量分析", "分析势头存在性、假设检验、滑动窗口与发球方加权")
+            )
+    
+    definitions.extend([
         ("sensitivity", "敏感性与稳健性", "报告敏感性门及限制"),
         ("strengths_weaknesses", "模型优缺点", "评价适用性与局限"),
         ("conclusion", "结论", "回答子问题并限制外推范围"),
         ("references", "参考文献", "列出可验证来源"),
-    ]
+    ])
     return PaperOutline(
         title=title,
         language=language,

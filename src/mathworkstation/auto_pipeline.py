@@ -705,6 +705,30 @@ class AutoPipelineService:
         except Exception:  # noqa: BLE001 - learning layer, never block
             pass
         # --- End Learning Loop ---
+        # --- Momentum Analysis: generate momentum section for C-type competitions ---
+        momentum_analysis_data = None
+        if competition_type and competition_type.upper() in ("C", "MCM-C", "ICM-C"):
+            try:
+                from .momentum_analysis import full_momentum_analysis, format_report_markdown
+                import pandas as pd
+                # Load the dataset for momentum analysis
+                dataset_root = self.cases.case_root(case_id) / "input" / "data" / "uploaded"
+                csv_files = list(dataset_root.glob("*.csv"))
+                if csv_files:
+                    df = pd.read_csv(csv_files[0])
+                    # Run momentum analysis
+                    momentum_report = full_momentum_analysis(df)
+                    momentum_analysis_data = format_report_markdown(momentum_report)
+                    # Save momentum analysis report
+                    report_path = self.cases.case_root(case_id) / "analysis" / "momentum_analysis.md"
+                    report_path.parent.mkdir(parents=True, exist_ok=True)
+                    report_path.write_text(momentum_analysis_data, encoding="utf-8")
+            except Exception as _mom_err:  # noqa: BLE001 - momentum layer, never block
+                append_jsonl(
+                    self.cases.case_root(case_id) / "decisions.jsonl",
+                    {"timestamp": now_iso(), "event": "momentum_analysis_failed", "error": f"{type(_mom_err).__name__}: {_mom_err}"},
+                )
+        # --- End Momentum Analysis ---
         for item in manifest["manifest"]["sections"]:
             section_id = item["section_id"]
             context_path = self.cases.case_root(case_id) / "paper" / "sections" / section_id / "context.json"
@@ -712,6 +736,9 @@ class AutoPipelineService:
             # Inject lessons into section context
             if section_lessons_text:
                 context["paper_lessons"] = section_lessons_text
+            # Inject momentum analysis data for momentum_analysis section
+            if section_id == "momentum_analysis" and momentum_analysis_data:
+                context["momentum_analysis_data"] = momentum_analysis_data
             content, _ = self.llm.markdown_call(case_id, session_id, "paper_draft", "paper_section", {"case_id": case_id, "section_id": section_id, "language": "zh", "context_json": context}, [item["context_artifact_id"]])
             content = content.replace("[SECTION_DRAFT_PENDING]", "本节尚未登记可用证据，保留结构性说明。")
             content = content.replace("[NEEDS_EVIDENCE]", "本节暂无已登记证据，保留结构性说明，不作外推结论。")
