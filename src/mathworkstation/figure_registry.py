@@ -82,6 +82,7 @@ class FigureRegistry:
         approval_artifact_id: str,
         approved_by: str,
         note: str,
+        section_id: str = "",
     ) -> dict[str, Any]:
         """Promote a DRAFT figure to FINAL after an explicit human evidence decision.
 
@@ -89,6 +90,18 @@ class FigureRegistry:
         register figures as DRAFT so that no plot silently becomes paper evidence.
         A figure only becomes citable in an outline once a human ties it to an
         existing ``paper_ready_approval`` artifact through this method.
+
+        As a side-effect, every promoted figure has its ``source_artifact_ids``
+        recorded as auditable ``sources[]`` entries via ``figure_tracking`` so
+        that the provenance chain survives into the paper (task: wire
+        figure_tracking into the promotion path).
+
+        Args:
+            section_id: optional paper section anchor for the source entries
+                (default ``""``).
+
+        Raises:
+            ValueError: promotion precondition violated.
         """
         if not note.strip():
             raise ValueError("figure promotion requires a note")
@@ -106,12 +119,38 @@ class FigureRegistry:
         artifact = self.artifacts.get(case_id, figure["artifact_id"])
         if not artifact.get("paper_eligible", False):
             self.artifacts.promote_to_paper(case_id, figure["artifact_id"], approval_artifact_id)
+
+        # ---- wire figure_tracking: every promoted figure carries a
+        # structured sources[] provenance chain. Each source_artifact_id is
+        # validated against ArtifactRegistry (same check as
+        # figure_tracking.attach_figure_source) and annotated with context +
+        # section anchor so that check_figure_tracking sees no REVIEW
+        # "FIGURE_WITHOUT_SOURCE" findings for promoted figures. -----------
+        existing_sources = figure.get("sources") or []
+        existing_ids = {s.get("source_artifact_id") for s in existing_sources}
+        new_sources = list(existing_sources)
+        source_context = figure.get("source_script", "figure pipeline")
+        for source_artifact_id in figure.get("source_artifact_ids", []):
+            if source_artifact_id in existing_ids:
+                continue
+            # validate source artifact exists (mirrors attach_figure_source)
+            self.artifacts.get(case_id, source_artifact_id)
+            new_sources.append(
+                {
+                    "source_artifact_id": source_artifact_id,
+                    "context": f"provenance via {source_context}",
+                    "section_id": section_id,
+                    "attached_at": now_iso(),
+                }
+            )
+
         promoted = {
             **figure,
             "status": "FINAL",
             "paper_ready_approval_id": approval_artifact_id,
             "approved_by": approved_by,
             "approval_note": note,
+            "sources": new_sources,
             "updated_at": now_iso(),
         }
         append_jsonl(self.registry_path(case_id), promoted)

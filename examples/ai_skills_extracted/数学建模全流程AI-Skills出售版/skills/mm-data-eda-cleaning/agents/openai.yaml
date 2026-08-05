@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：数据 EDA"
+  short_description: "检查、清洗、汇总和可视化建模数据。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-data-eda-cleaning 检查我的 CSV 数据并生成 EDA 报告。"
+policy:
+  allow_implicit_invocation: true

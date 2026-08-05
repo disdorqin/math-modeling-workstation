@@ -70,6 +70,7 @@ class FigureAutoPromoter:
                     approval_artifact_id,
                     approved_by,
                     note,
+                    section_id="",
                 )
                 promoted.append(promoted_figure)
             except Exception as e:
@@ -151,6 +152,7 @@ class FigureAutoPromoter:
                         approval_artifact_id,
                         approved_by,
                         f"{note} -> {section}",
+                        section_id=section,
                     )
                     promoted_by_section[section].append(promoted_figure)
                 except Exception as e:

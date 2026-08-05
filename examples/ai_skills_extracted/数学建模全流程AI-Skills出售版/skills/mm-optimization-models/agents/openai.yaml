@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：优化模型"
+  short_description: "构建线性、整数和多目标优化问题。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-optimization-models 帮我把问题写成目标函数和约束条件。"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：分类聚类"
+  short_description: "构建分组、模式识别和类别预测流程。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-classification-clustering 帮我设计分类或聚类建模流程。"
+policy:
+  allow_implicit_invocation: true

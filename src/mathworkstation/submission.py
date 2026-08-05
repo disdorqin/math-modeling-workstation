@@ -49,7 +49,13 @@ class SubmissionService:
 
     def prepare(self, case_id: str, profile_name: str = "SM", compile_pdf: bool = False) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
-        profile = PROFILES.get(profile_name.upper())
+        # Accept C-type competition spellings (MCM-C / MCM_C) by falling back
+        # to the base family profile when the exact name is not registered.
+        normalized = profile_name.upper()
+        profile = PROFILES.get(normalized)
+        if profile is None:
+            base = normalized.removesuffix("-C").removesuffix("_C").removesuffix("C")
+            profile = PROFILES.get(base)
         if profile is None:
             raise ValueError(f"unsupported submission profile: {profile_name}")
         paper_path = root / "paper" / "final.md"

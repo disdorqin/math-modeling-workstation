@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：赛题拆解"
+  short_description: "拆解题目目标、条件、变量、约束和难点。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-problem-decomposer 分析下面的数学建模题目。"
+policy:
+  allow_implicit_invocation: true

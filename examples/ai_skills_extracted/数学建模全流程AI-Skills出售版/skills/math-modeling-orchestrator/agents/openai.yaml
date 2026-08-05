@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：总控调度"
+  short_description: "判断数学建模任务并推荐子 Skill 工作流。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $math-modeling-orchestrator 帮我判断这个数学建模任务应该如何拆解和推进。"
+policy:
+  allow_implicit_invocation: true

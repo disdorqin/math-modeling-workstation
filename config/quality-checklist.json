@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "description": "质量检查清单：融合AI-Skills出售版(MIT License)的5个checklist与项目已有质量门。用于 research_audit / paper_consistency / paper_coherence 检查参考。",
+  "attribution": "融合来源：数学建模全流程AI-Skills出售版 checklists (MIT License, Copyright 2026)",
+  "checklists": {
+    "academic_integrity": {
+      "description": "学术诚信检查 - 自动化审核时的边界规则",
+      "source": "ai_skills/checklists/academic_integrity.md",
+      "items": [
+        "不代写完整论文（AI辅助≠代写）",
+        "不代替用户参赛",
+        "不伪造数据、图表、结果或参考文献",
+        "正式竞赛中提醒用户遵守赛事规则",
+        "未验证内容标注需要用户核验的提示"
+      ],
+      "integrated_with": "research_audit.py (SOURCE_URI_MISSING 检查), quality-gate (strict mode)"
+    },
+    "code_quality": {
+      "description": "代码质量检查 - CLI和脚本标准",
+      "source": "ai_skills/checklists/code_quality.md",
+      "items": [
+        "CLI 支持 --help",
+        "不写死本地路径",
+        "输出写入指定目录",
+        "错误信息清楚可读",
+        "依赖不超过允许范围"
+      ],
+      "integrated_with": "项目已有 pyproject.toml / CI pipeline"
+    },
+    "competition_boundary": {
+      "description": "竞赛边界检查 - AI使用范围和限制",
+      "source": "ai_skills/checklists/competition_boundary.md",
+      "items": [
+        "阅读并遵守赛事或课程规则",
+        "AI 只用于学习辅助、结构检查、代码模板和自检",
+        "不提交未经理解和核验的内容",
+        "团队成员确认数据和结果来源"
+      ],
+      "integrated_with": "AGENTS.md (AI agent使用边界), quality-gate"
+    },
+    "paper_logic": {
+      "description": "论文逻辑检查 - 结构与论证一致性",
+      "source": "ai_skills/checklists/paper_logic.md",
+      "items": [
+        "每一问都有明确回答",
+        "假设、变量、模型、结果之间一致",
+        "图表服务于论证目的",
+        "灵敏度或误差分析存在",
+        "模型局限被明确说明"
+      ],
+      "integrated_with": "paper_consistency.py, paper_coherence.py, paper_format.py"
+    },
+    "result_validation": {
+      "description": "结果验证检查 - 数据与输出可追溯性",
+      "source": "ai_skills/checklists/result_validation.md",
+      "items": [
+        "数据文件和字段可追溯",
+        "代码运行日志或输出文件存在",
+        "关键指标无 NaN 或异常维度",
+        "图表与数据一致",
+        "结论和数值结果一致"
+      ],
+      "integrated_with": "research_audit.py (TARGET_AS_FEATURE/IDENTIFIER_LIKE_FEATURE 检查), artifact_registry.py"
+    }
+  },
+  "quality_gate_mapping": {
+    "strict_mode": {
+      "applies_checklists": ["academic_integrity", "competition_boundary", "paper_logic", "result_validation"],
+      "trigger": "run-auto-pipeline 或 --strict 标志",
+      "behavior": "任一 checklist 项未通过则 BLOCK"
+    },
+    "default_mode": {
+      "applies_checklists": ["paper_logic", "result_validation"],
+      "trigger": "默认模式",
+      "behavior": "未通过项标记为 REVIEW（不阻断）"
+    }
+  }
+}

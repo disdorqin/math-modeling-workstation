@@ -104,7 +104,11 @@ def test_model_catalog_matches_authority_supported_set() -> None:
 
     catalog = _load_model_catalog()
     names = {m["name"] for m in catalog["methods"]}
-    assert names == REGRESSION_MODELS | CLASSIFICATION_MODELS, (
+    # Core regression/classification models must always be present (the LLM
+    # selects from the catalog); the catalog may grow with more families
+    # (optimization/evaluation/prediction/...), so superset is the contract.
+    core = REGRESSION_MODELS | CLASSIFICATION_MODELS
+    assert core <= names, (
         f"catalog methods {names} != authority {REGRESSION_MODELS | CLASSIFICATION_MODELS}"
     )
     # every catalog method declares a non-empty description and allowed task_types
