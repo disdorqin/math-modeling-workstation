@@ -374,6 +374,7 @@ def test_load_hmml_retrieval_injects_into_model_plan_prompt() -> None:
             "profile_json": "{}",
             "problem_analysis_json": "{}",
             "hmml_retrieved": block,
+            "knowledge_cards": "（无）",
         },
     )
     assert any("HMML-recommended" in message["content"] for message in rendered)

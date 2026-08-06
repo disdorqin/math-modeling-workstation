@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "description": "C层精华模型卡片索引(确定性知识, 非RAG)。每卡: 适用场景/核心公式/建模步骤/C题适用性/论文佐证/易错点。与 config/model-catalog.json 的 32 方法对齐。",
+  "created": "2026-08-06",
+  "author": "opencode",
+  "cards": [
+    {
+      "model_id": "linear",
+      "title": "线性回归",
+      "family": "回归族",
+      "task_types": [
+        "regression"
+      ],
+      "card_path": "cards/linear.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "ridge",
+      "title": "岭回归",
+      "family": "回归族",
+      "task_types": [
+        "regression"
+      ],
+      "card_path": "cards/ridge.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "lasso",
+      "title": "Lasso回归",
+      "family": "回归族",
+      "task_types": [
+        "regression"
+      ],
+      "card_path": "cards/lasso.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "random_forest",
+      "title": "随机森林",
+      "family": "树族(回归/分类)",
+      "task_types": [
+        "regression",
+        "classification"
+      ],
+      "card_path": "cards/random_forest.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "gradient_boosting",
+      "title": "梯度提升树",
+      "family": "树族(回归/分类)",
+      "task_types": [
+        "regression",
+        "classification"
+      ],
+      "card_path": "cards/gradient_boosting.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "logistic",
+      "title": "逻辑回归",
+      "family": "线性族(分类)",
+      "task_types": [
+        "classification"
+      ],
+      "card_path": "cards/logistic.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "svm",
+      "title": "支持向量机",
+      "family": "核方法族",
+      "task_types": [
+        "classification"
+      ],
+      "card_path": "cards/svm.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "linear_programming",
+      "title": "线性规划",
+      "family": "优化族",
+      "task_types": [
+        "optimization"
+      ],
+      "card_path": "cards/linear_programming.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "integer_programming",
+      "title": "整数/0-1规划",
+      "family": "优化族",
+      "task_types": [
+        "optimization"
+      ],
+      "card_path": "cards/integer_programming.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "nonlinear_optimization",
+      "title": "非线性规划",
+      "family": "优化族",
+      "task_types": [
+        "optimization"
+      ],
+      "card_path": "cards/nonlinear_optimization.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "dynamic_programming",
+      "title": "动态规划",
+      "family": "优化族",
+      "task_types": [
+        "optimization"
+      ],
+      "card_path": "cards/dynamic_programming.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "ahp",
+      "title": "层次分析法",
+      "family": "评价族",
+      "task_types": [
+        "evaluation"
+      ],
+      "card_path": "cards/ahp.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "entropy_weight",
+      "title": "熵权法",
+      "family": "评价族",
+      "task_types": [
+        "evaluation"
+      ],
+      "card_path": "cards/entropy_weight.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "topsis",
+      "title": "TOPSIS",
+      "family": "评价族",
+      "task_types": [
+        "evaluation"
+      ],
+      "card_path": "cards/topsis.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "entropy_topsis",
+      "title": "熵权-TOPSIS",
+      "family": "评价族",
+      "task_types": [
+        "evaluation"
+      ],
+      "card_path": "cards/entropy_topsis.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "gm11",
+      "title": "GM(1,1)灰色预测",
+      "family": "灰色预测族",
+      "task_types": [
+        "prediction"
+      ],
+      "card_path": "cards/gm11.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "time_series_arima",
+      "title": "ARIMA",
+      "family": "时序预测族",
+      "task_types": [
+        "prediction"
+      ],
+      "card_path": "cards/time_series_arima.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "exponential_smoothing",
+      "title": "指数平滑",
+      "family": "时序预测族",
+      "task_types": [
+        "prediction"
+      ],
+      "card_path": "cards/exponential_smoothing.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "holt_winters",
+      "title": "Holt-Winters",
+      "family": "时序预测族",
+      "task_types": [
+        "prediction"
+      ],
+      "card_path": "cards/holt_winters.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "moving_average",
+      "title": "移动平均",
+      "family": "时序预测族",
+      "task_types": [
+        "prediction"
+      ],
+      "card_path": "cards/moving_average.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "kmeans",
+      "title": "K-Means聚类",
+      "family": "聚类族",
+      "task_types": [
+        "clustering"
+      ],
+      "card_path": "cards/kmeans.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "dbscan",
+      "title": "DBSCAN",
+      "family": "聚类族",
+      "task_types": [
+        "clustering"
+      ],
+      "card_path": "cards/dbscan.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "pca",
+      "title": "主成分分析",
+      "family": "降维族",
+      "task_types": [
+        "dimension_reduction",
+        "evaluation"
+      ],
+      "card_path": "cards/pca.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "monte_carlo",
+      "title": "蒙特卡洛模拟",
+      "family": "模拟族",
+      "task_types": [
+        "simulation"
+      ],
+      "card_path": "cards/monte_carlo.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "grey_relation",
+      "title": "灰色关联分析",
+      "family": "关联分析族",
+      "task_types": [
+        "correlation_analysis"
+      ],
+      "card_path": "cards/grey_relation.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "interpolation",
+      "title": "插值与拟合",
+      "family": "插值拟合族",
+      "task_types": [
+        "interpolation"
+      ],
+      "card_path": "cards/interpolation.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "markov_chain",
+      "title": "马氏链",
+      "family": "随机过程族",
+      "task_types": [
+        "stochastic_process"
+      ],
+      "card_path": "cards/markov_chain.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "graph_network",
+      "title": "图与网络",
+      "family": "图优化族",
+      "task_types": [
+        "graph_optimization"
+      ],
+      "card_path": "cards/graph_network.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "ode_modeling",
+      "title": "微分方程建模",
+      "family": "机理建模族",
+      "task_types": [
+        "differential_equation"
+      ],
+      "card_path": "cards/ode_modeling.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "elastic_net",
+      "title": "Elastic Net",
+      "family": "回归族",
+      "task_types": [
+        "regression"
+      ],
+      "card_path": "cards/elastic_net.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "mm1",
+      "title": "M/M/1排队论",
+      "family": "排队论族",
+      "task_types": [
+        "queueing"
+      ],
+      "card_path": "cards/mm1.md",
+      "c_fit": 0.8
+    },
+    {
+      "model_id": "mmc",
+      "title": "M/M/c排队论",
+      "family": "排队论族",
+      "task_types": [
+        "queueing"
+      ],
+      "card_path": "cards/mmc.md",
+      "c_fit": 0.8
+    }
+  ]
+}

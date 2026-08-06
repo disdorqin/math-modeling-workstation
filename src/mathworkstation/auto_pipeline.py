@@ -145,10 +145,23 @@ class AutoPipelineService:
         self.ingestion = ProblemIngestionService(cases, self.artifacts)
         self.llm = StructuredLLM(CaseLLMService(cases, self.artifacts, self.sessions, self.checkpoints, llm_router))
         self.research = ResearchAuditService(cases, self.artifacts, self.datasets)
+        # Excellent-paper comparator: load once, fall back to None on config/state errors.
+        try:
+            from .excellent_paper_comparator import ExcellentPaperComparator
+            self.excellent_paper_comparator: ExcellentPaperComparator | None = ExcellentPaperComparator()
+        except Exception:
+            self.excellent_paper_comparator = None
         # Skill C coherence 集成: PaperCoherenceChecker 的 P2 发现并入打磨 issue,
         # 驱动 5-Stage 课程 (coherence→humanize→figures→notation→final_polish).
         # 由构造参数 coherence 控制, 确定性 fixture 测试可关闭以保持旧行为。
-        self.refinement = RefinementService(cases, self.artifacts, self.workflow, self.runs, coherence=self.coherence)
+        self.refinement = RefinementService(
+            cases,
+            self.artifacts,
+            self.workflow,
+            self.runs,
+            coherence=self.coherence,
+            comparator=self.excellent_paper_comparator,
+        )
         self.task_paper_pipeline = TaskPaperPipelineService(
             cases,
             self.artifacts,
@@ -642,7 +655,13 @@ class AutoPipelineService:
         # plan LLM as additional guidance. Best-effort and never blocking — the
         # method catalog remains the authoritative constraint.
         hmml_retrieved = _load_hmml_retrieval(analysis) or "（无）"
-        model_plan_context = {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json"), "hmml_retrieved": hmml_retrieved}
+        # --- C-layer knowledge cards (t554eae27): retrieve the essential model
+        # cards (适用场景/核心公式/建模步骤/C题适用性/论文佐证/易错点) for the
+        # problem and feed them to the model-plan LLM alongside HMML. Cards tell
+        # the LLM *how* to apply a method; the catalog still constrains *which*
+        # methods exist. Best-effort and never blocking.
+        knowledge_cards = _load_knowledge_cards(analysis) or "（无）"
+        model_plan_context = {"case_id": case_id, "dataset_id": dataset_id, "catalog_json": json.dumps(catalog, ensure_ascii=False, sort_keys=True), "columns_json": columns, "profile_json": profile, "problem_analysis_json": analysis.model_dump(mode="json"), "hmml_retrieved": hmml_retrieved, "knowledge_cards": knowledge_cards}
         if lessons_text:
             model_plan_context["paper_lessons"] = lessons_text
         try:
@@ -667,6 +686,7 @@ class AutoPipelineService:
                             "profile_json": profile,
                             "problem_analysis_json": analysis.model_dump(mode="json"),
                             "hmml_retrieved": hmml_retrieved,
+                            "knowledge_cards": knowledge_cards,
                         }
                 if lessons_text:
                     _fallback_ctx["paper_lessons"] = lessons_text
@@ -1166,6 +1186,7 @@ class AutoPipelineService:
                 "controller_json": context["controller"],
                 "sections_json": context["sections"],
                 "failures_json": context["failed_strategies"],
+                "excellent_ref_json": context.get("excellent_ref") or {},
             },
             PaperRefinementProposal,
             [context["current_paper_artifact_id"], *section_artifact_ids],
@@ -1263,6 +1284,7 @@ def _inject_typed_evidence(content: str, context: dict[str, Any]) -> str:
 
 _MODEL_CATALOG_CACHE: dict[str, Any] | None = None
 _HMML_RETRIEVAL_CACHE: dict[str, str] | None = None
+_KNOWLEDGE_CARDS_CACHE: dict[str, str] | None = None
 
 
 def _load_hmml_retrieval(analysis: Any) -> str:
@@ -1307,6 +1329,34 @@ def _load_model_catalog() -> dict[str, Any]:
     except Exception:  # noqa: BLE001 - missing/invalid catalog must not block
         _MODEL_CATALOG_CACHE = {"methods": [], "task_types": {}}
     return _MODEL_CATALOG_CACHE
+
+
+def _load_knowledge_cards(analysis: Any) -> str:
+    """C-layer knowledge-card retrieval for the model-plan stage (best-effort).
+
+    Retrieves the top-k essential model cards for the problem and renders them
+    for prompt injection. Cached per problem objective string so repeated runs
+    in one process do not re-read the card markdown. Returns the formatted card
+    block (or empty string when the card library is missing/unreadable, so the
+    pipeline never hard-fails on the fusion layer).
+    """
+    global _KNOWLEDGE_CARDS_CACHE
+    try:
+        from .knowledge_cards import get_retriever, infer_task_types
+
+        objectives = analysis.objectives if hasattr(analysis, "objectives") else []
+        query = "；".join(objectives) if objectives else (analysis.purpose if hasattr(analysis, "purpose") else "")
+        if not query:
+            return ""
+        if _KNOWLEDGE_CARDS_CACHE is not None and _KNOWLEDGE_CARDS_CACHE[0] == query:
+            return _KNOWLEDGE_CARDS_CACHE[1]
+        retriever = get_retriever()
+        cards = retriever.retrieve(query, task_types=infer_task_types(query))
+        formatted = retriever.format_cards(cards)
+        _KNOWLEDGE_CARDS_CACHE = (query, formatted)
+        return formatted
+    except Exception:  # noqa: BLE001 - knowledge-card layer is advisory, never block
+        return ""
 
 
 def _sanitize_internal_refs(content: str, context: dict[str, Any]) -> str:
