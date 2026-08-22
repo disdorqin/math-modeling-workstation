@@ -152,17 +152,30 @@ class PaperOutlineService:
         }
 
 
-def default_outline(title: str, competition_type: str, language: str = "zh", problem_type: str = "") -> PaperOutline:
-    # Detect C-type competitions (time-series / dynamic data). Accept any
-    # spelling of the competition: "C", "MCM-C", "MCM_C", "MCM" combined with
-    # a manifest problem_type="c". The previous len>=2 guard silently dropped
-    # the bare "C" spelling, making the timeseries/momentum sections flaky.
-    is_c_type = False
-    comp_upper = (competition_type or "").upper().strip()
-    if comp_upper == "C" or comp_upper.endswith("-C") or comp_upper.endswith("_C"):
-        is_c_type = True
-    if problem_type and problem_type.lower() == "c":
-        is_c_type = True
+def default_outline(
+    title: str,
+    competition_type: str,
+    language: str = "zh",
+    problem_type: str = "",
+    *,
+    task_families: list[str] | None = None,
+    domain_signals: list[str] | None = None,
+) -> PaperOutline:
+    """Build a semantic outline; the contest letter never determines the model.
+
+    ``problem_type`` is retained for API compatibility but is intentionally not
+    used to infer time-series or momentum sections.  C problems across MCM,
+    CUMCM, Huashu Cup and other contests span optimization, geometry, networks,
+    probability, simulation and many other families.  Optional sections are
+    therefore activated only by ProblemGraph/task semantics.
+    """
+    families = {str(value).strip().lower() for value in (task_families or []) if str(value).strip()}
+    signal_text = " ".join(str(value) for value in (domain_signals or [])).lower()
+    has_timeseries = bool(
+        families & {"forecasting", "distribution_forecasting"}
+        or any(token in signal_text for token in ("time series", "temporal", "dynamic", "sequence", "时序", "时间序列", "动态过程"))
+    )
+    has_momentum = any(token in signal_text for token in ("momentum", "势头", "动量"))
 
     definitions = [
         ("abstract", "摘要", "概括问题、方法、结果和关键词"),
@@ -172,9 +185,7 @@ def default_outline(title: str, competition_type: str, language: str = "zh", pro
         ("data_analysis", "数据分析", "说明来源、质量与探索性结果"),
     ]
 
-    # For C-type: timeseries_analysis goes after data_analysis to deepen the
-    # time-structured EDA (trend / autocorrelation / stationarity / breakpoints)
-    if is_c_type:
+    if has_timeseries:
         definitions.append(
             ("timeseries_analysis", "时序分析", "趋势分解、自相关检验、平稳性检验与结构断点分析")
         )
@@ -185,8 +196,7 @@ def default_outline(title: str, competition_type: str, language: str = "zh", pro
         ("results", "结果分析", "基于已批准证据报告结果"),
     ])
 
-    # For C-type: momentum_analysis (momentum existence / hypothesis / sliding window)
-    if is_c_type:
+    if has_momentum:
         definitions.append(
             ("momentum_analysis", "动量分析", "分析势头存在性、假设检验、滑动窗口与发球方加权")
         )

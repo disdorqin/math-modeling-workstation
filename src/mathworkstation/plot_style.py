@@ -7,13 +7,16 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from cycler import cycler
+from matplotlib import font_manager
 
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "plot-style.json"
@@ -104,6 +107,176 @@ def get_chart_template(chart_type: str) -> dict[str, Any]:
     """获取图表模板参数"""
     config = _load_config()
     return config["chart_templates"].get(chart_type, {})
+
+
+def get_publication_profile(profile: str = "CUMCM_C") -> dict[str, Any]:
+    """Return one publication profile without mutating matplotlib global state."""
+
+    profiles = _load_config().get("publication_profiles", {})
+    try:
+        value = profiles[profile]
+    except KeyError as error:
+        raise KeyError(f"unknown publication profile: {profile}") from error
+    return {
+        **value,
+        "palette": list(value.get("palette", [])),
+        "figsize": dict(value.get("figsize", {})),
+        "rc": dict(value.get("rc", {})),
+    }
+
+
+def get_profile_colors(profile: str = "CUMCM_C") -> list[str]:
+    """Get a print-safe palette for a specific competition/publication profile."""
+
+    colors = list(get_publication_profile(profile).get("palette", []))
+    return colors or get_colors()
+
+
+def get_publication_figsize(profile: str = "CUMCM_C", preset: str = "single_column") -> tuple[float, float]:
+    """Figure dimensions that reflect the destination paper rather than screen size."""
+
+    sizes = get_publication_profile(profile).get("figsize", {})
+    if preset in sizes:
+        return tuple(float(value) for value in sizes[preset])
+    if "single_column" in sizes:
+        return tuple(float(value) for value in sizes["single_column"])
+    return get_figsize("single")
+
+
+def _publication_font_stack(profile: str) -> list[str]:
+    """Return an installed Latin+CJK font stack for the destination profile."""
+
+    available = {entry.name for entry in font_manager.fontManager.ttflist}
+    if profile == "CUMCM_C":
+        preferred = [
+            "Microsoft YaHei",
+            "Noto Sans SC",
+            "Source Han Sans CN",
+            "SimHei",
+            "DejaVu Sans",
+        ]
+    else:
+        preferred = [
+            "Times New Roman",
+            "Noto Serif SC",
+            "Source Han Serif SC",
+            "Source Han Serif CN",
+            "SimSun",
+            "DejaVu Serif",
+        ]
+    selected = [name for name in preferred if name in available]
+    return selected or (["sans-serif"] if profile == "CUMCM_C" else ["serif"])
+
+
+@contextmanager
+def publication_context(
+    profile: str = "CUMCM_C",
+    *,
+    chart_type: str | None = None,
+) -> Iterator[dict[str, Any]]:
+    """Apply a publication profile locally and restore rcParams on exit.
+
+    The design follows the stateless TUEplots-style principle: one figure may be
+    rendered for CUMCM, another for MCM, and a third for a journal without a
+    previous call silently changing later figures.  ``chart_type`` is returned
+    as a template hint but is not blindly copied into rcParams.
+    """
+
+    spec = get_publication_profile(profile)
+    rc = dict(spec.get("rc", {}))
+    palette = list(spec.get("palette", []))
+    if palette:
+        rc["axes.prop_cycle"] = cycler(color=palette)
+    # Keep CJK fallbacks available for every publication profile.  Some evidence
+    # figures are rendered with SCI_CLEAN even when Chinese category/item labels
+    # come from a CUMCM dataset; a serif-only Latin stack would silently drop those
+    # glyphs.  Matplotlib keeps the requested Latin family first and falls back per
+    # glyph to the configured Windows/Noto CJK fonts when needed.
+    font_config = _load_config()["matplotlib"]["font"]
+    rc.setdefault("font.sans-serif", font_config["sans-serif"])
+    rc.setdefault("font.serif", font_config["serif"])
+    # Matplotlib does not reliably perform per-glyph fallback when font.family is
+    # only the generic token ``serif``/``sans-serif``.  Supplying the installed
+    # family stack directly keeps Times/YaHei as the visual primary while allowing
+    # Chinese category/item labels to fall through to Noto/Source Han/SimSun.
+    rc["font.family"] = _publication_font_stack(profile)
+    with plt.rc_context(rc=rc):
+        yield {
+            "profile": profile,
+            "palette": get_profile_colors(profile),
+            "figsize": dict(spec.get("figsize", {})),
+            "chart_template": get_chart_template(chart_type) if chart_type else {},
+        }
+
+
+def finalize_publication_axis(
+    axis: Any,
+    *,
+    chart_type: str | None = None,
+    title: str | None = None,
+    caption_first: bool = True,
+) -> None:
+    """Apply the final paper-facing polish after semantic plotting.
+
+    Competition figures are captioned in the paper, so repeating a long title
+    inside the axes wastes vertical space and creates the common AI-paper look of
+    ``title + caption`` saying the same thing twice.  Data figures therefore use
+    caption-first presentation by default; workflow diagrams remain free to keep
+    their own title because they are standalone compositions.
+
+    The function intentionally does not choose chart semantics or colors.  It only
+    normalizes presentation of an already-correct plot: spine weight, restrained
+    guide lines, legend density and categorical tick readability.
+    """
+
+    kind = str(chart_type or "").lower()
+    if title and not caption_first:
+        axis.set_title(title)
+    elif caption_first:
+        axis.set_title("")
+
+    composition_tokens = ("heatmap", "radar", "transition", "network", "workflow", "flowchart")
+    plot_like = not any(token in kind for token in composition_tokens)
+    if plot_like:
+        for name in ("top", "right"):
+            spine = axis.spines.get(name)
+            if spine is not None:
+                spine.set_visible(False)
+        axis.set_axisbelow(True)
+        axis.grid(axis="y", linewidth=0.45, alpha=0.18)
+
+    handles, labels = axis.get_legend_handles_labels()
+    if labels:
+        # Long legends are easier to scan in two columns than as one tall block,
+        # while short legends should remain compact.
+        ncol = 1 if len(labels) <= 4 else 2 if len(labels) <= 8 else 3
+        axis.legend(frameon=False, ncol=ncol)
+
+    tick_labels = [item.get_text() for item in axis.get_xticklabels()]
+    nonempty = [value for value in tick_labels if value]
+    if len(nonempty) >= 7 and any(len(value) >= 8 for value in nonempty):
+        for label in axis.get_xticklabels():
+            label.set_rotation(25)
+            label.set_horizontalalignment("right")
+
+
+def finalize_publication_figure(
+    figure: Any,
+    axis: Any,
+    *,
+    chart_type: str | None = None,
+    title: str | None = None,
+    caption_first: bool = True,
+) -> None:
+    """Finalize one publication figure without changing its evidence semantics."""
+
+    finalize_publication_axis(
+        axis,
+        chart_type=chart_type,
+        title=title,
+        caption_first=caption_first,
+    )
+    figure.tight_layout(pad=0.65)
 
 
 def get_color(name: str) -> str:

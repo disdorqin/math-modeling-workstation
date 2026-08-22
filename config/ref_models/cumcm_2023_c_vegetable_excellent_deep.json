@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "corpus_id": "cumcm-2023-c-vegetable-excellent-deep-v1",
+  "competition": "CUMCM",
+  "year": 2023,
+  "problem": "CUMCM-2023-C-Vegetable-Pricing-Replenishment",
+  "paper_count": 4,
+  "source_policy": "Derived signals only; raw excellent-paper PDFs stay in the external local knowledge base.",
+  "text_extraction": {
+    "backend": "pymupdf non-OCR",
+    "usable_papers": ["C050.pdf", "C126.pdf", "C228.pdf", "C235.pdf"]
+  },
+  "paper_signatures": [
+    {
+      "paper_id": "C050",
+      "model_sequence": ["Spearman analysis", "Fitting/least squares", "Time series", "Simulated annealing", "K-means"],
+      "model_transition_patterns": ["staged_question_progression", "hybrid_or_combined_model", "coarse_to_fine"],
+      "validation_types": ["parameter_search", "uncertainty_interval"]
+    },
+    {
+      "paper_id": "C126",
+      "model_sequence": ["Bayesian/MCMC", "Time series", "VAR", "Fitting/least squares", "Markov model", "Monte Carlo"],
+      "model_transition_patterns": ["switch_due_to_limitation"],
+      "validation_types": ["sensitivity_or_robustness", "model_comparison", "constraint_feasibility_check", "uncertainty_interval"]
+    },
+    {
+      "paper_id": "C228",
+      "model_sequence": ["Time series", "Particle swarm optimization", "Nonlinear programming", "LSTM", "Multiobjective optimization", "Apriori", "Fitting/least squares", "Grey prediction"],
+      "model_transition_patterns": ["hybrid_or_combined_model"],
+      "validation_types": ["error_metrics", "sensitivity_or_robustness", "parameter_search", "uncertainty_interval"]
+    },
+    {
+      "paper_id": "C235",
+      "model_sequence": ["ARIMA", "Simulated annealing", "Time series", "Dynamic programming", "Prophet", "Clustering", "Neural network"],
+      "model_transition_patterns": ["staged_question_progression", "refine_previous_model", "hybrid_or_combined_model", "coarse_to_fine"],
+      "validation_types": ["error_metrics", "sensitivity_or_robustness", "model_comparison", "parameter_search"]
+    }
+  ],
+  "recurring_capabilities": {
+    "question_types.forecasting": 1.0,
+    "question_types.statistical_analysis": 1.0,
+    "question_types.optimization": 1.0,
+    "question_types.resource_allocation": 1.0,
+    "question_types.decision_strategy": 1.0,
+    "question_types.uncertainty_or_stochastic": 1.0,
+    "question_types.classification_or_scoring": 0.75,
+    "question_types.simulation": 0.75,
+    "model_selection_rationales.data_characteristics": 1.0,
+    "model_selection_rationales.constraint_structure": 1.0,
+    "model_selection_rationales.robustness_or_uncertainty": 1.0,
+    "model_selection_rationales.interpretability_or_operability": 1.0,
+    "model_selection_rationales.accuracy_or_fit": 0.5,
+    "model_selection_rationales.computational_efficiency": 0.5,
+    "model_transition_patterns.hybrid_or_combined_model": 0.75,
+    "model_transition_patterns.staged_question_progression": 0.5,
+    "model_transition_patterns.coarse_to_fine": 0.5,
+    "validation_types.parameter_search": 0.75,
+    "validation_types.sensitivity_or_robustness": 0.75,
+    "validation_types.uncertainty_interval": 0.75,
+    "validation_types.error_metrics": 0.5,
+    "validation_types.model_comparison": 0.5,
+    "innovation_patterns.algorithmic_improvement": 0.75,
+    "innovation_patterns.constraint_aware_optimization": 0.75,
+    "abstract_structure.has_quantified_results": 1.0,
+    "abstract_structure.has_validation_language": 1.0,
+    "abstract_structure.has_concluding_language": 1.0
+  },
+  "figure_purpose_prevalence": {
+    "decision_or_schedule": 0.5,
+    "data_distribution": 0.25,
+    "result_comparison": 0.25
+  },
+  "medians": {
+    "abstract_tokens": 851.5,
+    "abstract_numeric_tokens": 10.0,
+    "abstract_method_count": 3.5,
+    "model_sequence_length": 6.5,
+    "figure_mentions": 13.0,
+    "table_mentions": 13.0
+  },
+  "benchmark_note": "All four papers connect statistical demand analysis to forecasting and constrained pricing/replenishment decisions, while their concrete algorithms vary widely. The recurring capability is the research chain, not ARIMA/LSTM/PSO/SA itself."
+}

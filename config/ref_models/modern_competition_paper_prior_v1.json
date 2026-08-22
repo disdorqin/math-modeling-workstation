@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-21T17:53:00+08:00",
+  "purpose": "Time-weighted modern excellent-paper priors distilled from the user's local MCM/CUMCM excellent-paper corpus. Learn distributions and argument patterns, never source wording or algorithm prestige.",
+  "policies": {
+    "primary_problem_type": "C",
+    "recent_style_years": [2023, 2024, 2025],
+    "classic_modeling_logic_retained": true,
+    "non_c_can_inform_style_only": true,
+    "algorithm_imitation_forbidden": true,
+    "unreliable_metrics_not_for_hard_gates": [
+      "reference_entries",
+      "raw_image_count",
+      "image_area_ratio"
+    ]
+  },
+  "coverage": {
+    "local_pdf_inventory": 396,
+    "c_problem_inventory": 85,
+    "c_problem_text_parsed": 67,
+    "c_problem_fallback_required": 18,
+    "mcm_c_2023_2025": {"papers": 41, "parsed": 41, "fallback": 0},
+    "cumcm_c_2023": {"papers": 4, "parsed": 4, "fallback": 0},
+    "cumcm_2024_2025_text_status": "SCAN_OR_UNMAPPABLE_TEXT_LAYER_REQUIRES_VISUAL_FALLBACK"
+  },
+  "profiles": {
+    "MCM_C": {
+      "source": "batch_distillation_local_mcm_c_2023_2025",
+      "years": [2023, 2024, 2025],
+      "paper_count": 41,
+      "metrics": {
+        "abstract_units": 453.0,
+        "abstract_numeric_tokens": 13.0,
+        "abstract_method_count": 2.0,
+        "model_sequence_length": 5.0,
+        "figure_mentions": 26.0,
+        "table_mentions": 10.0,
+        "workflow_figure_prevalence": 0.1958
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.6813,
+        "time_series_or_trend": 0.4356,
+        "sensitivity_or_uncertainty": 0.3936,
+        "result_comparison": 0.3187,
+        "physical_or_geometric_mechanism": 0.2208,
+        "workflow_or_framework": 0.1958,
+        "decision_or_schedule": 0.0230
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.9024,
+        "uncertainty_interval": 0.8293,
+        "error_metrics": 0.7317,
+        "cross_validation_or_holdout": 0.7073,
+        "parameter_search": 0.3171,
+        "model_comparison": 0.0488
+      }
+    },
+    "CUMCM_C": {
+      "source": "cumcm_2023_c_deep_profile_plus_batch_distillation",
+      "years": [2023],
+      "paper_count": 4,
+      "metrics": {
+        "abstract_units": 851.5,
+        "abstract_numeric_tokens": 10.0,
+        "abstract_method_count": 3.5,
+        "model_sequence_length": 6.5,
+        "figure_mentions": 13.0,
+        "table_mentions": 13.0
+      },
+      "figure_purpose_prevalence": {
+        "decision_or_schedule": 0.50,
+        "data_distribution": 0.25,
+        "result_comparison": 0.25
+      },
+      "validation_prevalence": {
+        "error_metrics": 0.50,
+        "parameter_search": 0.50,
+        "uncertainty_interval": 0.50,
+        "model_comparison": 0.25
+      },
+      "coverage_note": "2024-2025 CUMCM excellent PDFs in the current local corpus are mostly scan/unmappable-text documents. They are intentionally excluded from text-derived hard priors until visual/OCR fallback is validated."
+    }
+  },
+  "all_c_distillation": {
+    "papers": 85,
+    "parsed": 67,
+    "fallback": 18,
+    "weighted_median_model_sequence_length": 4.0,
+    "weighted_median_figure_mentions": 24.0,
+    "weighted_median_table_mentions": 10.0,
+    "validation_prevalence": {
+      "sensitivity_or_robustness": 0.7568,
+      "uncertainty_interval": 0.6198,
+      "error_metrics": 0.5861,
+      "cross_validation_or_holdout": 0.4961,
+      "parameter_search": 0.2630,
+      "model_comparison": 0.0740
+    }
+  },
+  "student_rules": {
+    "abstract": [
+      "Report supported methods and headline answers, not a generic problem restatement.",
+      "Favor recent-paper information density while never inventing missing numeric evidence."
+    ],
+    "figures": [
+      "Prefer an argument chain of data/structure, result, and sensitivity/comparison figures when evidence exists.",
+      "Do not target a raw figure quota; every figure must have a research purpose."
+    ],
+    "validation": [
+      "For empirical C-problem nodes, actively look for uncertainty, robustness, holdout/cross-validation, or sensitivity evidence appropriate to the task family.",
+      "Do not fabricate model comparisons merely because comparison is common in excellent papers."
+    ],
+    "narrative": [
+      "A simple model is acceptable when the paper maintains a coherent problem-data-method-validation-result-decision chain.",
+      "Modern visual density must not replace mathematical or evidence discipline."
+    ]
+  }
+}

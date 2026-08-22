@@ -15,6 +15,7 @@ from mathworkstation.plot_style import (
     apply_style,
     classify_figure,
     create_figure,
+    finalize_publication_figure,
     get_chart_template,
     get_color,
     get_colors,
@@ -22,6 +23,10 @@ from mathworkstation.plot_style import (
     get_line_cycle,
     get_linestyles,
     get_markers,
+    get_profile_colors,
+    get_publication_figsize,
+    get_publication_profile,
+    publication_context,
     plot_with_style,
     save_figure,
 )
@@ -41,6 +46,7 @@ class TestPlotStyleConfig:
         assert "figsize_presets" in config
         assert "chart_templates" in config
         assert "figure_categories" in config
+        assert "publication_profiles" in config
 
     def test_colors(self):
         """测试配色列表"""
@@ -79,6 +85,39 @@ class TestPlotStyleConfig:
         assert get_color("success") == "#2ca02c"
         assert get_color("danger") == "#d62728"
         assert get_color("unknown") == "#1f77b4"
+
+    def test_publication_profiles_are_destination_specific(self):
+        cumcm = get_publication_profile("CUMCM_C")
+        mcm = get_publication_profile("MCM_C")
+        sci = get_publication_profile("SCI_CLEAN")
+        assert cumcm["rc"]["font.family"] == "sans-serif"
+        assert mcm["rc"]["font.family"] == "serif"
+        assert sci["figsize"]["single_column"][0] < cumcm["figsize"]["single_column"][0]
+        assert get_profile_colors("CUMCM_C") != get_profile_colors("MCM_C")
+        assert get_publication_figsize("MCM_C", "wide") == (7.2, 4.1)
+
+    def test_publication_context_restores_global_rcparams(self):
+        before_family = list(plt.rcParams["font.family"])
+        before_grid = plt.rcParams["axes.grid"]
+        with publication_context("MCM_C", chart_type="time_series") as spec:
+            assert plt.rcParams["font.family"][0] == "Times New Roman"
+            assert any(name in plt.rcParams["font.family"] for name in ("Noto Serif SC", "Source Han Serif SC", "SimSun"))
+            assert plt.rcParams["axes.grid"] is False
+            assert spec["chart_template"]["confidence_alpha"] == 0.18
+        assert list(plt.rcParams["font.family"]) == before_family
+        assert plt.rcParams["axes.grid"] == before_grid
+
+    def test_extended_chart_template_coverage(self):
+        for chart_type in (
+            "boxplot",
+            "time_series",
+            "radar",
+            "state_transition",
+            "association",
+            "ranking",
+            "uncertainty",
+        ):
+            assert get_chart_template(chart_type), chart_type
 
     def test_get_chart_template(self):
         """测试获取图表模板"""
@@ -156,6 +195,18 @@ class TestFigureCreation:
         assert Path(path).exists()
         
         Path(path).unlink()
+
+    def test_finalize_publication_figure_uses_caption_first_and_readable_axes(self):
+        with publication_context("MCM_C"):
+            fig, ax = plt.subplots()
+            ax.bar([0, 1], [2.0, 3.0], label="candidate")
+            ax.set_xticks([0, 1], ["A very long category", "Another long category"])
+            finalize_publication_figure(fig, ax, chart_type="bar", title="Duplicated paper caption")
+            assert ax.get_title() == ""
+            assert ax.spines["top"].get_visible() is False
+            assert ax.spines["right"].get_visible() is False
+            assert ax.get_legend() is not None
+            plt.close(fig)
 
     def test_plot_with_style(self):
         """测试使用统一风格绘图"""

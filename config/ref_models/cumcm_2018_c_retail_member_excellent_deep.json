@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "corpus_id": "cumcm-2018-c-retail-member-excellent-deep-v1",
+  "competition": "CUMCM",
+  "year": 2018,
+  "problem": "CUMCM-2018-C-Retail-Member-Profile",
+  "paper_count": 3,
+  "source_policy": "Derived signals only; raw excellent-paper PDFs stay in the external local knowledge base.",
+  "text_extraction": {
+    "backend": "pymupdf non-OCR",
+    "usable_papers": [
+      "2018C：基于 RFMS 指标的大型百货商场会员画像数据挖掘.pdf",
+      "2018C：基于 RFMT 模型的百货商场会员画像描绘.pdf",
+      "2018C：大型百货商场会员画像描述.pdf"
+    ]
+  },
+  "paper_signatures": [
+    {
+      "paper_id": "2018C-1",
+      "model_sequence": ["RFM-family member value model", "Member lifecycle state model"],
+      "model_selection_rationales": ["data_characteristics", "constraint_structure", "robustness_or_uncertainty", "interpretability_or_operability"],
+      "model_transition_patterns": ["refine_previous_model", "hybrid_or_combined_model"],
+      "validation_types": ["model_comparison", "uncertainty_interval"],
+      "innovation_patterns": ["domain_specific_construct"]
+    },
+    {
+      "paper_id": "2018C-2",
+      "model_sequence": ["RFM-family member value model", "AHP", "Member lifecycle state model", "Clustering", "K-means", "Fitting/least squares"],
+      "model_selection_rationales": ["data_characteristics", "constraint_structure", "robustness_or_uncertainty", "interpretability_or_operability"],
+      "model_transition_patterns": ["refine_previous_model", "hybrid_or_combined_model"],
+      "validation_types": ["error_metrics"],
+      "innovation_patterns": ["domain_specific_construct", "algorithmic_improvement"]
+    },
+    {
+      "paper_id": "2018C-3",
+      "model_sequence": ["Member lifecycle state model", "Markov model", "Apriori"],
+      "model_selection_rationales": ["data_characteristics", "constraint_structure"],
+      "model_transition_patterns": ["staged_question_progression"],
+      "validation_types": ["error_metrics"],
+      "innovation_patterns": ["domain_specific_construct", "algorithmic_improvement"]
+    }
+  ],
+  "recurring_capabilities": {
+    "question_types.statistical_analysis": 1.0,
+    "question_types.classification_or_scoring": 1.0,
+    "question_types.decision_strategy": 1.0,
+    "question_types.uncertainty_or_stochastic": 1.0,
+    "question_types.forecasting": 0.666667,
+    "question_types.optimization": 0.666667,
+    "model_selection_rationales.data_characteristics": 1.0,
+    "model_selection_rationales.constraint_structure": 1.0,
+    "model_selection_rationales.robustness_or_uncertainty": 0.666667,
+    "model_selection_rationales.interpretability_or_operability": 0.666667,
+    "model_transition_patterns.refine_previous_model": 0.666667,
+    "model_transition_patterns.hybrid_or_combined_model": 0.666667,
+    "validation_types.error_metrics": 0.666667,
+    "innovation_patterns.domain_specific_construct": 1.0,
+    "innovation_patterns.algorithmic_improvement": 0.666667,
+    "abstract_structure.has_quantified_results": 0.666667,
+    "abstract_structure.has_validation_language": 0.666667,
+    "abstract_structure.has_concluding_language": 0.666667,
+    "failure_patterns.parameter_subjectivity": 0.666667
+  },
+  "medians": {
+    "abstract_tokens": 890.0,
+    "abstract_numeric_tokens": 18.0,
+    "abstract_method_count": 2.0,
+    "model_sequence_length": 3.0,
+    "figure_mentions": 7.0,
+    "table_mentions": 9.0
+  },
+  "benchmark_note": "All three papers build a problem-specific member representation/state model. The benchmark therefore rewards domain representation and linked question progression rather than any single clustering or scoring algorithm."
+}

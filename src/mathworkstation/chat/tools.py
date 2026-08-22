@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from ..research_preferences import ResearchPreferenceProfile, ResearchPreferenceService, default_interview
+
 #: handler signature: (args, ctx) -> result-dict
 Handler = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
 
@@ -68,6 +70,29 @@ def _create_case(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         version=args.get("version", 1),
     )
     return {"manifest": manifest, "case_id": manifest["case_id"]}
+
+
+def _get_research_interview(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    interview = default_interview()
+    return interview.model_dump(mode="json")
+
+
+def _get_research_preferences(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    case_id = args.get("case_id") or ctx["case_id"]
+    profile = ResearchPreferenceService(ctx["cases"], ctx.get("artifacts")).load(case_id)
+    return {"case_id": case_id, "profile": profile.model_dump(mode="json")}
+
+
+def _set_research_preferences(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    case_id = args.get("case_id") or ctx["case_id"]
+    payload = dict(args.get("profile") or {})
+    profile = ResearchPreferenceProfile.model_validate(payload)
+    result = ResearchPreferenceService(ctx["cases"], ctx.get("artifacts")).save(case_id, profile)
+    return {
+        "case_id": case_id,
+        "profile": profile.model_dump(mode="json"),
+        "artifact_id": (result.get("artifact") or {}).get("artifact_id"),
+    }
 
 
 def _read_paper(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
@@ -141,6 +166,24 @@ def build_tools(services: dict[str, Any]) -> dict[str, ToolSpec]:
             "create_case",
             "创建新案例(竞赛类型 SM/MCM/ICM/CUMCM 等)",
             _create_case,
+            needs_approval=False,
+        ),
+        ToolSpec(
+            "get_research_interview",
+            "获取正式比赛前的研究偏好访谈问题与默认配置",
+            _get_research_interview,
+            needs_approval=False,
+        ),
+        ToolSpec(
+            "get_research_preferences",
+            "读取当前案例的建模/论文风格偏好",
+            _get_research_preferences,
+            needs_approval=False,
+        ),
+        ToolSpec(
+            "set_research_preferences",
+            "保存当前案例的建模优先级、偏好模型风格、视觉密度与人工检查点配置",
+            _set_research_preferences,
             needs_approval=False,
         ),
         ToolSpec(

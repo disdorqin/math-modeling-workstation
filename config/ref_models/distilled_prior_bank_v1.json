@@ -1,0 +1,1928 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T01:13:43+08:00",
+  "corpus_papers": 1018,
+  "parsed_papers": 843,
+  "visual_only_papers": 175,
+  "policies": {
+    "learn_patterns_not_wording": true,
+    "c_modeling_prior_only_from_c_papers": true,
+    "non_c_style_only": true,
+    "recent_style_preferred": true,
+    "classic_modeling_logic_retained": true,
+    "no_global_style_monopoly": true,
+    "minimum_slice_papers": 3
+  },
+  "slices": {
+    "competition:CUMCM": {
+      "slice_id": "competition:CUMCM",
+      "scope": {
+        "competition": "CUMCM"
+      },
+      "paper_count": 219,
+      "parsed_count": 123,
+      "visual_only_count": 96,
+      "style_metrics": {
+        "weighted_median_page_count": 37.0,
+        "weighted_median_abstract_units": 966.0,
+        "weighted_median_abstract_numeric_tokens": 23.0,
+        "weighted_median_abstract_method_count": 1.0,
+        "weighted_median_model_sequence_length": 2.0,
+        "weighted_median_figure_mentions": 16.0,
+        "weighted_median_table_mentions": 12.0,
+        "weighted_median_reference_entries": 223.0,
+        "weighted_median_image_count": 19.0,
+        "weighted_median_pages_with_images": 21.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2973,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.2268,
+        "effective_weight": 23.8878,
+        "paper_count": 123.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 42.0,
+        "weighted_median_image_count": 0.0,
+        "weighted_median_pages_with_images": 0.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.0,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 1.0,
+        "effective_weight": 60.65,
+        "paper_count": 219.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 42.0,
+        "weighted_median_abstract_units": 966.0,
+        "weighted_median_abstract_numeric_tokens": 43.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 16.0,
+        "weighted_median_table_mentions": 18.0,
+        "weighted_median_reference_entries": 178.0,
+        "weighted_median_image_count": 18.0,
+        "weighted_median_pages_with_images": 15.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2971,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0,
+        "effective_weight": 9.22,
+        "paper_count": 11.0
+      },
+      "figure_purpose_prevalence": {
+        "physical_or_geometric_mechanism": 0.32,
+        "data_distribution": 0.3099,
+        "workflow_or_framework": 0.2268,
+        "result_comparison": 0.2035,
+        "decision_or_schedule": 0.1907,
+        "spatial_layout_or_route": 0.1528,
+        "time_series_or_trend": 0.1254,
+        "sensitivity_or_uncertainty": 0.0549,
+        "optimization_or_convergence": 0.01
+      },
+      "validation_prevalence": {
+        "error_metrics": 0.4165,
+        "parameter_search": 0.2169,
+        "uncertainty_interval": 0.2169,
+        "model_comparison": 0.1974,
+        "sensitivity_or_robustness": 0.0445
+      },
+      "question_type_prevalence": {
+        "decision_strategy": 1.0,
+        "statistical_analysis": 0.8221,
+        "optimization": 0.8004,
+        "spatial_or_layout_design": 0.756,
+        "forecasting": 0.7223,
+        "classification_or_scoring": 0.6692,
+        "simulation": 0.3254
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.8221,
+        "interpretability_or_operability": 0.7223,
+        "constraint_structure": 0.7115,
+        "robustness_or_uncertainty": 0.3698,
+        "accuracy_or_fit": 0.1085
+      },
+      "model_transition_prevalence": {
+        "refine_previous_model": 0.9002,
+        "staged_question_progression": 0.4056,
+        "scenario_branching": 0.1779
+      }
+    },
+    "competition:CUMCM:C": {
+      "slice_id": "competition:CUMCM:C",
+      "scope": {
+        "competition": "CUMCM",
+        "problem_letter": "C"
+      },
+      "paper_count": 29,
+      "parsed_count": 11,
+      "visual_only_count": 18,
+      "style_metrics": {
+        "weighted_median_page_count": 44.0,
+        "weighted_median_abstract_units": 966.0,
+        "weighted_median_abstract_numeric_tokens": 43.0,
+        "weighted_median_abstract_method_count": 4.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 16.0,
+        "weighted_median_table_mentions": 18.0,
+        "weighted_median_reference_entries": 288.0,
+        "weighted_median_image_count": 21.0,
+        "weighted_median_pages_with_images": 15.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2971,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0,
+        "effective_weight": 7.18,
+        "paper_count": 11.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 49.0,
+        "weighted_median_image_count": 0.0,
+        "weighted_median_pages_with_images": 0.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.0,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 1.0,
+        "effective_weight": 22.71,
+        "paper_count": 29.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 42.0,
+        "weighted_median_abstract_units": 966.0,
+        "weighted_median_abstract_numeric_tokens": 43.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 16.0,
+        "weighted_median_table_mentions": 18.0,
+        "weighted_median_reference_entries": 178.0,
+        "weighted_median_image_count": 18.0,
+        "weighted_median_pages_with_images": 15.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2971,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0,
+        "effective_weight": 9.22,
+        "paper_count": 11.0
+      },
+      "figure_purpose_prevalence": {
+        "decision_or_schedule": 0.3677,
+        "data_distribution": 0.2799,
+        "result_comparison": 0.1602,
+        "physical_or_geometric_mechanism": 0.0474,
+        "time_series_or_trend": 0.0474
+      },
+      "validation_prevalence": {
+        "error_metrics": 0.4165,
+        "parameter_search": 0.2169,
+        "uncertainty_interval": 0.2169,
+        "model_comparison": 0.1974,
+        "sensitivity_or_robustness": 0.0445
+      },
+      "question_type_prevalence": {
+        "decision_strategy": 1.0,
+        "statistical_analysis": 0.8221,
+        "optimization": 0.8004,
+        "spatial_or_layout_design": 0.756,
+        "forecasting": 0.7223,
+        "classification_or_scoring": 0.6692,
+        "simulation": 0.3254
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.8221,
+        "interpretability_or_operability": 0.7223,
+        "constraint_structure": 0.7115,
+        "robustness_or_uncertainty": 0.3698,
+        "accuracy_or_fit": 0.1085
+      },
+      "model_transition_prevalence": {
+        "refine_previous_model": 0.9002,
+        "staged_question_progression": 0.4056,
+        "scenario_branching": 0.1779
+      }
+    },
+    "competition:CUMCM:C:modern": {
+      "slice_id": "competition:CUMCM:C:modern",
+      "scope": {
+        "competition": "CUMCM",
+        "problem_letter": "C",
+        "era": "2023+"
+      },
+      "paper_count": 9,
+      "parsed_count": 4,
+      "visual_only_count": 5,
+      "style_metrics": {
+        "weighted_median_page_count": 70.0,
+        "weighted_median_abstract_units": 909.0,
+        "weighted_median_abstract_numeric_tokens": 12.0,
+        "weighted_median_abstract_method_count": 4.0,
+        "weighted_median_model_sequence_length": 6.0,
+        "weighted_median_figure_mentions": 8.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 568.0,
+        "weighted_median_image_count": 32.0,
+        "weighted_median_pages_with_images": 14.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.1873,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0,
+        "effective_weight": 4.6,
+        "paper_count": 4.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 65.0,
+        "weighted_median_image_count": 0.0,
+        "weighted_median_pages_with_images": 0.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.0,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 1.0,
+        "effective_weight": 10.85,
+        "paper_count": 9.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 70.0,
+        "weighted_median_abstract_units": 909.0,
+        "weighted_median_abstract_numeric_tokens": 12.0,
+        "weighted_median_abstract_method_count": 4.0,
+        "weighted_median_model_sequence_length": 6.0,
+        "weighted_median_figure_mentions": 8.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 568.0,
+        "weighted_median_image_count": 32.0,
+        "weighted_median_pages_with_images": 14.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.1873,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0,
+        "effective_weight": 4.0,
+        "paper_count": 4.0
+      },
+      "figure_purpose_prevalence": {
+        "decision_or_schedule": 0.5,
+        "data_distribution": 0.25,
+        "result_comparison": 0.25
+      },
+      "validation_prevalence": {
+        "error_metrics": 0.5,
+        "parameter_search": 0.5,
+        "uncertainty_interval": 0.5,
+        "model_comparison": 0.25
+      },
+      "question_type_prevalence": {
+        "decision_strategy": 1.0,
+        "forecasting": 1.0,
+        "optimization": 1.0,
+        "spatial_or_layout_design": 1.0,
+        "statistical_analysis": 1.0,
+        "classification_or_scoring": 0.75,
+        "simulation": 0.75
+      },
+      "model_selection_rationale_prevalence": {
+        "constraint_structure": 1.0,
+        "data_characteristics": 1.0,
+        "interpretability_or_operability": 1.0,
+        "robustness_or_uncertainty": 0.75,
+        "accuracy_or_fit": 0.25
+      },
+      "model_transition_prevalence": {
+        "refine_previous_model": 1.0,
+        "staged_question_progression": 0.5
+      }
+    },
+    "competition:CUMCM:modern": {
+      "slice_id": "competition:CUMCM:modern",
+      "scope": {
+        "competition": "CUMCM",
+        "era": "2023+"
+      },
+      "paper_count": 37,
+      "parsed_count": 14,
+      "visual_only_count": 23,
+      "style_metrics": {
+        "weighted_median_page_count": 53.0,
+        "weighted_median_abstract_units": 1092.0,
+        "weighted_median_abstract_numeric_tokens": 23.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 25.0,
+        "weighted_median_table_mentions": 12.0,
+        "weighted_median_reference_entries": 474.0,
+        "weighted_median_image_count": 32.0,
+        "weighted_median_pages_with_images": 16.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2973,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1867,
+        "effective_weight": 8.625,
+        "paper_count": 14.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 56.0,
+        "weighted_median_image_count": 0.0,
+        "weighted_median_pages_with_images": 0.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.0,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 1.0,
+        "effective_weight": 22.75,
+        "paper_count": 37.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 70.0,
+        "weighted_median_abstract_units": 909.0,
+        "weighted_median_abstract_numeric_tokens": 12.0,
+        "weighted_median_abstract_method_count": 4.0,
+        "weighted_median_model_sequence_length": 6.0,
+        "weighted_median_figure_mentions": 8.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 568.0,
+        "weighted_median_image_count": 32.0,
+        "weighted_median_pages_with_images": 14.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.1873,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0,
+        "effective_weight": 4.0,
+        "paper_count": 4.0
+      },
+      "figure_purpose_prevalence": {
+        "physical_or_geometric_mechanism": 0.3733,
+        "decision_or_schedule": 0.3133,
+        "data_distribution": 0.2733,
+        "spatial_layout_or_route": 0.2333,
+        "result_comparison": 0.2267,
+        "workflow_or_framework": 0.1867,
+        "time_series_or_trend": 0.14,
+        "sensitivity_or_uncertainty": 0.0467
+      },
+      "validation_prevalence": {
+        "error_metrics": 0.5,
+        "parameter_search": 0.5,
+        "uncertainty_interval": 0.5,
+        "model_comparison": 0.25
+      },
+      "question_type_prevalence": {
+        "decision_strategy": 1.0,
+        "forecasting": 1.0,
+        "optimization": 1.0,
+        "spatial_or_layout_design": 1.0,
+        "statistical_analysis": 1.0,
+        "classification_or_scoring": 0.75,
+        "simulation": 0.75
+      },
+      "model_selection_rationale_prevalence": {
+        "constraint_structure": 1.0,
+        "data_characteristics": 1.0,
+        "interpretability_or_operability": 1.0,
+        "robustness_or_uncertainty": 0.75,
+        "accuracy_or_fit": 0.25
+      },
+      "model_transition_prevalence": {
+        "refine_previous_model": 1.0,
+        "staged_question_progression": 0.5
+      }
+    },
+    "competition:MCM": {
+      "slice_id": "competition:MCM",
+      "scope": {
+        "competition": "MCM"
+      },
+      "paper_count": 799,
+      "parsed_count": 720,
+      "visual_only_count": 79,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 12.0,
+        "weighted_median_abstract_method_count": 1.0,
+        "weighted_median_model_sequence_length": 3.0,
+        "weighted_median_figure_mentions": 22.0,
+        "weighted_median_table_mentions": 8.0,
+        "weighted_median_reference_entries": 99.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4477,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1516,
+        "effective_weight": 156.2807,
+        "paper_count": 720.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 18.0,
+        "weighted_median_pages_with_images": 12.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3914,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 192.306,
+        "paper_count": 799.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 457.0,
+        "weighted_median_abstract_numeric_tokens": 13.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4214,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1504,
+        "effective_weight": 67.7,
+        "paper_count": 108.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.4227,
+        "result_comparison": 0.2944,
+        "sensitivity_or_uncertainty": 0.2902,
+        "time_series_or_trend": 0.2143,
+        "physical_or_geometric_mechanism": 0.1831,
+        "workflow_or_framework": 0.1516,
+        "decision_or_schedule": 0.1073,
+        "spatial_layout_or_route": 0.0448,
+        "optimization_or_convergence": 0.0241
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.805,
+        "error_metrics": 0.5471,
+        "uncertainty_interval": 0.5468,
+        "cross_validation_or_holdout": 0.4446,
+        "parameter_search": 0.2242,
+        "model_comparison": 0.0357
+      },
+      "question_type_prevalence": {
+        "forecasting": 0.9592,
+        "statistical_analysis": 0.9456,
+        "decision_strategy": 0.9087,
+        "classification_or_scoring": 0.8777,
+        "optimization": 0.7421,
+        "simulation": 0.3858,
+        "spatial_or_layout_design": 0.1752
+      },
+      "model_selection_rationale_prevalence": {
+        "accuracy_or_fit": 0.8753,
+        "data_characteristics": 0.8691,
+        "robustness_or_uncertainty": 0.8148,
+        "constraint_structure": 0.6712,
+        "interpretability_or_operability": 0.387
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.434,
+        "hybrid_or_combined_model": 0.2981,
+        "staged_question_progression": 0.2106,
+        "refine_previous_model": 0.1332
+      }
+    },
+    "competition:MCM:C": {
+      "slice_id": "competition:MCM:C",
+      "scope": {
+        "competition": "MCM",
+        "problem_letter": "C"
+      },
+      "paper_count": 133,
+      "parsed_count": 108,
+      "visual_only_count": 25,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 457.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 114.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4401,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1655,
+        "effective_weight": 65.875,
+        "paper_count": 108.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 18.0,
+        "weighted_median_pages_with_images": 11.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3703,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 87.37,
+        "paper_count": 133.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 457.0,
+        "weighted_median_abstract_numeric_tokens": 13.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4214,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1504,
+        "effective_weight": 67.7,
+        "paper_count": 108.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5531,
+        "time_series_or_trend": 0.3822,
+        "result_comparison": 0.3215,
+        "sensitivity_or_uncertainty": 0.2905,
+        "physical_or_geometric_mechanism": 0.1671,
+        "workflow_or_framework": 0.1655,
+        "decision_or_schedule": 0.0921,
+        "optimization_or_convergence": 0.0079,
+        "spatial_layout_or_route": 0.0079
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.805,
+        "error_metrics": 0.5471,
+        "uncertainty_interval": 0.5468,
+        "cross_validation_or_holdout": 0.4446,
+        "parameter_search": 0.2242,
+        "model_comparison": 0.0357
+      },
+      "question_type_prevalence": {
+        "forecasting": 0.9592,
+        "statistical_analysis": 0.9456,
+        "decision_strategy": 0.9087,
+        "classification_or_scoring": 0.8777,
+        "optimization": 0.7421,
+        "simulation": 0.3858,
+        "spatial_or_layout_design": 0.1752
+      },
+      "model_selection_rationale_prevalence": {
+        "accuracy_or_fit": 0.8753,
+        "data_characteristics": 0.8691,
+        "robustness_or_uncertainty": 0.8148,
+        "constraint_structure": 0.6712,
+        "interpretability_or_operability": 0.387
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.434,
+        "hybrid_or_combined_model": 0.2981,
+        "staged_question_progression": 0.2106,
+        "refine_previous_model": 0.1332
+      }
+    },
+    "competition:MCM:C:modern": {
+      "slice_id": "competition:MCM:C:modern",
+      "scope": {
+        "competition": "MCM",
+        "problem_letter": "C",
+        "era": "2023+"
+      },
+      "paper_count": 82,
+      "parsed_count": 59,
+      "visual_only_count": 23,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 112.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4214,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1836,
+        "effective_weight": 43.175,
+        "paper_count": 59.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 18.0,
+        "weighted_median_pages_with_images": 11.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3615,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 63.85,
+        "paper_count": 82.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 112.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.407,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1831,
+        "effective_weight": 35.5,
+        "paper_count": 59.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.6595,
+        "time_series_or_trend": 0.447,
+        "result_comparison": 0.3405,
+        "sensitivity_or_uncertainty": 0.326,
+        "physical_or_geometric_mechanism": 0.198,
+        "workflow_or_framework": 0.1836,
+        "decision_or_schedule": 0.0266
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.8873,
+        "uncertainty_interval": 0.8873,
+        "error_metrics": 0.7324,
+        "cross_validation_or_holdout": 0.7183,
+        "parameter_search": 0.3239,
+        "model_comparison": 0.0423
+      },
+      "question_type_prevalence": {
+        "classification_or_scoring": 1.0,
+        "forecasting": 1.0,
+        "statistical_analysis": 1.0,
+        "decision_strategy": 0.9296,
+        "optimization": 0.8451,
+        "simulation": 0.4507,
+        "spatial_or_layout_design": 0.1268
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.9577,
+        "robustness_or_uncertainty": 0.9577,
+        "accuracy_or_fit": 0.9437,
+        "constraint_structure": 0.7746,
+        "interpretability_or_operability": 0.4789
+      },
+      "model_transition_prevalence": {
+        "hybrid_or_combined_model": 0.4648,
+        "scenario_branching": 0.4648,
+        "staged_question_progression": 0.3239,
+        "refine_previous_model": 0.0986
+      }
+    },
+    "competition:MCM:modern": {
+      "slice_id": "competition:MCM:modern",
+      "scope": {
+        "competition": "MCM",
+        "era": "2023+"
+      },
+      "paper_count": 217,
+      "parsed_count": 144,
+      "visual_only_count": 73,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 13.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 9.0,
+        "weighted_median_reference_entries": 96.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4553,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.2225,
+        "effective_weight": 68.7688,
+        "paper_count": 144.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 17.0,
+        "weighted_median_pages_with_images": 11.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3694,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 103.4,
+        "paper_count": 217.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 112.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.407,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1831,
+        "effective_weight": 35.5,
+        "paper_count": 59.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5218,
+        "sensitivity_or_uncertainty": 0.3687,
+        "result_comparison": 0.3152,
+        "time_series_or_trend": 0.3056,
+        "workflow_or_framework": 0.2225,
+        "physical_or_geometric_mechanism": 0.1732,
+        "decision_or_schedule": 0.0529,
+        "optimization_or_convergence": 0.0223,
+        "spatial_layout_or_route": 0.0191
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.8873,
+        "uncertainty_interval": 0.8873,
+        "error_metrics": 0.7324,
+        "cross_validation_or_holdout": 0.7183,
+        "parameter_search": 0.3239,
+        "model_comparison": 0.0423
+      },
+      "question_type_prevalence": {
+        "classification_or_scoring": 1.0,
+        "forecasting": 1.0,
+        "statistical_analysis": 1.0,
+        "decision_strategy": 0.9296,
+        "optimization": 0.8451,
+        "simulation": 0.4507,
+        "spatial_or_layout_design": 0.1268
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.9577,
+        "robustness_or_uncertainty": 0.9577,
+        "accuracy_or_fit": 0.9437,
+        "constraint_structure": 0.7746,
+        "interpretability_or_operability": 0.4789
+      },
+      "model_transition_prevalence": {
+        "hybrid_or_combined_model": 0.4648,
+        "scenario_branching": 0.4648,
+        "staged_question_progression": 0.3239,
+        "refine_previous_model": 0.0986
+      }
+    },
+    "era:classic": {
+      "slice_id": "era:classic",
+      "scope": {
+        "era": "classic"
+      },
+      "paper_count": 481,
+      "parsed_count": 452,
+      "visual_only_count": 29,
+      "style_metrics": {
+        "weighted_median_page_count": 27.0,
+        "weighted_median_abstract_units": 483.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 0.0,
+        "weighted_median_model_sequence_length": 1.0,
+        "weighted_median_figure_mentions": 19.0,
+        "weighted_median_table_mentions": 8.0,
+        "weighted_median_reference_entries": 115.0,
+        "weighted_median_image_count": 16.0,
+        "weighted_median_pages_with_images": 12.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3347,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1036,
+        "effective_weight": 59.8088,
+        "paper_count": 452.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 27.0,
+        "weighted_median_image_count": 15.0,
+        "weighted_median_pages_with_images": 11.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.324,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 65.308,
+        "paper_count": 481.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 27.0,
+        "weighted_median_abstract_units": 465.0,
+        "weighted_median_abstract_numeric_tokens": 19.0,
+        "weighted_median_abstract_method_count": 1.0,
+        "weighted_median_model_sequence_length": 2.0,
+        "weighted_median_figure_mentions": 19.0,
+        "weighted_median_table_mentions": 11.0,
+        "weighted_median_reference_entries": 143.0,
+        "weighted_median_image_count": 12.0,
+        "weighted_median_pages_with_images": 11.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2946,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.039,
+        "effective_weight": 23.62,
+        "paper_count": 36.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.3477,
+        "result_comparison": 0.2303,
+        "sensitivity_or_uncertainty": 0.1538,
+        "physical_or_geometric_mechanism": 0.1509,
+        "time_series_or_trend": 0.1352,
+        "workflow_or_framework": 0.1036,
+        "spatial_layout_or_route": 0.0938,
+        "decision_or_schedule": 0.0614,
+        "optimization_or_convergence": 0.0248
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.5237,
+        "error_metrics": 0.3116,
+        "uncertainty_interval": 0.1558,
+        "cross_validation_or_holdout": 0.0779,
+        "parameter_search": 0.0779,
+        "model_comparison": 0.0347
+      },
+      "question_type_prevalence": {
+        "statistical_analysis": 0.8527,
+        "decision_strategy": 0.8442,
+        "forecasting": 0.7748,
+        "classification_or_scoring": 0.7574,
+        "optimization": 0.6105,
+        "spatial_or_layout_design": 0.2815,
+        "simulation": 0.2337
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.6969,
+        "constraint_structure": 0.5953,
+        "accuracy_or_fit": 0.5453,
+        "robustness_or_uncertainty": 0.4848,
+        "interpretability_or_operability": 0.3463
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.42,
+        "refine_previous_model": 0.2989,
+        "staged_question_progression": 0.0737,
+        "hybrid_or_combined_model": 0.039
+      }
+    },
+    "era:modern": {
+      "slice_id": "era:modern",
+      "scope": {
+        "era": "modern"
+      },
+      "paper_count": 254,
+      "parsed_count": 158,
+      "visual_only_count": 96,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 13.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 9.0,
+        "weighted_median_reference_entries": 107.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4395,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.2185,
+        "effective_weight": 77.3937,
+        "paper_count": 158.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 16.0,
+        "weighted_median_pages_with_images": 9.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3319,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 126.15,
+        "paper_count": 254.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 24.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3964,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1646,
+        "effective_weight": 39.5,
+        "paper_count": 63.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.4941,
+        "sensitivity_or_uncertainty": 0.3328,
+        "result_comparison": 0.3053,
+        "time_series_or_trend": 0.2871,
+        "workflow_or_framework": 0.2185,
+        "physical_or_geometric_mechanism": 0.1955,
+        "decision_or_schedule": 0.0819,
+        "spatial_layout_or_route": 0.043,
+        "optimization_or_convergence": 0.0198
+      },
+      "validation_prevalence": {
+        "uncertainty_interval": 0.8481,
+        "sensitivity_or_robustness": 0.7975,
+        "error_metrics": 0.7089,
+        "cross_validation_or_holdout": 0.6456,
+        "parameter_search": 0.3418,
+        "model_comparison": 0.0633
+      },
+      "question_type_prevalence": {
+        "forecasting": 1.0,
+        "statistical_analysis": 1.0,
+        "classification_or_scoring": 0.9747,
+        "decision_strategy": 0.9367,
+        "optimization": 0.8608,
+        "simulation": 0.481,
+        "spatial_or_layout_design": 0.2152
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.962,
+        "robustness_or_uncertainty": 0.9367,
+        "accuracy_or_fit": 0.8734,
+        "constraint_structure": 0.7975,
+        "interpretability_or_operability": 0.5316
+      },
+      "model_transition_prevalence": {
+        "hybrid_or_combined_model": 0.4177,
+        "scenario_branching": 0.4177,
+        "staged_question_progression": 0.3418,
+        "refine_previous_model": 0.1899
+      }
+    },
+    "era:transition": {
+      "slice_id": "era:transition",
+      "scope": {
+        "era": "transition"
+      },
+      "paper_count": 283,
+      "parsed_count": 233,
+      "visual_only_count": 50,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 466.0,
+        "weighted_median_abstract_numeric_tokens": 11.0,
+        "weighted_median_abstract_method_count": 1.0,
+        "weighted_median_model_sequence_length": 2.0,
+        "weighted_median_figure_mentions": 22.0,
+        "weighted_median_table_mentions": 8.0,
+        "weighted_median_reference_entries": 100.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 23.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.5768,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1397,
+        "effective_weight": 42.9659,
+        "paper_count": 233.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 17.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.466,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 61.4979,
+        "paper_count": 283.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 472.0,
+        "weighted_median_abstract_numeric_tokens": 10.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 101.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.5744,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.2,
+        "effective_weight": 13.8,
+        "paper_count": 20.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.3357,
+        "result_comparison": 0.3135,
+        "physical_or_geometric_mechanism": 0.2816,
+        "sensitivity_or_uncertainty": 0.2725,
+        "decision_or_schedule": 0.2635,
+        "time_series_or_trend": 0.1438,
+        "workflow_or_framework": 0.1397,
+        "spatial_layout_or_route": 0.0401,
+        "optimization_or_convergence": 0.023
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.8,
+        "error_metrics": 0.4,
+        "cross_validation_or_holdout": 0.2,
+        "parameter_search": 0.1333,
+        "uncertainty_interval": 0.1333,
+        "model_comparison": 0.0667
+      },
+      "question_type_prevalence": {
+        "decision_strategy": 1.0,
+        "forecasting": 1.0,
+        "statistical_analysis": 0.8667,
+        "classification_or_scoring": 0.6667,
+        "optimization": 0.6667,
+        "simulation": 0.3333,
+        "spatial_or_layout_design": 0.2667
+      },
+      "model_selection_rationale_prevalence": {
+        "accuracy_or_fit": 0.9333,
+        "data_characteristics": 0.8667,
+        "robustness_or_uncertainty": 0.7333,
+        "constraint_structure": 0.4667,
+        "interpretability_or_operability": 0.2667
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.3333,
+        "hybrid_or_combined_model": 0.2,
+        "refine_previous_model": 0.2,
+        "staged_question_progression": 0.2
+      }
+    },
+    "problem:C": {
+      "slice_id": "problem:C",
+      "scope": {
+        "problem_letter": "C"
+      },
+      "paper_count": 162,
+      "parsed_count": 119,
+      "visual_only_count": 43,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1493,
+        "effective_weight": 73.055,
+        "paper_count": 119.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 15.0,
+        "weighted_median_pages_with_images": 10.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3244,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 110.08,
+        "paper_count": 162.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 465.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 21.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3914,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1323,
+        "effective_weight": 76.92,
+        "paper_count": 119.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5262,
+        "time_series_or_trend": 0.3493,
+        "result_comparison": 0.3057,
+        "sensitivity_or_uncertainty": 0.2619,
+        "physical_or_geometric_mechanism": 0.1554,
+        "workflow_or_framework": 0.1493,
+        "decision_or_schedule": 0.1192,
+        "optimization_or_convergence": 0.0071,
+        "spatial_layout_or_route": 0.0071
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.7139,
+        "error_metrics": 0.5315,
+        "uncertainty_interval": 0.5073,
+        "cross_validation_or_holdout": 0.3913,
+        "parameter_search": 0.2233,
+        "model_comparison": 0.0551
+      },
+      "question_type_prevalence": {
+        "forecasting": 0.9308,
+        "statistical_analysis": 0.9308,
+        "decision_strategy": 0.9197,
+        "classification_or_scoring": 0.8527,
+        "optimization": 0.7491,
+        "simulation": 0.3786,
+        "spatial_or_layout_design": 0.2448
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.8635,
+        "accuracy_or_fit": 0.7834,
+        "robustness_or_uncertainty": 0.7614,
+        "constraint_structure": 0.676,
+        "interpretability_or_operability": 0.4272
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.4033,
+        "hybrid_or_combined_model": 0.2624,
+        "staged_question_progression": 0.234,
+        "refine_previous_model": 0.2252
+      }
+    },
+    "task:classification_or_scoring": {
+      "slice_id": "task:classification_or_scoring",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "classification_or_scoring"
+      },
+      "paper_count": 104,
+      "parsed_count": 104,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1428,
+        "effective_weight": 64.875,
+        "paper_count": 104.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 64.875,
+        "paper_count": 104.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 11.0,
+        "weighted_median_reference_entries": 125.0,
+        "weighted_median_image_count": 21.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3914,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1272,
+        "effective_weight": 65.59,
+        "paper_count": 104.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5123,
+        "time_series_or_trend": 0.3801,
+        "result_comparison": 0.2936,
+        "sensitivity_or_uncertainty": 0.2743,
+        "physical_or_geometric_mechanism": 0.1697,
+        "workflow_or_framework": 0.1428,
+        "decision_or_schedule": 0.0607,
+        "optimization_or_convergence": 0.008,
+        "spatial_layout_or_route": 0.008
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.739,
+        "error_metrics": 0.5952,
+        "uncertainty_interval": 0.5528,
+        "cross_validation_or_holdout": 0.4309,
+        "parameter_search": 0.2479,
+        "model_comparison": 0.0381
+      },
+      "question_type_prevalence": {
+        "classification_or_scoring": 1.0,
+        "statistical_analysis": 0.9657,
+        "forecasting": 0.9376,
+        "decision_strategy": 0.9338,
+        "optimization": 0.7198,
+        "simulation": 0.3586,
+        "spatial_or_layout_design": 0.2266
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.9148,
+        "robustness_or_uncertainty": 0.7936,
+        "accuracy_or_fit": 0.7925,
+        "constraint_structure": 0.6466,
+        "interpretability_or_operability": 0.4031
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.4261,
+        "hybrid_or_combined_model": 0.2796,
+        "staged_question_progression": 0.2186,
+        "refine_previous_model": 0.1755
+      }
+    },
+    "task:decision_strategy": {
+      "slice_id": "task:decision_strategy",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "decision_strategy"
+      },
+      "paper_count": 111,
+      "parsed_count": 111,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 465.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 125.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1605,
+        "effective_weight": 67.95,
+        "paper_count": 111.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 67.95,
+        "paper_count": 111.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 467.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 125.0,
+        "weighted_median_image_count": 20.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3935,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1439,
+        "effective_weight": 70.74,
+        "paper_count": 111.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5167,
+        "time_series_or_trend": 0.3249,
+        "result_comparison": 0.321,
+        "sensitivity_or_uncertainty": 0.2556,
+        "workflow_or_framework": 0.1605,
+        "physical_or_geometric_mechanism": 0.1501,
+        "decision_or_schedule": 0.1282,
+        "optimization_or_convergence": 0.0077,
+        "spatial_layout_or_route": 0.0077
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.6889,
+        "uncertainty_interval": 0.5375,
+        "error_metrics": 0.5307,
+        "cross_validation_or_holdout": 0.4043,
+        "parameter_search": 0.2429,
+        "model_comparison": 0.0599
+      },
+      "question_type_prevalence": {
+        "decision_strategy": 1.0,
+        "statistical_analysis": 0.9378,
+        "forecasting": 0.9248,
+        "classification_or_scoring": 0.8658,
+        "optimization": 0.7803,
+        "simulation": 0.3986,
+        "spatial_or_layout_design": 0.2532
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.8776,
+        "robustness_or_uncertainty": 0.7997,
+        "accuracy_or_fit": 0.7645,
+        "constraint_structure": 0.7079,
+        "interpretability_or_operability": 0.4162
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.3984,
+        "hybrid_or_combined_model": 0.2711,
+        "staged_question_progression": 0.2403,
+        "refine_previous_model": 0.2188
+      }
+    },
+    "task:forecasting": {
+      "slice_id": "task:forecasting",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "forecasting"
+      },
+      "paper_count": 110,
+      "parsed_count": 110,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.407,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1551,
+        "effective_weight": 70.295,
+        "paper_count": 110.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.407,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 70.295,
+        "paper_count": 110.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 14.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 11.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3964,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1422,
+        "effective_weight": 71.6,
+        "paper_count": 110.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5469,
+        "time_series_or_trend": 0.363,
+        "result_comparison": 0.3177,
+        "sensitivity_or_uncertainty": 0.2722,
+        "physical_or_geometric_mechanism": 0.1566,
+        "workflow_or_framework": 0.1551,
+        "decision_or_schedule": 0.1191,
+        "optimization_or_convergence": 0.0074
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.7226,
+        "error_metrics": 0.5453,
+        "uncertainty_interval": 0.545,
+        "cross_validation_or_holdout": 0.4204,
+        "parameter_search": 0.2399,
+        "model_comparison": 0.0592
+      },
+      "question_type_prevalence": {
+        "forecasting": 1.0,
+        "statistical_analysis": 0.9486,
+        "decision_strategy": 0.9137,
+        "classification_or_scoring": 0.8589,
+        "optimization": 0.7433,
+        "simulation": 0.3939,
+        "spatial_or_layout_design": 0.233
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.8763,
+        "accuracy_or_fit": 0.8159,
+        "robustness_or_uncertainty": 0.7737,
+        "constraint_structure": 0.6777,
+        "interpretability_or_operability": 0.4461
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.3975,
+        "hybrid_or_combined_model": 0.2818,
+        "staged_question_progression": 0.2514,
+        "refine_previous_model": 0.2061
+      }
+    },
+    "task:optimization": {
+      "slice_id": "task:optimization",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "optimization"
+      },
+      "paper_count": 88,
+      "parsed_count": 88,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 465.0,
+        "weighted_median_abstract_numeric_tokens": 16.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 118.0,
+        "weighted_median_image_count": 20.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1443,
+        "effective_weight": 56.88,
+        "paper_count": 88.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 20.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 56.88,
+        "paper_count": 88.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 466.0,
+        "weighted_median_abstract_numeric_tokens": 16.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 22.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 114.0,
+        "weighted_median_image_count": 19.0,
+        "weighted_median_pages_with_images": 12.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3964,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1347,
+        "effective_weight": 57.62,
+        "paper_count": 88.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.57,
+        "time_series_or_trend": 0.3359,
+        "result_comparison": 0.3068,
+        "sensitivity_or_uncertainty": 0.2453,
+        "physical_or_geometric_mechanism": 0.1776,
+        "decision_or_schedule": 0.1531,
+        "workflow_or_framework": 0.1443,
+        "optimization_or_convergence": 0.0091
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.7312,
+        "uncertainty_interval": 0.5918,
+        "error_metrics": 0.5297,
+        "cross_validation_or_holdout": 0.4616,
+        "parameter_search": 0.2721,
+        "model_comparison": 0.0649
+      },
+      "question_type_prevalence": {
+        "optimization": 1.0,
+        "decision_strategy": 0.958,
+        "statistical_analysis": 0.9396,
+        "forecasting": 0.9236,
+        "classification_or_scoring": 0.8193,
+        "simulation": 0.4068,
+        "spatial_or_layout_design": 0.1904
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.8584,
+        "accuracy_or_fit": 0.824,
+        "constraint_structure": 0.8098,
+        "robustness_or_uncertainty": 0.802,
+        "interpretability_or_operability": 0.495
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.3499,
+        "hybrid_or_combined_model": 0.3082,
+        "staged_question_progression": 0.2544,
+        "refine_previous_model": 0.2121
+      }
+    },
+    "task:simulation": {
+      "slice_id": "task:simulation",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "simulation"
+      },
+      "paper_count": 45,
+      "parsed_count": 45,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 13.0,
+        "weighted_median_abstract_method_count": 3.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 8.0,
+        "weighted_median_reference_entries": 107.0,
+        "weighted_median_image_count": 20.0,
+        "weighted_median_pages_with_images": 12.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.407,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1505,
+        "effective_weight": 30.37,
+        "paper_count": 45.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 20.0,
+        "weighted_median_pages_with_images": 12.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.407,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 30.37,
+        "paper_count": 45.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 454.0,
+        "weighted_median_abstract_numeric_tokens": 12.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 5.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 6.0,
+        "weighted_median_reference_entries": 107.0,
+        "weighted_median_image_count": 19.0,
+        "weighted_median_pages_with_images": 12.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1346,
+        "effective_weight": 29.12,
+        "paper_count": 45.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5212,
+        "result_comparison": 0.3727,
+        "time_series_or_trend": 0.247,
+        "sensitivity_or_uncertainty": 0.2432,
+        "decision_or_schedule": 0.1567,
+        "workflow_or_framework": 0.1505,
+        "physical_or_geometric_mechanism": 0.1299,
+        "spatial_layout_or_route": 0.0171
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.7335,
+        "uncertainty_interval": 0.6758,
+        "error_metrics": 0.4554,
+        "cross_validation_or_holdout": 0.4093,
+        "parameter_search": 0.2376,
+        "model_comparison": 0.0831
+      },
+      "question_type_prevalence": {
+        "simulation": 1.0,
+        "decision_strategy": 0.9684,
+        "forecasting": 0.9684,
+        "statistical_analysis": 0.9052,
+        "classification_or_scoring": 0.8077,
+        "optimization": 0.8049,
+        "spatial_or_layout_design": 0.3468
+      },
+      "model_selection_rationale_prevalence": {
+        "robustness_or_uncertainty": 0.8537,
+        "data_characteristics": 0.8077,
+        "accuracy_or_fit": 0.7679,
+        "constraint_structure": 0.7218,
+        "interpretability_or_operability": 0.6016
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.467,
+        "hybrid_or_combined_model": 0.3578,
+        "staged_question_progression": 0.3063,
+        "refine_previous_model": 0.2665
+      }
+    },
+    "task:spatial_or_layout_design": {
+      "slice_id": "task:spatial_or_layout_design",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "spatial_or_layout_design"
+      },
+      "paper_count": 28,
+      "parsed_count": 28,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 29.0,
+        "weighted_median_abstract_units": 541.0,
+        "weighted_median_abstract_numeric_tokens": 13.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 26.0,
+        "weighted_median_table_mentions": 12.0,
+        "weighted_median_reference_entries": 143.0,
+        "weighted_median_image_count": 32.0,
+        "weighted_median_pages_with_images": 15.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3368,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0852,
+        "effective_weight": 16.955,
+        "paper_count": 28.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 29.0,
+        "weighted_median_image_count": 32.0,
+        "weighted_median_pages_with_images": 15.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3368,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 16.955,
+        "paper_count": 28.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 29.0,
+        "weighted_median_abstract_units": 541.0,
+        "weighted_median_abstract_numeric_tokens": 12.0,
+        "weighted_median_abstract_method_count": 1.0,
+        "weighted_median_model_sequence_length": 3.0,
+        "weighted_median_figure_mentions": 24.0,
+        "weighted_median_table_mentions": 12.0,
+        "weighted_median_reference_entries": 112.0,
+        "weighted_median_image_count": 31.0,
+        "weighted_median_pages_with_images": 14.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.2973,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.0754,
+        "effective_weight": 18.83,
+        "paper_count": 28.0
+      },
+      "figure_purpose_prevalence": {
+        "result_comparison": 0.4777,
+        "data_distribution": 0.345,
+        "sensitivity_or_uncertainty": 0.3424,
+        "time_series_or_trend": 0.2159,
+        "decision_or_schedule": 0.2041,
+        "physical_or_geometric_mechanism": 0.1306,
+        "workflow_or_framework": 0.0852,
+        "spatial_layout_or_route": 0.0307
+      },
+      "validation_prevalence": {
+        "error_metrics": 0.5629,
+        "sensitivity_or_robustness": 0.5279,
+        "uncertainty_interval": 0.3941,
+        "parameter_search": 0.2921,
+        "cross_validation_or_holdout": 0.1859,
+        "model_comparison": 0.1498
+      },
+      "question_type_prevalence": {
+        "spatial_or_layout_design": 1.0,
+        "decision_strategy": 0.9511,
+        "forecasting": 0.8858,
+        "statistical_analysis": 0.837,
+        "classification_or_scoring": 0.7892,
+        "optimization": 0.5826,
+        "simulation": 0.5364
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.837,
+        "robustness_or_uncertainty": 0.6914,
+        "constraint_structure": 0.6102,
+        "accuracy_or_fit": 0.5852,
+        "interpretability_or_operability": 0.5396
+      },
+      "model_transition_prevalence": {
+        "refine_previous_model": 0.5964,
+        "scenario_branching": 0.522,
+        "staged_question_progression": 0.2783,
+        "hybrid_or_combined_model": 0.2347
+      }
+    },
+    "task:statistical_analysis": {
+      "slice_id": "task:statistical_analysis",
+      "scope": {
+        "problem_letter": "C",
+        "task_family": "statistical_analysis"
+      },
+      "paper_count": 112,
+      "parsed_count": 112,
+      "visual_only_count": 0,
+      "style_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 462.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 10.0,
+        "weighted_median_reference_entries": 120.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1329,
+        "effective_weight": 69.695,
+        "paper_count": 112.0
+      },
+      "layout_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_image_count": 23.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.4059,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "effective_weight": 69.695,
+        "paper_count": 112.0
+      },
+      "modeling_metrics": {
+        "weighted_median_page_count": 25.0,
+        "weighted_median_abstract_units": 465.0,
+        "weighted_median_abstract_numeric_tokens": 15.0,
+        "weighted_median_abstract_method_count": 2.0,
+        "weighted_median_model_sequence_length": 4.0,
+        "weighted_median_figure_mentions": 23.0,
+        "weighted_median_table_mentions": 11.0,
+        "weighted_median_reference_entries": 135.0,
+        "weighted_median_image_count": 22.0,
+        "weighted_median_pages_with_images": 13.0,
+        "weighted_median_image_area_ratio": 0.0,
+        "weighted_median_text_area_ratio": 0.3935,
+        "weighted_median_landscape_page_ratio": 0.0,
+        "weighted_median_scan_page_ratio": 0.0,
+        "weighted_workflow_figure_prevalence": 0.1165,
+        "effective_weight": 71.6,
+        "paper_count": 112.0
+      },
+      "figure_purpose_prevalence": {
+        "data_distribution": 0.5399,
+        "time_series_or_trend": 0.3662,
+        "result_comparison": 0.2819,
+        "sensitivity_or_uncertainty": 0.2671,
+        "physical_or_geometric_mechanism": 0.158,
+        "workflow_or_framework": 0.1329,
+        "decision_or_schedule": 0.1083,
+        "optimization_or_convergence": 0.0075,
+        "spatial_layout_or_route": 0.0075
+      },
+      "validation_prevalence": {
+        "sensitivity_or_robustness": 0.7098,
+        "error_metrics": 0.5709,
+        "uncertainty_interval": 0.545,
+        "cross_validation_or_holdout": 0.4075,
+        "parameter_search": 0.2271,
+        "model_comparison": 0.0592
+      },
+      "question_type_prevalence": {
+        "statistical_analysis": 1.0,
+        "forecasting": 0.9486,
+        "decision_strategy": 0.9265,
+        "classification_or_scoring": 0.8846,
+        "optimization": 0.7561,
+        "simulation": 0.3682,
+        "spatial_or_layout_design": 0.2201
+      },
+      "model_selection_rationale_prevalence": {
+        "data_characteristics": 0.9148,
+        "accuracy_or_fit": 0.7902,
+        "robustness_or_uncertainty": 0.7866,
+        "constraint_structure": 0.6648,
+        "interpretability_or_operability": 0.4332
+      },
+      "model_transition_prevalence": {
+        "scenario_branching": 0.3975,
+        "hybrid_or_combined_model": 0.269,
+        "staged_question_progression": 0.2514,
+        "refine_previous_model": 0.219
+      }
+    }
+  },
+  "students": {
+    "abstract": {
+      "preferred_slices": [
+        "competition:{competition}:C:modern",
+        "competition:{competition}:C"
+      ],
+      "purpose": "Calibrate information density and supported-result coverage; never copy source wording."
+    },
+    "figures": {
+      "preferred_slices": [
+        "competition:{competition}:modern",
+        "competition:{competition}:C:modern"
+      ],
+      "purpose": "Choose evidence-serving figure roles and modern visual density without raw figure quotas."
+    },
+    "layout": {
+      "preferred_slices": [
+        "competition:{competition}:modern"
+      ],
+      "purpose": "Use recent layout/page signals only where extraction is reliable; scanned-page signals stay separate."
+    },
+    "validation": {
+      "preferred_slices": [
+        "task:{task_family}",
+        "competition:{competition}:C"
+      ],
+      "purpose": "Recommend validation families that match the task; corpus frequency never fabricates an experiment."
+    },
+    "narrative": {
+      "preferred_slices": [
+        "competition:{competition}:C",
+        "task:{task_family}"
+      ],
+      "purpose": "Maintain a problem-data-method-validation-result-decision chain rather than a fixed paper template."
+    }
+  },
+  "universal_rules": [
+    "Prefer a coherent problem-data-method-validation-result-decision chain over model complexity.",
+    "Every figure or table must serve an evidence or explanation role; corpus counts are calibration signals, not quotas.",
+    "Use recent papers mainly for presentation/style and retain classic C papers for modeling logic.",
+    "Never introduce an algorithm, metric, comparison, or experiment merely because it is common in excellent papers.",
+    "When task semantics permit, check at least one appropriate robustness/validation mechanism observed across both MCM-C and CUMCM-C corpora: error_metrics."
+  ]
+}

@@ -12,6 +12,7 @@ from typing import Any
 
 from .artifact_registry import ArtifactRegistry
 from .case_manager import CaseManager
+from .excellent_paper_comparator import ExcellentPaperComparator
 from .io_utils import append_jsonl, atomic_write_json, atomic_write_text, now_iso, read_json, sha256_file
 from .paper_consistency import CLAIM_REF, FIGURE_REF, INTERNAL_ARTIFACT_REF, NUMBER, PLACEHOLDER
 from .paper_outline import section_contract
@@ -295,11 +296,13 @@ class RefinementService:
         runs: RunManager,
         evaluator: PaperQualityEvaluator | None = None,
         coherence: bool = False,
+        comparator: ExcellentPaperComparator | None = None,
     ) -> None:
         self.cases = cases
         self.artifacts = artifacts
         self.workflow = workflow
         self.runs = runs
+        self.comparator = comparator
         if evaluator is not None:
             self.evaluator = evaluator
         else:
@@ -313,6 +316,7 @@ class RefinementService:
         proposer: ProposalFunction | None,
         config: RefinementConfig | None = None,
         focus_policy: StageFocusPolicy | None = None,
+        force_new_epoch: bool = False,
     ) -> dict[str, Any]:
         """Run the refinement loop.
 
@@ -334,7 +338,12 @@ class RefinementService:
         else:
             started = self.workflow.start_node(case_id, "refinement_loop", session_id)
         try:
-            state, sections, frozen = self._load_or_initialize(case_id, config, started["run"]["run_id"])
+            state, sections, frozen = self._load_or_initialize(
+                case_id,
+                config,
+                started["run"]["run_id"],
+                force_new_epoch=force_new_epoch,
+            )
             self._reconcile_stage_commit(case_id, state)
             issues = IssueRegistry(root / "refinement" / "issues.jsonl")
             stop_reason = "MAX_STAGES"
@@ -435,6 +444,7 @@ class RefinementService:
         case_id: str,
         config: RefinementConfig,
         run_id: str,
+        force_new_epoch: bool = False,
     ) -> tuple[dict[str, Any], dict[str, str], dict[str, Any]]:
         root = self.cases.case_root(case_id)
         state_path = root / "memory" / "refinement_state.json"
@@ -444,12 +454,26 @@ class RefinementService:
             frozen = read_json(root / "memory" / "frozen_facts.json")
             sections_artifact = self.artifacts.get(case_id, state["current_sections_artifact_id"])
             sections = read_json(root / sections_artifact["path"])["sections"]
-            if state["frozen_evidence_digest"] == self._evidence_digest(case_id):
+            current_evidence_digest = self._evidence_digest(case_id)
+            current_source_digest = self._source_sections_digest(root)
+            # Backward compatibility: older cases have no source digest. In
+            # that case preserve the historical evidence-only resume rule;
+            # every newly initialized epoch stores the source digest below.
+            source_matches = state.get("source_sections_digest", current_source_digest) == current_source_digest
+            evidence_matches = state["frozen_evidence_digest"] == current_evidence_digest
+            if evidence_matches and source_matches and not force_new_epoch:
                 return state, sections, frozen
             epoch = int(state.get("epoch", 1)) + 1
+            archive_reason = (
+                "outer workstation requested a fresh refinement epoch"
+                if force_new_epoch and evidence_matches and source_matches
+                else "frozen evidence digest changed"
+                if not evidence_matches
+                else "source paper changed"
+            )
             atomic_write_json(
                 root / "refinement" / "epochs" / f"epoch-{epoch - 1:03d}" / "final_state.json",
-                {**state, "archived_at": now_iso(), "archive_reason": "frozen evidence digest changed"},
+                {**state, "archived_at": now_iso(), "archive_reason": archive_reason},
             )
 
         manifest = read_json(root / "paper" / "sections" / "manifest.json")
@@ -480,6 +504,7 @@ class RefinementService:
             "current_paper_artifact_id": initial_artifact["artifact_id"],
             "current_sections_artifact_id": sections_artifact["artifact_id"],
             "frozen_evidence_digest": frozen["evidence"]["digest"],
+            "source_sections_digest": self._source_sections_digest(root),
             "quality_vector": evaluation["quality_vector"],
             "quality_ema": evaluation["quality_vector"]["total"],
             "accepted_stages": [],
@@ -574,7 +599,30 @@ class RefinementService:
                 "failed_strategies": state.get("failed_strategies", [])[-3:],
                 "current_paper_artifact_id": state["current_paper_artifact_id"],
                 "hidden": hidden.summary() if hidden is not None else None,
+                "excellent_ref": {},
             }
+            if self.comparator is not None:
+                try:
+                    focus = (
+                        hidden.summary().get("focus") if hidden is not None else None
+                    ) or "coherence"
+                    full_paper = "\n".join(sections.values())
+                    context["excellent_ref"] = self.comparator.report(full_paper, focus)
+                except Exception as comparator_error:
+                    context["excellent_ref"] = {}
+                    append_jsonl(
+                        root / "decisions.jsonl",
+                        {
+                            "timestamp": now_iso(),
+                            "event": "comparator_degraded",
+                            "focus": (
+                                hidden.summary().get("focus")
+                                if hidden is not None
+                                else "coherence"
+                            ),
+                            "error": f"{type(comparator_error).__name__}: {comparator_error}",
+                        },
+                    )
             atomic_write_json(pending_root / "input.json", context)
             atomic_write_json(pending_root / "evaluation.before.json", before)
             atomic_write_json(pending_root / "selection.json", {"issues": selected, "editable_sections": editable_ids})
@@ -846,6 +894,31 @@ class RefinementService:
             "sections": contracts,
             "evidence": {"digest": self._evidence_digest(case_id), "frozen_at": now_iso()},
         }
+
+    def _source_sections_digest(self, root: Path) -> str:
+        """Digest the current pre-refinement section drafts.
+
+        Outer workstation paper-only Rounds may rewrite prose while keeping the
+        numeric evidence identical. Evidence digest alone therefore cannot
+        decide whether an old refinement state is resumable: doing so would
+        silently publish the previous epoch's sections and discard the new
+        draft. This digest makes the source manuscript part of the epoch key.
+        """
+        manifest_path = root / "paper" / "sections" / "manifest.json"
+        if not manifest_path.is_file():
+            return _payload_digest({"sections": []})
+        manifest = read_json(manifest_path)
+        sections = []
+        for item in manifest.get("sections", []):
+            section_id = str(item["section_id"])
+            draft = root / "paper" / "sections" / section_id / "draft.md"
+            sections.append(
+                {
+                    "section_id": section_id,
+                    "sha256": sha256_file(draft) if draft.is_file() else None,
+                }
+            )
+        return _payload_digest({"sections": sections})
 
     def _evidence_digest(self, case_id: str) -> str:
         root = self.cases.case_root(case_id)

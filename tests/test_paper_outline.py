@@ -73,31 +73,32 @@ def _section_ids(outline) -> list[str]:
     return [s.section_id for s in outline.sections]
 
 
-def test_default_outline_mcm_c_spelling_gets_c_type_sections() -> None:
-    """"MCM-C" spelling must trigger the timeseries/momentum sections.
-
-    Regression test for the flaky momentum integration (t3a5a988f): the old
-    ``len(competition_type) >= 2`` guard plus a pydantic ``min_length=2`` made
-    C-type detection depend on the exact spelling, so the sections appeared
-    only sometimes.
-    """
-    outline = default_outline("C 题论文", "MCM-C")
+def test_contest_letter_c_does_not_imply_timeseries_or_momentum() -> None:
+    outline = default_outline("C 题论文", "MCM-C", problem_type="c")
     ids = _section_ids(outline)
-    assert "timeseries_analysis" in ids
-    assert "momentum_analysis" in ids
-
-
-def test_default_outline_problem_type_c_triggers_c_type_sections() -> None:
-    """problem_type='c' alone (e.g. from the case manifest) must enable C-type
-    sections even when competition_type is the generic "MCM" spelling."""
-    outline = default_outline("C 题论文", "MCM", problem_type="c")
-    ids = _section_ids(outline)
-    assert "timeseries_analysis" in ids
-    assert "momentum_analysis" in ids
-
-
-def test_default_outline_non_c_has_no_c_type_sections() -> None:
-    outline = default_outline("A 题论文", "MCM")
-    ids = _section_ids(outline)
-    assert "momentum_analysis" not in ids
     assert "timeseries_analysis" not in ids
+    assert "momentum_analysis" not in ids
+
+
+def test_semantic_forecasting_adds_timeseries_without_momentum() -> None:
+    outline = default_outline(
+        "时序 C 题论文",
+        "MCM-C",
+        problem_type="c",
+        task_families=["forecasting"],
+        domain_signals=["forecast the temporal evolution of demand"],
+    )
+    ids = _section_ids(outline)
+    assert "timeseries_analysis" in ids
+    assert "momentum_analysis" not in ids
+
+
+def test_explicit_momentum_semantics_adds_momentum_section() -> None:
+    outline = default_outline(
+        "网球势头论文",
+        "MCM-C",
+        task_families=["explanatory_inference"],
+        domain_signals=["test whether momentum changes during a tennis match"],
+    )
+    ids = _section_ids(outline)
+    assert "momentum_analysis" in ids

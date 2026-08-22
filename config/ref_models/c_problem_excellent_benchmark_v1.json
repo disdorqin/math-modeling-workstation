@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "scope": "C_PROBLEM_ONLY",
+  "primary_benchmark_policy": "Only C-problem corpora may drive excellent-paper readiness. Other problem letters remain archive/regression references only.",
+  "source_policy": "Raw papers and attachments stay in D:\\作业\\竞赛\\大学生数学建模\\美赛\\备赛\\资料; repository stores only manifests and derived signals.",
+  "benchmark_status": {
+    "fulltext_text_layer": "PASS",
+    "cross_competition_corpus": "PASS",
+    "pdf_visual_layout": "UNVERIFIED",
+    "blind_human_competition_review": "UNVERIFIED"
+  },
+  "corpora": [
+    {
+      "competition": "CUMCM",
+      "year": 2010,
+      "problem_letter": "C",
+      "problem": "Oil Pipeline Layout",
+      "paper_count": 3,
+      "asset": "config/ref_models/cumcm_2010_c_oil_pipeline_excellent_deep.json",
+      "task_mix": ["geometry", "layout", "optimization", "decision"],
+      "signature": ["constraint-driven modeling", "scenario branching", "geometric/shortest-path construction", "quantified optimal route/cost"]
+    },
+    {
+      "competition": "CUMCM",
+      "year": 2018,
+      "problem_letter": "C",
+      "problem": "Retail Member Profiling",
+      "paper_count": 3,
+      "asset": "config/ref_models/cumcm_2018_c_retail_member_excellent_deep.json",
+      "task_mix": ["data mining", "scoring", "lifecycle", "association", "decision"],
+      "signature": ["problem-specific member representation", "linked question progression", "state/lifecycle modeling", "business-facing decision output"]
+    },
+    {
+      "competition": "CUMCM",
+      "year": 2023,
+      "problem_letter": "C",
+      "problem": "Vegetable Pricing and Replenishment",
+      "paper_count": 4,
+      "asset": "config/ref_models/cumcm_2023_c_vegetable_excellent_deep.json",
+      "task_mix": ["EDA", "forecasting", "pricing", "replenishment", "optimization"],
+      "signature": ["data analysis to forecast", "forecast to constrained decision", "uncertainty/sensitivity", "algorithm diversity without one mandatory model"]
+    },
+    {
+      "competition": "MCM",
+      "year": 2018,
+      "problem_letter": "C",
+      "problem": "Energy Compact",
+      "paper_count": 5,
+      "asset": "config/ref_models/mcm_2018_c_energy_oaward_fulltext.json",
+      "task_mix": ["profile construction", "evaluation", "forecasting", "targets", "policy memo"],
+      "signature": ["energy profile", "multi-criteria evaluation", "2025/2050 forecast", "compact targets/actions", "Governors memo"]
+    },
+    {
+      "competition": "MCM",
+      "year": 2023,
+      "problem_letter": "C",
+      "problem": "Wordle",
+      "paper_count": 6,
+      "asset": "config/ref_models/mcm_2023_c_wordle_oaward_fulltext.json",
+      "task_mix": ["forecasting", "explanation", "distribution", "classification", "synthesis letter"],
+      "signature": ["Wordle-specific feature engineering", "game/popularity mechanism", "uncertainty", "temporal validation", "editor deliverable"]
+    }
+  ],
+  "shared_c_problem_priors": [
+    {
+      "name": "problem_specific_representation_before_generic_model",
+      "meaning": "Build variables, states, indices, geometry, or domain constructs that answer the actual C-problem semantics before selecting a generic algorithm.",
+      "hard_gate": false
+    },
+    {
+      "name": "question_chain_not_independent_model_zoo",
+      "meaning": "Later subproblems should reuse, refine, or challenge accepted earlier research state when the prompt is dependent; do not solve every question as an unrelated model demo.",
+      "hard_gate": true
+    },
+    {
+      "name": "data_and_constraint_driven_model_choice",
+      "meaning": "Model choice must be justified by observed data characteristics, domain mechanism, or constraint structure rather than prestige or frequency in excellent papers.",
+      "hard_gate": true
+    },
+    {
+      "name": "quantified_answers_in_high_visibility_sections",
+      "meaning": "Abstract/summary and conclusions should report actual task answers and key numbers when evidence exists, not only method names and generic accuracy language.",
+      "hard_gate": true
+    },
+    {
+      "name": "validation_matches_claim_type",
+      "meaning": "Forecasts, rankings, optimization, explanation, classification, and uncertainty require family-appropriate validation; a universal RMSE paragraph is not acceptable.",
+      "hard_gate": true
+    },
+    {
+      "name": "algorithm_diversity_is_normal",
+      "meaning": "Excellent C papers use very different algorithms for the same problem. Corpus frequency may suggest candidates but must never force one method without local evidence.",
+      "hard_gate": true
+    },
+    {
+      "name": "decision_or_deliverable_must_be_evidence_backed",
+      "meaning": "Routes, policies, replenishment plans, targets, letters, and memos must be downstream of accepted quantitative evidence, never invented by the paper renderer.",
+      "hard_gate": true
+    }
+  ],
+  "competition_profiles": {
+    "CUMCM_C": {
+      "language": "zh",
+      "priors": ["explicit problem analysis", "assumptions/symbols when useful", "per-question model establishment and solution", "requested result tables/files", "model evaluation tied to the actual problem"],
+      "do_not_force": ["MCM Summary Sheet", "memo/letter unless prompt requests it", "one fixed algorithm family"]
+    },
+    "MCM_C": {
+      "language": "en",
+      "priors": ["high-information Summary Sheet", "problem-specific domain framing", "uncertainty/validation when claims require it", "prompt-specific memo/letter when requested", "real bibliography"],
+      "do_not_force": ["CUMCM section headings", "Chinese contest boilerplate", "one fixed algorithm family"]
+    }
+  },
+  "next_gate": "Use the five-corpus map to audit ModelingBrain/Validation/Paper priors, then run three real CUMCM C end-to-end gates before human review.",
+  "total_reference_papers": 21
+}

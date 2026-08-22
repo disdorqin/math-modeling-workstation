@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "updated_at": "2026-08-22",
+  "purpose": "Capability-driven visual routing for competition papers. The policy selects rendering classes by evidence fidelity and editability needs; it deliberately does not hard-code a fixed palette, layout, or chart for each problem type.",
+  "principles": [
+    "Numeric evidence must remain traceable to executed data and should be rendered deterministically unless a human explicitly approves another representation.",
+    "Conceptual, workflow, mechanism, and architecture diagrams may use generative image models because they explain research structure rather than encode unverified numeric evidence.",
+    "Generative diagrams are candidates, not automatically accepted paper evidence; a visual review or editable redraw is required before promotion.",
+    "Editable PowerPoint/SVG redraw is preferred when an agent or MCP capability is available, but the workstation must keep a deterministic fallback so paper generation never depends on one external tool.",
+    "Rendering policy chooses capabilities, not visual taste: palette, composition, iconography, and layout remain adaptive to the visual brief and references available in the current case."
+  ],
+  "intent_routes": {
+    "numeric_evidence": {
+      "preferred_backends": ["deterministic_plot", "editable_vector"],
+      "numeric_fidelity_required": true,
+      "visual_review_required": false
+    },
+    "statistical_summary": {
+      "preferred_backends": ["deterministic_plot", "editable_vector"],
+      "numeric_fidelity_required": true,
+      "visual_review_required": false
+    },
+    "workflow_diagram": {
+      "preferred_backends": ["ai_image", "ppt_mcp", "deterministic_vector"],
+      "numeric_fidelity_required": false,
+      "visual_review_required": true
+    },
+    "mechanism_diagram": {
+      "preferred_backends": ["ai_image", "ppt_mcp", "deterministic_vector"],
+      "numeric_fidelity_required": false,
+      "visual_review_required": true
+    },
+    "model_architecture": {
+      "preferred_backends": ["ai_image", "ppt_mcp", "deterministic_vector"],
+      "numeric_fidelity_required": false,
+      "visual_review_required": true
+    }
+  },
+  "capabilities": {
+    "deterministic_plot": {
+      "availability_key": "deterministic_plot",
+      "paper_eligible_without_visual_review": true
+    },
+    "deterministic_vector": {
+      "availability_key": "deterministic_vector",
+      "paper_eligible_without_visual_review": true
+    },
+    "ai_image": {
+      "availability_key": "ai_image",
+      "paper_eligible_without_visual_review": false,
+      "notes": "Use the configured image route (for example GPT Image) through CaseImageService."
+    },
+    "ppt_mcp": {
+      "availability_key": "ppt_mcp",
+      "paper_eligible_without_visual_review": false,
+      "handoff_only": true,
+      "notes": "The workstation emits a semantic handoff; an external MCP-capable agent may create an editable PowerPoint figure."
+    },
+    "editable_vector": {
+      "availability_key": "editable_vector",
+      "paper_eligible_without_visual_review": true
+    }
+  }
+}

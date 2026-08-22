@@ -34,7 +34,8 @@ class ResultRecord(BaseModel):
     result_id: str = Field(min_length=3)
     result_type: Literal[
         "MODEL_COMPARISON", "SENSITIVITY", "DATA_QUALITY", "FORECAST",
-        "OPTIMUM", "SIMULATION", "RANKING",
+        "OPTIMUM", "SIMULATION", "RANKING", "EXPLANATORY",
+        "DISTRIBUTION_FORECAST", "EXPLORATORY", "CLASSIFICATION",
     ]
     metric: str = Field(min_length=1)
     value: float
@@ -63,6 +64,7 @@ class TableRecord(BaseModel):
     source_artifact_ids: list[str] = Field(min_length=1)
     section_ids: list[str] = Field(default_factory=list)
     markdown_path: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_width(self) -> "TableRecord":
@@ -183,11 +185,74 @@ class PaperContractService:
     def list_subproblems(self, case_id: str) -> list[SubproblemContract]:
         return self._list(case_id, "subproblems", "subproblem_id", SubproblemContract)
 
-    def list_results(self, case_id: str) -> list[ResultRecord]:
-        return self._list(case_id, "results", "result_id", ResultRecord)
+    def _active_evidence_path(self, case_id: str) -> Path:
+        return self.cases.case_root(case_id) / "results" / "contracts" / "active_evidence.json"
 
-    def list_tables(self, case_id: str) -> list[TableRecord]:
-        return self._list(case_id, "tables", "table_id", TableRecord)
+    def _active_ids(self, case_id: str, key: str) -> set[str] | None:
+        path = self._active_evidence_path(case_id)
+        if not path.is_file():
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return {str(value) for value in payload.get(key, [])}
+
+    def list_results(self, case_id: str, active_only: bool = False) -> list[ResultRecord]:
+        values = self._list(case_id, "results", "result_id", ResultRecord)
+        if not active_only:
+            return values
+        active = self._active_ids(case_id, "result_ids")
+        return values if active is None else [item for item in values if item.result_id in active]
+
+    def list_tables(self, case_id: str, active_only: bool = False) -> list[TableRecord]:
+        values = self._list(case_id, "tables", "table_id", TableRecord)
+        if not active_only:
+            return values
+        active = self._active_ids(case_id, "table_ids")
+        return values if active is None else [item for item in values if item.table_id in active]
+
+    def activate_evidence_lineage(
+        self,
+        case_id: str,
+        result_ids: list[str],
+        table_ids: list[str],
+        source_artifact_ids: list[str] | None = None,
+        generation: int | None = None,
+    ) -> dict[str, Any]:
+        """Select the result/table generation that the current paper may cite.
+
+        Result and table registries remain append-only for auditability. A
+        recurrent workstation round therefore must not make older numeric
+        generations disappear; instead this small pointer document declares
+        which records are ACTIVE for section packs and complete-paper gates.
+        """
+        known_results = {item.result_id for item in self.list_results(case_id)}
+        known_tables = {item.table_id for item in self.list_tables(case_id)}
+        if not set(result_ids) <= known_results:
+            raise ValueError("active evidence references unknown result records")
+        if not set(table_ids) <= known_tables:
+            raise ValueError("active evidence references unknown table records")
+        upstream = list(dict.fromkeys(source_artifact_ids or []))
+        for artifact_id in upstream:
+            self.artifacts.get(case_id, artifact_id)
+        payload = {
+            "schema_version": 1,
+            "case_id": case_id,
+            "generation": generation,
+            "result_ids": list(dict.fromkeys(result_ids)),
+            "table_ids": list(dict.fromkeys(table_ids)),
+            "source_artifact_ids": upstream,
+            "activated_at": now_iso(),
+        }
+        path = self._active_evidence_path(case_id)
+        atomic_write_json(path, payload)
+        artifact = self.artifacts.register_existing(
+            case_id,
+            path.relative_to(self.cases.case_root(case_id)).as_posix(),
+            "paper_evidence_lineage",
+            "python",
+            upstream=upstream,
+            paper_eligible=False,
+        )
+        return {**payload, "artifact_id": artifact["artifact_id"]}
 
     def _record_path(self, case_id: str, name: str) -> Path:
         return self._registry_path(case_id, name)
@@ -221,10 +286,20 @@ class PaperContractService:
     ) -> None:
         groups = (("assumptions", assumptions or [], AssumptionRecord, "assumption_id"), ("data_semantics", semantics or [], DataSemanticRecord, "semantic_id"), ("diagnostics", diagnostics or [], DiagnosticRecord, "diagnostic_id"), ("answers", answers or [], SubproblemAnswerRecord, "answer_id"))
         for name, values, model, key in groups:
-            existing = {item.model_dump(mode="json")[key] for item in self._list(case_id, name, key, model)}
+            existing = {
+                item.model_dump(mode="json")[key]: item
+                for item in self._list(case_id, name, key, model)
+            }
             for value in values:
-                if value.model_dump(mode="json")[key] not in existing:
+                payload = value.model_dump(mode="json")
+                previous = existing.get(payload[key])
+                if previous is None or previous != value:
+                    # Same logical id + changed evidence is a new append-only
+                    # revision. _list() resolves the latest record by id, which
+                    # is essential when recurrent rounds update diagnostics or
+                    # subproblem answers after new experiments.
                     self._append_record(case_id, name, value)
+                    existing[payload[key]] = value
         if storyline is not None:
             self._append_record(case_id, "storylines", storyline)
 
@@ -268,8 +343,8 @@ class PaperContractService:
         return SectionEvidencePack(
             section_id=section_id,
             subproblems=[item for item in self.list_subproblems(case_id) if item.owner_section == section_id],
-            results=[item for item in self.list_results(case_id) if section_id in item.section_ids],
-            tables=[item for item in self.list_tables(case_id) if section_id in item.section_ids],
+            results=[item for item in self.list_results(case_id, active_only=True) if section_id in item.section_ids],
+            tables=[item for item in self.list_tables(case_id, active_only=True) if section_id in item.section_ids],
             assumptions=[item for item in self.list_assumptions(case_id) if section_id in item.affected_sections],
             data_semantics=[item for item in self.list_data_semantics(case_id) if section_id in item.section_ids],
             diagnostics=[item for item in self.list_diagnostics(case_id) if section_id in item.section_ids],
@@ -279,8 +354,8 @@ class PaperContractService:
     def assess_complete_paper(self, case_id: str, paper_text: str) -> CompletePaperAssessment:
         details: list[dict[str, Any]] = []
         subproblems = self.list_subproblems(case_id)
-        results = self.list_results(case_id)
-        tables = self.list_tables(case_id)
+        results = self.list_results(case_id, active_only=True)
+        tables = self.list_tables(case_id, active_only=True)
         if not subproblems:
             details.append({"code": "SUBPROBLEM_CONTRACT_MISSING"})
         for item in subproblems:
@@ -296,7 +371,7 @@ class PaperContractService:
         if not tables:
             details.append({"code": "RESULT_TABLE_MISSING"})
         for item in tables:
-            if item.table_id not in paper_text:
+            if item.table_id not in paper_text and item.title not in paper_text:
                 details.append({"code": "RESULT_TABLE_NOT_REFERENCED", "table_id": item.table_id})
         if not self.list_diagnostics(case_id):
             details.append({"code": "DIAGNOSTIC_RECORD_MISSING"})

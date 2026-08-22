@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "scope": "C_PROBLEM_ONLY",
+  "profiles": {
+    "MCM_C": {
+      "competition": "MCM",
+      "language": "en",
+      "summary_headings": ["Summary", "Abstract"],
+      "render_summary_heading": "Summary",
+      "required_sections": [
+        "Problem Analysis and Decomposition",
+        "Assumptions and Scope",
+        "Models, Validation, and Results",
+        "Model Evaluation: Strengths, Weaknesses, and Robustness",
+        "Conclusions",
+        "References"
+      ],
+      "forbidden_foreign_headings": ["问题重述与分析", "模型建立、检验与结果", "模型评价、稳健性与局限"],
+      "deliverable_policy": "Render memo/letter only when the prompt registers such a synthesis node.",
+      "summary_policy": "High-information Summary: methods plus task answers/key numbers; do not write a generic abstract disconnected from the question chain.",
+      "reference_policy": "Use real, pre-contest verified bibliography; references are context/method sources, not evidence for dataset-specific results."
+    },
+    "CUMCM_C": {
+      "competition": "CUMCM",
+      "language": "zh",
+      "summary_headings": ["摘要"],
+      "render_summary_heading": "摘要",
+      "required_sections": [
+        "问题重述与分析",
+        "模型假设与适用范围",
+        "模型建立、检验与结果",
+        "结果解释与决策建议",
+        "模型评价、稳健性与局限",
+        "结论",
+        "参考文献"
+      ],
+      "forbidden_foreign_headings": ["Problem Analysis and Decomposition", "Models, Validation, and Results", "Model Evaluation: Strengths, Weaknesses, and Robustness"],
+      "deliverable_policy": "按题目要求输出表格/附件/策略；只有题目明确要求 memo/letter 时才渲染对应交付物。",
+      "summary_policy": "摘要按各问研究链给出方法、关键结果与验证信息；不得只罗列算法名称。",
+      "reference_policy": "使用真实且赛前可用的参考文献；文献只支持背景/方法，不替代本题数据证据。"
+    }
+  }
+}

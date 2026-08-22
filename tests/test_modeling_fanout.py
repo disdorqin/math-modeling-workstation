@@ -28,10 +28,12 @@ from mathworkstation.agents.modeling import (
     build_modeling_protocol,
 )
 from mathworkstation.artifact_registry import ArtifactRegistry
+from mathworkstation.auto_pipeline import AutoPipelineService
 from mathworkstation.case_manager import CaseManager
 from mathworkstation.claims import ClaimRegistry
 from mathworkstation.datasets import DatasetKind, DatasetRegistry
 from mathworkstation.figure_registry import FigureRegistry
+from mathworkstation.io_utils import atomic_write_json
 
 
 def _write_dataset_csv(path: Path, n_rows: int = 40, seed_offset: int = 0) -> None:
@@ -39,7 +41,7 @@ def _write_dataset_csv(path: Path, n_rows: int = 40, seed_offset: int = 0) -> No
     x1 = rng.normal(size=n_rows)
     x2 = rng.normal(size=n_rows)
     y = 3.0 * x1 - 2.0 * x2 + rng.normal(scale=0.1, size=n_rows)
-    pd.DataFrame({"x1": x1, "x2": x2, "y": y}).to_csv(path, index=False)
+    pd.DataFrame({"time": np.arange(n_rows), "x1": x1, "x2": x2, "y": y}).to_csv(path, index=False)
 
 
 class _Harness:
@@ -154,6 +156,95 @@ def _patch_fit_counter(monkeypatch) -> list:
 
     monkeypatch.setattr(modeling._CandidateModelAgent, "_evaluate", counting)
     return calls
+
+
+class TestTimeOrderedProtocol:
+    def test_persists_exact_past_only_train_folds(self, tmp_path) -> None:
+        harness = _Harness(tmp_path, n_rows=48)
+        built = harness.build_protocol(split_strategy="time_ordered", temporal_column="time", n_splits=4)
+        protocol = built["protocol"]
+
+        assert len(protocol["fold_train_indices"]) == 4
+        assert len(protocol["fold_test_indices"]) == 4
+        for train_idx, test_idx in zip(protocol["fold_train_indices"], protocol["fold_test_indices"], strict=True):
+            assert train_idx
+            assert test_idx
+            assert max(train_idx) < min(test_idx)  # no future row may train a past fold
+
+        reports = harness.run_all_candidates(built["protocol_artifact_id"])
+        assert all(report.proposals[0].payload["status"] == "VALID" for report in reports.values())
+
+
+class TestAutoPipelineFanoutBridge:
+    def test_main_pipeline_bridge_persists_bounded_fanout_summary(self, tmp_path) -> None:
+        harness = _Harness(tmp_path, n_rows=40)
+        service = AutoPipelineService(harness.cases, None, coherence=False)  # type: ignore[arg-type]
+        result = service._run_model_fanout_audit(
+            harness.case_id,
+            "session-fanout-bridge",
+            harness.dataset_id,
+            {
+                "task_type": "regression",
+                "target_column": "y",
+                "feature_columns": ["x1", "x2"],
+                "primary_metric": "rmse",
+                "cv_folds": 5,
+                "random_seed": 42,
+                "split_strategy": "random",
+                "temporal_column": None,
+            },
+        )
+
+        assert result["status"] == "OK"
+        assert len(result["candidate_artifact_ids"]) == 3
+        assert result["outcome"] in {"WINNER", "TIE", "NO_ACCEPTABLE_WINNER"}
+        summary_artifact = harness.artifacts.get(harness.case_id, result["summary_artifact_id"])
+        summary = harness.read_artifact(summary_artifact)
+        assert summary["comparison_artifact_id"] == result["comparison_artifact_id"]
+        assert len(summary["candidate_artifact_ids"]) == 3
+        assert summary["judge"]["agent"] == "model_judge_agent"
+
+
+class TestRecurrentModelContext:
+    def test_hidden_state_and_fanout_verdict_feed_next_model_plan_context(self, tmp_path) -> None:
+        harness = _Harness(tmp_path, n_rows=40)
+        service = AutoPipelineService(harness.cases, None, coherence=False)  # type: ignore[arg-type]
+        root = harness.cases.case_root(harness.case_id)
+        atomic_write_json(
+            root / "workstation" / "hidden_state.json",
+            {
+                "schema_version": 1,
+                "case_id": harness.case_id,
+                "round": 2,
+                "status": "IDLE",
+                "lessons": ["expand candidate search after unresolved comparison"],
+                "open_issues": ["ws-issue-model-search"],
+                "round_history": [
+                    {
+                        "round": 2,
+                        "accepted": False,
+                        "pivot": "model_plan",
+                        "gate_before": "REVIEW",
+                        "gate_after": "REVIEW",
+                    }
+                ],
+            },
+        )
+        atomic_write_json(
+            root / "analysis" / "model_fanout_summary.json",
+            {
+                "outcome": "NO_ACCEPTABLE_WINNER",
+                "winner_candidate_id": None,
+                "tie_candidate_ids": [],
+            },
+        )
+
+        context = service._workstation_model_context(harness.case_id)
+        assert "expand candidate search" in context
+        assert "ws-issue-model-search" in context
+        assert "round 2: rejected; pivot=model_plan" in context
+        assert "NO_ACCEPTABLE_WINNER" in context
+        assert "Re-derive every numerical claim" in context
 
 
 class TestProtocolIdempotency:

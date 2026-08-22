@@ -54,9 +54,9 @@ from .contracts import AgentReport, AgentRequest, ProposalKind
 #: rejected explicitly rather than silently assumed "bigger is better".
 _METRIC_DIRECTION = {"rmse": "minimize", "mae": "minimize", "r2": "maximize"}
 
-#: model_family -> a hyperparameter-count-free complexity rank, used only to
-#: break a genuine numeric tie (never to override a real metric difference).
-_COMPLEXITY_RANK = {"robust_baseline": 0, "linear": 1, "tree": 2}
+#: Complexity is measured from the fitted estimator itself (coefficient count,
+#: tree node count, etc.) and is used only to break a genuine numeric tie.  No
+#: global model-family prestige ranking is maintained here.
 
 #: relative metric difference below which two candidates are treated as tied
 #: rather than one being declared better on noise.
@@ -105,10 +105,13 @@ def build_modeling_protocol(
     source_artifact = artifacts.get(case_id, dataset["artifact_id"])
     case_root = cases.case_root(case_id)
     frame = read_table(resolve_within(case_root, source_artifact["path"]))
-    missing = sorted(set([target_column, *feature_columns]) - set(frame.columns))
+    required_columns = [*feature_columns, target_column]
+    if split_strategy == "time_ordered" and temporal_column:
+        required_columns.append(temporal_column)
+    missing = sorted(set(required_columns) - set(frame.columns))
     if missing:
         raise ValueError(f"protocol references missing columns: {missing}")
-    modeling = frame[[*feature_columns, target_column]].dropna(subset=[target_column])
+    modeling = frame[list(dict.fromkeys(required_columns))].dropna(subset=[target_column])
     if len(modeling) < n_splits * 2:
         raise ValueError("insufficient rows for the requested fold count")
 
@@ -118,10 +121,12 @@ def build_modeling_protocol(
             modeling = modeling.sort_values(by=temporal_column, kind="mergesort").reset_index(drop=True)
         # TimeSeriesSplit: train on past, test on future (no shuffle)
         splitter = TimeSeriesSplit(n_splits=n_splits)
-        fold_test_indices = [test_idx.tolist() for _, test_idx in splitter.split(modeling)]
+        folds = [(train_idx.tolist(), test_idx.tolist()) for train_idx, test_idx in splitter.split(modeling)]
     else:
         splitter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-        fold_test_indices = [test_idx.tolist() for _, test_idx in splitter.split(modeling)]
+        folds = [(train_idx.tolist(), test_idx.tolist()) for train_idx, test_idx in splitter.split(modeling)]
+    fold_train_indices = [train_idx for train_idx, _ in folds]
+    fold_test_indices = [test_idx for _, test_idx in folds]
 
     protocol = {
         "schema_version": 1,
@@ -138,6 +143,7 @@ def build_modeling_protocol(
         "random_state": random_state,
         "split_strategy": split_strategy,
         "temporal_column": temporal_column,
+        "fold_train_indices": fold_train_indices,
         "fold_test_indices": fold_test_indices,
         "n_rows": int(len(modeling)),
         "created_by": created_by,
@@ -168,6 +174,25 @@ def _row_positions(frame: pd.DataFrame, protocol: dict[str, Any]) -> tuple[pd.Da
     features = frame[protocol["feature_columns"]].reset_index(drop=True)
     target = frame[protocol["target_column"]].reset_index(drop=True)
     return features, target
+
+
+def _effective_parameter_proxy(estimator: Any) -> float | None:
+    """Best-effort structural complexity from fitted estimator attributes.
+
+    The proxy is intentionally capability-based rather than a hard-coded model
+    family order.  Linear estimators expose ``coef_``; tree estimators expose
+    ``tree_.node_count``.  Unknown estimators return ``None`` so the judge leaves
+    a metric tie unresolved instead of inventing a complexity preference.
+    """
+
+    if hasattr(estimator, "coef_"):
+        coefficients = np.asarray(getattr(estimator, "coef_"))
+        intercept = np.asarray(getattr(estimator, "intercept_", []))
+        return float(coefficients.size + max(1, intercept.size))
+    tree = getattr(estimator, "tree_", None)
+    if tree is not None and hasattr(tree, "node_count"):
+        return float(tree.node_count)
+    return None
 
 
 def _metric_value(name: str, actual, predicted) -> float:
@@ -343,6 +368,11 @@ class _CandidateModelAgent(DeterministicAgent):
             "metric_name": protocol["primary_metric"],
             "metric_direction": protocol["metric_direction"],
             "n_folds": protocol["n_splits"],
+            "complexity_measure": {
+                "kind": "effective_parameter_proxy",
+                "value": None,
+                "fold_values": [],
+            },
             # No wall-clock timestamp here either -- see build_modeling_protocol's
             # comment. A candidate fit under an unchanged protocol must hash
             # identically on rerun.
@@ -351,28 +381,52 @@ class _CandidateModelAgent(DeterministicAgent):
             case_root = self.cases.case_root(case_id)
             source_path = resolve_within(case_root, self._dataset_path(protocol))
             frame = read_table(source_path)
-            frame = frame[[*protocol["feature_columns"], protocol["target_column"]]].dropna(
-                subset=[protocol["target_column"]]
-            )
+            required_columns = [*protocol["feature_columns"], protocol["target_column"]]
+            temporal_column = protocol.get("temporal_column")
+            if protocol.get("split_strategy") == "time_ordered" and temporal_column:
+                required_columns.append(temporal_column)
+            frame = frame[list(dict.fromkeys(required_columns))].dropna(subset=[protocol["target_column"]])
+            if protocol.get("split_strategy") == "time_ordered" and temporal_column:
+                frame = frame.sort_values(by=temporal_column, kind="mergesort").reset_index(drop=True)
             if len(frame) != protocol["n_rows"]:
                 raise ValueError(
                     f"row count {len(frame)} does not match protocol n_rows {protocol['n_rows']}"
                 )
             features, target = _row_positions(frame, protocol)
             fold_values: list[float] = []
-            for test_idx in protocol["fold_test_indices"]:
+            complexity_values: list[float] = []
+            train_folds = protocol.get("fold_train_indices")
+            if not train_folds:
+                # Backward compatibility for protocol artifacts created before
+                # explicit train-fold persistence. Random KFold can be safely
+                # reconstructed as complement; time-ordered protocols are not
+                # reused because their protocol hash changes under the new
+                # schema content.
+                train_folds = [
+                    [i for i in range(len(features)) if i not in set(test_idx)]
+                    for test_idx in protocol["fold_test_indices"]
+                ]
+            for train_idx, test_idx in zip(train_folds, protocol["fold_test_indices"], strict=True):
+                train_idx = list(train_idx)
                 test_idx = list(test_idx)
-                train_idx = [i for i in range(len(features)) if i not in set(test_idx)]
                 pipeline = Pipeline([("preprocessor", _preprocessor(features)), ("model", self._estimator())])
                 pipeline.fit(features.iloc[train_idx], target.iloc[train_idx])
                 predicted = pipeline.predict(features.iloc[test_idx])
                 fold_values.append(_metric_value(protocol["primary_metric"], target.iloc[test_idx], predicted))
+                complexity = _effective_parameter_proxy(pipeline.named_steps["model"])
+                if complexity is not None:
+                    complexity_values.append(float(complexity))
             base_record.update(
                 {
                     "metric_value": float(np.mean(fold_values)),
                     "fold_metric_values": [float(v) for v in fold_values],
                     "status": "VALID",
                     "invalid_reason": "",
+                    "complexity_measure": {
+                        "kind": "effective_parameter_proxy",
+                        "value": float(np.mean(complexity_values)) if complexity_values else None,
+                        "fold_values": complexity_values,
+                    },
                 }
             )
         except Exception as error:  # noqa: BLE001 - a failed fit is still a typed, recorded candidate
@@ -780,18 +834,22 @@ class ModelJudgeAgent(DeterministicAgent):
 
     @staticmethod
     def _simpler_under_tie(tied: list[dict[str, Any]]) -> dict[str, Any] | None:
-        ranked = sorted(
-            tied,
-            key=lambda c: _COMPLEXITY_RANK.get(c["model_family"], len(_COMPLEXITY_RANK)),
-        )
-        if len(ranked) < 2:
-            return ranked[0] if ranked else None
-        # only a real tie-break if the simplest candidate's rank is strictly
-        # lower than the next -- if two candidates share a rank, this is not
-        # resolvable by complexity and must fall through to TIE.
-        best_rank = _COMPLEXITY_RANK.get(ranked[0]["model_family"], len(_COMPLEXITY_RANK))
-        next_rank = _COMPLEXITY_RANK.get(ranked[1]["model_family"], len(_COMPLEXITY_RANK))
-        return ranked[0] if best_rank < next_rank else None
+        measured: list[tuple[float, dict[str, Any]]] = []
+        for candidate in tied:
+            value = (candidate.get("complexity_measure") or {}).get("value")
+            if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                measured.append((float(value), candidate))
+        # Complexity can break a metric tie only when every tied candidate has
+        # a comparable structural measurement. Missing measurements leave the
+        # verdict as TIE rather than falling back to a family-name preference.
+        if len(measured) != len(tied):
+            return None
+        measured.sort(key=lambda item: item[0])
+        if len(measured) < 2:
+            return measured[0][1] if measured else None
+        best_value, best_candidate = measured[0]
+        next_value = measured[1][0]
+        return best_candidate if best_value + 1e-12 < next_value else None
 
     @staticmethod
     def _format(value: float) -> str:

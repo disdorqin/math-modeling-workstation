@@ -48,7 +48,8 @@ def execute_classification(
     y_test = data[target].iloc[test_indices]
     model = LogisticRegression(max_iter=2000, random_state=seed)
     model.fit(x_train, y_train)
-    predicted = model.predict(x_test)
+    probabilities = model.predict_proba(x_test)
+    predicted = model.classes_[np.argmax(probabilities, axis=1)]
     labels = sorted(str(value) for value in data[target].unique())
     confusion = pd.crosstab(y_test.astype(str), pd.Series(predicted, index=y_test.index).astype(str), dropna=False)
     confusion = confusion.reindex(index=labels, columns=labels, fill_value=0)
@@ -63,6 +64,10 @@ def execute_classification(
         },
         "confusion_matrix": confusion.to_numpy(dtype=int).tolist(),
         "labels": labels,
+        "holdout_actual": [str(value) for value in y_test.tolist()],
+        "holdout_predicted": [str(value) for value in predicted.tolist()],
+        "holdout_probabilities": probabilities.tolist(),
+        "probability_labels": [str(value) for value in model.classes_.tolist()],
     }
 
 

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-22",
+  "purpose": "Adaptive publication palettes for evidence figures. Palettes are inspired by established scientific-journal schemes and perceptually safe plotting practice; selection is based on semantic intent and figure identity rather than a fixed competition-wide blue.",
+  "sources": [
+    "ggsci: NPG / NEJM / JAMA / Lancet publication-inspired discrete palettes",
+    "CMasher / Crameri principle: use perceptually meaningful sequential or diverging maps for continuous evidence"
+  ],
+  "discrete_families": {
+    "npg": ["#E64B35", "#4DBBD5", "#00A087", "#3C5488", "#F39B7F", "#8491B4", "#91D1C2", "#7E6148"],
+    "jama": ["#374E55", "#DF8F44", "#00A1D5", "#B24745", "#79AF97", "#6A6599", "#80796B"],
+    "nejm": ["#BC3C29", "#0072B5", "#E18727", "#20854E", "#7876B1", "#6F99AD", "#FFDC91", "#EE4C97"],
+    "lancet": ["#00468B", "#ED0000", "#42B540", "#0099B4", "#925E9F", "#FDAF91", "#ADB6B6"],
+    "muted_earth": ["#567C8D", "#D28C60", "#6F8F72", "#9A6F7E", "#B7A26A", "#6E7291", "#8C8171"],
+    "muted_botanical": ["#2F6B5F", "#C8845B", "#7A9E7E", "#5E7FA3", "#B05C63", "#9B8BB4", "#B2A36A"]
+  },
+  "diverging_families": {
+    "red_blue": ["#2166AC", "#67A9CF", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#EF8A62", "#B2182B"],
+    "blue_orange": ["#2C5D8A", "#7FA6C5", "#E9EDF0", "#E8B47A", "#B85C38"],
+    "teal_rose": ["#2A716C", "#8AB9B1", "#F1EEE8", "#D99A9D", "#9B4B5A"],
+    "purple_green": ["#665191", "#AAA0C9", "#F1F0EC", "#9FC19A", "#4F7B57"]
+  },
+  "sequential_families": {
+    "teal": ["#E5F2F0", "#B7D9D3", "#7DB7AE", "#3E8F84", "#1D665E"],
+    "warm": ["#FBF0E6", "#F2D2B6", "#E7AD7D", "#D98552", "#A95735"],
+    "indigo": ["#ECECF4", "#C9CAE0", "#9FA3C8", "#7179AB", "#4D5686"]
+  },
+  "semantic_routes": {
+    "correlation": {"mode": "diverging", "families": ["red_blue"]},
+    "effect": {"mode": "diverging", "families": ["teal_rose", "blue_orange"]},
+    "comparison": {"mode": "discrete", "families": ["jama", "nejm", "npg"]},
+    "category": {"mode": "discrete", "families": ["muted_botanical", "npg", "jama"]},
+    "sensitivity": {"mode": "discrete", "families": ["nejm", "muted_earth", "jama"]},
+    "ranking": {"mode": "sequential", "families": ["indigo", "teal", "warm"]},
+    "default": {"mode": "discrete", "families": ["muted_botanical", "jama", "npg", "muted_earth"]}
+  }
+}

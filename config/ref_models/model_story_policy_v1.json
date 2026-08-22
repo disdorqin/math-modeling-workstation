@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "principles": [
+    "evidence_locked",
+    "simple_first",
+    "complexity_requires_burden_of_proof",
+    "inherit_before_rebuild",
+    "validation_adjacent_to_model",
+    "decision_consumes_accepted_evidence"
+  ],
+  "section_title": {
+    "prefer_method_or_mechanism_name": true,
+    "fallback_to_problem_title": true,
+    "show_question_number_as_secondary_locator": true
+  },
+  "stage_emphasis": {
+    "PROBLEM_INSIGHT": 0.80,
+    "INHERITED_RESULT": 0.75,
+    "SIMPLE_RELATION": 1.00,
+    "INSUFFICIENCY_EVIDENCE": 0.85,
+    "NECESSARY_CORRECTION": 0.95,
+    "CORE_MODEL": 1.20,
+    "EXTENSION": 1.00,
+    "VALIDATION": 0.85,
+    "DECISION": 0.90
+  },
+  "rendering": {
+    "avoid_fixed_slot_labels": true,
+    "repeat_full_derivation_for_extension": false,
+    "formula_after_motivation": true,
+    "emit_insufficiency_only_with_evidence": true,
+    "emit_correction_only_with_evidence": true
+  }
+}

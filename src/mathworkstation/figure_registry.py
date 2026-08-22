@@ -75,6 +75,48 @@ class FigureRegistry:
                 return figure
         raise KeyError(f"figure not found: {figure_id}")
 
+    def attach_visual_review(
+        self,
+        case_id: str,
+        figure_id: str,
+        review_artifact_id: str,
+        *,
+        gate: str,
+        reviewer: str,
+        reviewer_kind: str,
+    ) -> dict[str, Any]:
+        """Attach a rendered-image review without changing evidence eligibility.
+
+        Visual review is a document-quality concern, not a substitute for the
+        paper-ready evidence approval used by :meth:`promote`.  The method only
+        annotates the latest figure record so VisualQualityService can distinguish
+        an actually inspected diagram from one that merely has clean metadata.
+        """
+
+        figure = self.get(case_id, figure_id)
+        review = self.artifacts.get(case_id, review_artifact_id)
+        if review.get("artifact_type") != "visual_figure_review":
+            raise ValueError("visual review artifact must have type visual_figure_review")
+        normalized_gate = str(gate or "").upper()
+        if normalized_gate not in {"PASS", "REVISE", "REJECT"}:
+            raise ValueError("visual review gate must be PASS, REVISE, or REJECT")
+        parameters = dict(figure.get("parameters") or {})
+        parameters.update(
+            {
+                "visual_review_status": normalized_gate,
+                "visual_review_artifact_id": review_artifact_id,
+                "visual_reviewer": reviewer,
+                "visual_reviewer_kind": reviewer_kind,
+            }
+        )
+        updated = {
+            **figure,
+            "parameters": parameters,
+            "updated_at": now_iso(),
+        }
+        append_jsonl(self.registry_path(case_id), updated)
+        return updated
+
     def promote(
         self,
         case_id: str,

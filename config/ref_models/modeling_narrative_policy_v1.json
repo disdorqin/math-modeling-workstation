@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-22",
+  "purpose": "Soft structural priors for competition-paper modeling narratives. The policy guides emphasis and equation selection without assuming that every problem has the same number of questions or that a fixed question index must be the core model.",
+  "principles": [
+    "Prefer one coherent modeling spine over independent model showcases for every subproblem.",
+    "Treat exploratory or descriptive work as a foundation when it supplies variables, relationships, or constraints to downstream modeling.",
+    "Promote a research node to core-model status only when its executed model is both substantive and structurally central to downstream answers.",
+    "When a later question inherits upstream predictions, parameters, constraints, or decision variables, describe it as an extension of the upstream model rather than as a brand-new model.",
+    "Use the smallest equation set that exposes the model's decision variables, governing relation or objective, and essential constraints; routine estimators and metrics may stay in prose or appendices.",
+    "Complexity must be justified by validation evidence, not by presentation value."
+  ],
+  "role_equation_budget": {
+    "FOUNDATION": 1,
+    "CORE_MODEL": 3,
+    "EXTENSION": 3,
+    "INDEPENDENT_MODEL": 2,
+    "SYNTHESIS": 0
+  },
+  "core_selection": {
+    "maximum_core_models": 2,
+    "model_family_bonus": 2.0,
+    "downstream_reach_weight": 1.0,
+    "direct_dependency_weight": 0.5,
+    "foundation_family_penalty": 1.5,
+    "core_score_band": 0.75
+  },
+  "inheritance": {
+    "same_family_is_extension_signal": true,
+    "upstream_model_dependency_is_extension_signal": true,
+    "shared_method_tokens_are_supporting_signal": true
+  },
+  "paper_emphasis": {
+    "FOUNDATION": 0.8,
+    "CORE_MODEL": 1.35,
+    "EXTENSION": 1.0,
+    "INDEPENDENT_MODEL": 1.0,
+    "SYNTHESIS": 0.7
+  }
+}

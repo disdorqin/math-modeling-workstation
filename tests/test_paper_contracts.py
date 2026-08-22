@@ -73,3 +73,69 @@ def test_missing_metric_and_table_reference_are_detected(tmp_path: Path) -> None
     assert "RESULT_METRIC_NOT_IN_PAPER" in assessment.issue_codes
     assert "RESULT_TABLE_NOT_REFERENCED" in assessment.issue_codes
     assert table.table_id not in "完整论文但尚未写入数值和表引用。"
+
+
+def test_active_evidence_lineage_hides_superseded_numeric_generation(tmp_path: Path) -> None:
+    case_id, service, artifacts = _service(tmp_path)
+    root = service.cases.case_root(case_id)
+    source = root / "results" / "metrics" / "round-source.json"
+    source.write_text("{}\n", encoding="utf-8")
+    artifact = artifacts.register_existing(
+        case_id, source.relative_to(root).as_posix(), "metric_source", "test", paper_eligible=True
+    )
+
+    old_result = service.create_result(
+        case_id,
+        result_type="MODEL_COMPARISON",
+        metric="rmse",
+        value=9.0,
+        scope="old round",
+        source_artifact_ids=[artifact["artifact_id"]],
+        section_ids=["results"],
+    )
+    old_table, _ = service.create_table(
+        case_id,
+        title="旧轮模型比较",
+        columns=["RMSE"],
+        rows=[["9.000000"]],
+        result_ids=[old_result.result_id],
+        source_artifact_ids=[artifact["artifact_id"]],
+        section_ids=["results"],
+    )
+    service.activate_evidence_lineage(
+        case_id, [old_result.result_id], [old_table.table_id], [artifact["artifact_id"]], generation=1
+    )
+
+    new_result = service.create_result(
+        case_id,
+        result_type="MODEL_COMPARISON",
+        metric="rmse",
+        value=3.0,
+        scope="new round",
+        source_artifact_ids=[artifact["artifact_id"]],
+        section_ids=["results"],
+    )
+    new_table, _ = service.create_table(
+        case_id,
+        title="新轮模型比较",
+        columns=["RMSE"],
+        rows=[["3.000000"]],
+        result_ids=[new_result.result_id],
+        source_artifact_ids=[artifact["artifact_id"]],
+        section_ids=["results"],
+    )
+    lineage = service.activate_evidence_lineage(
+        case_id, [new_result.result_id], [new_table.table_id], [artifact["artifact_id"]], generation=2
+    )
+
+    assert lineage["generation"] == 2
+    assert [item.result_id for item in service.list_results(case_id, active_only=True)] == [new_result.result_id]
+    assert [item.table_id for item in service.list_tables(case_id, active_only=True)] == [new_table.table_id]
+    assert len(service.list_results(case_id)) == 2  # history is still append-only
+
+    paper = f"新一轮结果为 {new_result.formatted_value()}，见 [{new_table.table_id}]。"
+    assessment = service.assess_complete_paper(case_id, paper)
+    metric_details = [item for item in assessment.details if item["code"] == "RESULT_METRIC_NOT_IN_PAPER"]
+    table_details = [item for item in assessment.details if item["code"] == "RESULT_TABLE_NOT_REFERENCED"]
+    assert metric_details == []
+    assert table_details == []
