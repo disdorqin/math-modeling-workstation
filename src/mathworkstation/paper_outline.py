@@ -28,6 +28,12 @@ REQUIRED_SECTIONS = {
     "references",
 }
 
+# Optional sections that may be added for specific competition types
+OPTIONAL_SECTIONS = {
+    "momentum_analysis",
+    "timeseries_analysis",
+}
+
 SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
     "abstract": {"required_any": [["研究目的", "研究目标"], ["研究方法", "方法"], ["主要结果", "结果"], ["稳健性", "边界"]]},
     "problem_restated": {"required_any": [["研究概述", "研究背景", "问题"], ["目标", "子问题"]]},
@@ -37,6 +43,8 @@ SECTION_CONTRACTS: dict[str, dict[str, list[list[str]]]] = {
     "model_construction": {"required_any": [["模型"], ["目标函数", "$", "损失"]]},
     "model_solution": {"required_any": [["求解", "训练"], ["交叉验证", "指标"]]},
     "results": {"required_any": [["结果", "模型"], ["图表证据", "图", "表"]]},
+    "momentum_analysis": {"required_any": [["动量", "势头", "momentum"], ["假设检验", "Ljung-Box", "游程"], ["滑动窗口", "时序"]]},
+    "timeseries_analysis": {"required_any": [["时序", "时间序列", "趋势"], ["自相关", "Ljung-Box", "ACF"], ["平稳性", "ADF", "单位根"], ["断点", "滑动", "趋势分解"]]},
     "sensitivity": {"required_any": [["敏感性", "稳健性"], ["比例", "随机种子", "波动"]]},
     "strengths_weaknesses": {"required_any": [["优点", "优势"], ["局限", "缺点"]]},
     "conclusion": {"required_any": [["结论"], ["适用", "外推", "限制"]]},
@@ -144,21 +152,61 @@ class PaperOutlineService:
         }
 
 
-def default_outline(title: str, competition_type: str, language: str = "zh") -> PaperOutline:
+def default_outline(
+    title: str,
+    competition_type: str,
+    language: str = "zh",
+    problem_type: str = "",
+    *,
+    task_families: list[str] | None = None,
+    domain_signals: list[str] | None = None,
+) -> PaperOutline:
+    """Build a semantic outline; the contest letter never determines the model.
+
+    ``problem_type`` is retained for API compatibility but is intentionally not
+    used to infer time-series or momentum sections.  C problems across MCM,
+    CUMCM, Huashu Cup and other contests span optimization, geometry, networks,
+    probability, simulation and many other families.  Optional sections are
+    therefore activated only by ProblemGraph/task semantics.
+    """
+    families = {str(value).strip().lower() for value in (task_families or []) if str(value).strip()}
+    signal_text = " ".join(str(value) for value in (domain_signals or [])).lower()
+    has_timeseries = bool(
+        families & {"forecasting", "distribution_forecasting"}
+        or any(token in signal_text for token in ("time series", "temporal", "dynamic", "sequence", "时序", "时间序列", "动态过程"))
+    )
+    has_momentum = any(token in signal_text for token in ("momentum", "势头", "动量"))
+
     definitions = [
         ("abstract", "摘要", "概括问题、方法、结果和关键词"),
         ("problem_restated", "引言与问题重述", "说明研究背景、题目价值，并准确重述题目目标与约束"),
         ("assumptions", "模型假设", "列出假设及其适用范围"),
         ("notation", "符号说明", "统一变量、参数和单位"),
         ("data_analysis", "数据分析", "说明来源、质量与探索性结果"),
+    ]
+
+    if has_timeseries:
+        definitions.append(
+            ("timeseries_analysis", "时序分析", "趋势分解、自相关检验、平稳性检验与结构断点分析")
+        )
+
+    definitions.extend([
         ("model_construction", "模型建立", "给出模型结构、公式和依据"),
         ("model_solution", "模型求解", "记录算法、参数和执行过程"),
         ("results", "结果分析", "基于已批准证据报告结果"),
+    ])
+
+    if has_momentum:
+        definitions.append(
+            ("momentum_analysis", "动量分析", "分析势头存在性、假设检验、滑动窗口与发球方加权")
+        )
+
+    definitions.extend([
         ("sensitivity", "敏感性与稳健性", "报告敏感性门及限制"),
         ("strengths_weaknesses", "模型优缺点", "评价适用性与局限"),
         ("conclusion", "结论", "回答子问题并限制外推范围"),
         ("references", "参考文献", "列出可验证来源"),
-    ]
+    ])
     return PaperOutline(
         title=title,
         language=language,

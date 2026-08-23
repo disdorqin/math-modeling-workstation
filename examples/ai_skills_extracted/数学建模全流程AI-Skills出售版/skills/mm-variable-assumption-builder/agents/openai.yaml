@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：变量假设"
+  short_description: "生成变量、参数、假设、目标和约束草案。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-variable-assumption-builder 帮我设计变量、参数、假设和约束。"
+policy:
+  allow_implicit_invocation: true

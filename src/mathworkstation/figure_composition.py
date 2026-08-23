@@ -9,13 +9,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
-plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "Noto Sans SC", "DejaVu Sans"]
-plt.rcParams["axes.unicode_minus"] = False
-
 from .artifact_registry import ArtifactRegistry
 from .case_manager import CaseManager
 from .figure_registry import FigureRegistry
 from .io_utils import now_iso
+from .plot_style import apply_style, get_colors, get_figsize, save_figure
+
+apply_style()
 
 
 class FigureCompositionService:
@@ -49,7 +49,8 @@ class FigureCompositionService:
             ("实验验证", "交叉验证、误差\n敏感性与稳健性", "#FCE8E6"),
             ("证据论文", "图表、结论\n摘要与可复现导出", "#F0EAF8"),
         ]
-        figure, axis = plt.subplots(figsize=(16, 4.6), dpi=180)
+        figsize = get_figsize("workflow")
+        figure, axis = plt.subplots(figsize=figsize, dpi=240)
         axis.set_xlim(0, len(steps) * 3.0)
         axis.set_ylim(0, 4.6)
         axis.axis("off")
@@ -71,7 +72,7 @@ class FigureCompositionService:
         axis.text(0.25, 0.62, "每一步均产生可追溯证据；异常进入审查/恢复分支，不静默跳过。", fontsize=11, color="#455A64")
         axis.text(0.25, 4.15, "数学建模研究工作流", fontsize=18, fontweight="bold", color="#102A43")
         figure.tight_layout()
-        figure.savefig(png_path, dpi=240, bbox_inches="tight", facecolor="white")
+        save_figure(figure, png_path, dpi=240)
         figure.savefig(svg_path, format="svg", bbox_inches="tight", facecolor="white")
         plt.close(figure)
         png_figure = self.figures.register(

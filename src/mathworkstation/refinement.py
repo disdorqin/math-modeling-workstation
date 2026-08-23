@@ -12,9 +12,11 @@ from typing import Any
 
 from .artifact_registry import ArtifactRegistry
 from .case_manager import CaseManager
+from .excellent_paper_comparator import ExcellentPaperComparator
 from .io_utils import append_jsonl, atomic_write_json, atomic_write_text, now_iso, read_json, sha256_file
 from .paper_consistency import CLAIM_REF, FIGURE_REF, INTERNAL_ARTIFACT_REF, NUMBER, PLACEHOLDER
 from .paper_outline import section_contract
+from .refinement_hidden_state import HiddenState, StageFocusPolicy
 from .run_manager import RunManager
 from .stage_service import _render_final_manuscript
 from .workflow import FailureCategory
@@ -58,6 +60,7 @@ class RefinementConfig:
     max_sections_per_stage: int = 2
     max_issues_per_stage: int = 3
     max_changed_ratio: float = 0.12
+    max_stage_failures: int = 2
     quality_ema_beta: float = 0.6
     targets: dict[str, float] = field(
         default_factory=lambda: {
@@ -85,6 +88,14 @@ class RefinementConfig:
 
 
 class PaperQualityEvaluator:
+    def __init__(self, coherence: bool = False) -> None:
+        """
+        Args:
+            coherence: 为 True 时把 PaperCoherenceChecker 的 P2 发现并入
+                findings(默认 False → 行为与既有完全一致, 不破坏既有测试)。
+        """
+        self.coherence = coherence
+
     def evaluate(
         self,
         sections: dict[str, str],
@@ -147,6 +158,14 @@ class PaperQualityEvaluator:
                         dimension=dimension,
                     )
                 )
+        if self.coherence:
+            from .paper_coherence import PaperCoherenceChecker
+            coherence_findings = PaperCoherenceChecker().check(sections)
+            for item in coherence_findings:
+                if not any(existing.get("code") == item["code"] and existing.get("section_id") == item["section_id"]
+                           for existing in findings):
+                    findings.append(item)
+
         hard_pass = not any(item["severity"] in {"P0", "P1"} for item in findings)
         total = sum(dimensions.values()) / len(dimensions)
         return {
@@ -276,12 +295,19 @@ class RefinementService:
         workflow: WorkflowService,
         runs: RunManager,
         evaluator: PaperQualityEvaluator | None = None,
+        coherence: bool = False,
+        comparator: ExcellentPaperComparator | None = None,
     ) -> None:
         self.cases = cases
         self.artifacts = artifacts
         self.workflow = workflow
         self.runs = runs
-        self.evaluator = evaluator or PaperQualityEvaluator()
+        self.comparator = comparator
+        if evaluator is not None:
+            self.evaluator = evaluator
+        else:
+            # coherence=True → 注入 PaperCoherenceChecker 的 P2 发现作为打磨 issue
+            self.evaluator = PaperQualityEvaluator(coherence=coherence)
 
     def run(
         self,
@@ -289,9 +315,22 @@ class RefinementService:
         session_id: str | None,
         proposer: ProposalFunction | None,
         config: RefinementConfig | None = None,
+        focus_policy: StageFocusPolicy | None = None,
+        force_new_epoch: bool = False,
     ) -> dict[str, Any]:
+        """Run the refinement loop.
+
+        ``focus_policy`` (optional) enables the RNN-style hidden state: each
+        Stage is told which *focus* to work on (coherence → humanize →
+        figures/tables → notation/LaTeX → final polish) via the proposer
+        context, and the inter-stage hidden state is updated in place
+        (``refinement/hidden_state.json``). When ``None`` the loop behaves
+        exactly as before — hidden state is not written and existing tests are
+        unaffected.
+        """
         config = config or RefinementConfig()
         root = self.cases.case_root(case_id)
+        hidden = HiddenState(root, focus_policy) if focus_policy is not None else None
         controller = self.workflow.checkpoints.load(case_id)
         runtime = controller.runtimes["refinement_loop"]
         if runtime.status.value == "RUNNING" and runtime.active_run_id:
@@ -299,10 +338,16 @@ class RefinementService:
         else:
             started = self.workflow.start_node(case_id, "refinement_loop", session_id)
         try:
-            state, sections, frozen = self._load_or_initialize(case_id, config, started["run"]["run_id"])
+            state, sections, frozen = self._load_or_initialize(
+                case_id,
+                config,
+                started["run"]["run_id"],
+                force_new_epoch=force_new_epoch,
+            )
             self._reconcile_stage_commit(case_id, state)
             issues = IssueRegistry(root / "refinement" / "issues.jsonl")
             stop_reason = "MAX_STAGES"
+            stage_failures = 0
             while state["iteration"] < config.max_stages:
                 before = self.evaluator.evaluate(sections, frozen, config.targets)
                 current_issues = issues.update(before["findings"], state["iteration"])
@@ -316,7 +361,24 @@ class RefinementService:
                     stop_reason = "NO_PROPOSER"
                     break
                 stage = state["iteration"] + 1
-                result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config)
+                try:
+                    result = self._run_stage(case_id, session_id, stage, sections, frozen, state, before, selected, proposer, config, hidden)
+                except Exception as stage_error:
+                    # Stage-level failure (e.g., LLM timeout/budget) should not crash the loop.
+                    # Record the failure, increment iteration, and continue to next stage.
+                    stage_failures += 1
+                    append_jsonl(
+                        root / "refinement" / "history.jsonl",
+                        {"stage": stage, "error": f"{type(stage_error).__name__}: {stage_error}", "ts": now_iso()},
+                    )
+                    state["iteration"] = stage
+                    state["no_progress_streak"] = state.get("no_progress_streak", 0) + 1
+                    atomic_write_json(root / "memory" / "refinement_state.json", state)
+                    if stage_failures >= config.max_stage_failures:
+                        stop_reason = "TOO_MANY_STAGE_FAILURES"
+                        break
+                    continue
+                stage_failures = 0  # reset on success
                 effective_findings = result["findings_after"] if result["accepted"] else before["findings"]
                 current_issues = issues.update(effective_findings, stage)
                 issues.record_attempt(result["issue_ids"], stage, result["accepted"])
@@ -326,6 +388,17 @@ class RefinementService:
                     issue_id for issue_id, item in issues.current().items() if item.get("status") == "OPEN"
                 )
                 self._commit_stage(case_id, stage, result, next_state)
+                if hidden is not None:
+                    note = self._hidden_note(stage, result, before)
+                    hidden.record(
+                        stage=stage,
+                        accepted=result["accepted"],
+                        focus=hidden.focus_policy.focus_for(stage),
+                        quality_before=before,
+                        quality_after={"quality_vector": result.get("quality_after") or before["quality_vector"]},
+                        note=note,
+                        frozen={"evidence_digest": frozen.get("evidence", {}).get("digest")},
+                    )
                 state = next_state
                 if state["rejection_streak"] >= config.max_rejection_streak:
                     if state["strategy_reset_count"] == 0 and state["iteration"] < config.max_stages:
@@ -371,6 +444,7 @@ class RefinementService:
         case_id: str,
         config: RefinementConfig,
         run_id: str,
+        force_new_epoch: bool = False,
     ) -> tuple[dict[str, Any], dict[str, str], dict[str, Any]]:
         root = self.cases.case_root(case_id)
         state_path = root / "memory" / "refinement_state.json"
@@ -380,12 +454,26 @@ class RefinementService:
             frozen = read_json(root / "memory" / "frozen_facts.json")
             sections_artifact = self.artifacts.get(case_id, state["current_sections_artifact_id"])
             sections = read_json(root / sections_artifact["path"])["sections"]
-            if state["frozen_evidence_digest"] == self._evidence_digest(case_id):
+            current_evidence_digest = self._evidence_digest(case_id)
+            current_source_digest = self._source_sections_digest(root)
+            # Backward compatibility: older cases have no source digest. In
+            # that case preserve the historical evidence-only resume rule;
+            # every newly initialized epoch stores the source digest below.
+            source_matches = state.get("source_sections_digest", current_source_digest) == current_source_digest
+            evidence_matches = state["frozen_evidence_digest"] == current_evidence_digest
+            if evidence_matches and source_matches and not force_new_epoch:
                 return state, sections, frozen
             epoch = int(state.get("epoch", 1)) + 1
+            archive_reason = (
+                "outer workstation requested a fresh refinement epoch"
+                if force_new_epoch and evidence_matches and source_matches
+                else "frozen evidence digest changed"
+                if not evidence_matches
+                else "source paper changed"
+            )
             atomic_write_json(
                 root / "refinement" / "epochs" / f"epoch-{epoch - 1:03d}" / "final_state.json",
-                {**state, "archived_at": now_iso(), "archive_reason": "frozen evidence digest changed"},
+                {**state, "archived_at": now_iso(), "archive_reason": archive_reason},
             )
 
         manifest = read_json(root / "paper" / "sections" / "manifest.json")
@@ -416,6 +504,7 @@ class RefinementService:
             "current_paper_artifact_id": initial_artifact["artifact_id"],
             "current_sections_artifact_id": sections_artifact["artifact_id"],
             "frozen_evidence_digest": frozen["evidence"]["digest"],
+            "source_sections_digest": self._source_sections_digest(root),
             "quality_vector": evaluation["quality_vector"],
             "quality_ema": evaluation["quality_vector"]["total"],
             "accepted_stages": [],
@@ -452,6 +541,7 @@ class RefinementService:
         selected: list[dict[str, Any]],
         proposer: ProposalFunction,
         config: RefinementConfig,
+        hidden: HiddenState | None = None,
     ) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
         stage_root = _stage_root(root, int(state.get("epoch", 1)), stage)
@@ -508,7 +598,31 @@ class RefinementService:
                 },
                 "failed_strategies": state.get("failed_strategies", [])[-3:],
                 "current_paper_artifact_id": state["current_paper_artifact_id"],
+                "hidden": hidden.summary() if hidden is not None else None,
+                "excellent_ref": {},
             }
+            if self.comparator is not None:
+                try:
+                    focus = (
+                        hidden.summary().get("focus") if hidden is not None else None
+                    ) or "coherence"
+                    full_paper = "\n".join(sections.values())
+                    context["excellent_ref"] = self.comparator.report(full_paper, focus)
+                except Exception as comparator_error:
+                    context["excellent_ref"] = {}
+                    append_jsonl(
+                        root / "decisions.jsonl",
+                        {
+                            "timestamp": now_iso(),
+                            "event": "comparator_degraded",
+                            "focus": (
+                                hidden.summary().get("focus")
+                                if hidden is not None
+                                else "coherence"
+                            ),
+                            "error": f"{type(comparator_error).__name__}: {comparator_error}",
+                        },
+                    )
             atomic_write_json(pending_root / "input.json", context)
             atomic_write_json(pending_root / "evaluation.before.json", before)
             atomic_write_json(pending_root / "selection.json", {"issues": selected, "editable_sections": editable_ids})
@@ -591,6 +705,24 @@ class RefinementService:
         except Exception as error:
             self.runs.finish_run(case_id, run["run_id"], "FAILED", {"type": type(error).__name__, "message": str(error)})
             raise
+
+    @staticmethod
+    def _hidden_note(stage: int, result: dict[str, Any], before: dict[str, Any]) -> str:
+        """One-sentence LSTM-cell-state memory summary for the hidden state.
+
+        Summarises what this Stage did and where the paper stands, so the next
+        Stage knows what to focus on without re-reading the whole paper.
+        """
+        accepted = result["accepted"]
+        total_before = before["quality_vector"].get("total", 0.0)
+        total_after = result.get("quality_after") or before["quality_vector"].get("total", 0.0)
+        delta = round(total_after - total_before, 6)
+        status = "已接受" if accepted else "被拒绝"
+        return (
+            f"第 {stage} 次打磨({status}):质量 {total_before:.3f}→{total_after:.3f} "
+            f"(Δ{delta:+.3f})。焦点 {before.get('focus', 'coherence')} 处理完毕，"
+            f"下一步进入 {before.get('focus', 'coherence')} 的下一阶段。已冻结数字与证据。"
+        )
 
     def _apply_proposal(
         self,
@@ -762,6 +894,31 @@ class RefinementService:
             "sections": contracts,
             "evidence": {"digest": self._evidence_digest(case_id), "frozen_at": now_iso()},
         }
+
+    def _source_sections_digest(self, root: Path) -> str:
+        """Digest the current pre-refinement section drafts.
+
+        Outer workstation paper-only Rounds may rewrite prose while keeping the
+        numeric evidence identical. Evidence digest alone therefore cannot
+        decide whether an old refinement state is resumable: doing so would
+        silently publish the previous epoch's sections and discard the new
+        draft. This digest makes the source manuscript part of the epoch key.
+        """
+        manifest_path = root / "paper" / "sections" / "manifest.json"
+        if not manifest_path.is_file():
+            return _payload_digest({"sections": []})
+        manifest = read_json(manifest_path)
+        sections = []
+        for item in manifest.get("sections", []):
+            section_id = str(item["section_id"])
+            draft = root / "paper" / "sections" / section_id / "draft.md"
+            sections.append(
+                {
+                    "section_id": section_id,
+                    "sha256": sha256_file(draft) if draft.is_file() else None,
+                }
+            )
+        return _payload_digest({"sections": sections})
 
     def _evidence_digest(self, case_id: str) -> str:
         root = self.cases.case_root(case_id)

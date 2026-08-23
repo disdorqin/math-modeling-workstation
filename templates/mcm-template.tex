@@ -1,0 +1,244 @@
+% ===========================================================================
+% MCM/ICM Mathematical Contest in Modeling LaTeX Template
+% English paper format
+%
+% Format requirements:
+%   - Summary on separate page, max 1 page
+%   - Three-line tables (booktabs: toprule/midrule/bottomrule, 1.5pt, no vertical lines)
+%   - Table captions above, figure captions below
+%   - Figures at 600dpi, black-and-white distinguishable (line styles + legends)
+%   - Formulas centered, right-aligned numbering (only when referenced)
+%   - References 5-10, standard academic format
+%   - Times New Roman body + math
+%   - Margins 2.5cm
+%   - Body no more than 20 pages
+% ===========================================================================
+
+\documentclass[12pt,a4paper]{article}
+
+% ---------- Page setup: 2.5cm margins ----------
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
+
+% ---------- Font: Times New Roman ----------
+\usepackage{times}
+\usepackage[T1]{fontenc}
+
+% ---------- Three-line tables (booktabs, 1.5pt) ----------
+\usepackage{booktabs}
+\renewcommand{\toprule}{\specialrule{1.5pt}{0pt}{0pt}}
+\renewcommand{\midrule}{\specialrule{1.5pt}{0pt}{0pt}}
+\renewcommand{\bottomrule}{\specialrule{1.5pt}{0pt}{0pt}}
+
+% ---------- Mathematics ----------
+\usepackage{amsmath,amssymb}
+
+% ---------- Graphics ----------
+\usepackage{graphicx}
+\usepackage[font=small,labelfont=bf,labelsep=space]{caption}
+% Figure captions below figures (default)
+\captionsetup[figure]{position=below}
+% Table captions above tables
+\captionsetup[table]{position=above}
+
+% ---------- Hyperlinks ----------
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
+
+% ---------- References ----------
+\usepackage[numbers,sort&compress]{natbib}
+
+% ---------- Line spacing: 1.5 ----------
+\usepackage{setspace}
+\onehalfspacing
+
+% ---------- Appendix ----------
+\usepackage[titletoc]{appendix}
+
+% ---------- Code listings ----------
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+}
+
+% ===========================================================================
+% Paper information (fill in here)
+% ===========================================================================
+\newcommand{\mcmtitle}{Paper Title}
+\newcommand{\mcmkeywords}{keyword1; keyword2; keyword3; keyword4}
+
+% ===========================================================================
+% Document begins
+% ===========================================================================
+\begin{document}
+
+% ===================================================================
+% Summary page (separate page)
+% ===================================================================
+\begin{center}
+    {\Large\bfseries \mcmtitle}
+
+    \vspace{18pt}
+    {\large\bfseries Summary}
+\end{center}
+
+\vspace{6pt}
+
+% --- Notes ---
+% Summary requirements:
+%   1. Five elements: restatement / approach / model / results / conclusions
+%   2. 3-5 keywords
+%   3. No formulas, tables, or figures
+%   4. No more than 1 page
+
+This paper addresses the problem of \underline{\hspace{4cm}} by developing
+a \underline{\hspace{2cm}} model. First, \underline{\hspace{4cm}}.
+Then, \underline{\hspace{4cm}}. Finally, \underline{\hspace{4cm}}.
+
+The main results are as follows:
+\begin{enumerate}
+    \item Problem 1: \underline{\hspace{6cm}}
+    \item Problem 2: \underline{\hspace{6cm}}
+    \item Problem 3: \underline{\hspace{6cm}}
+\end{enumerate}
+
+\vspace{12pt}
+\noindent {\bfseries Keywords:} \mcmkeywords
+
+\newpage
+
+% ===================================================================
+% Body begins here (max 20 pages)
+% ===================================================================
+
+% ===================================================================
+% 1. Introduction
+% ===================================================================
+\section{Introduction}
+
+\subsection{Background}
+% Problem background
+
+\subsection{Problem Statement}
+% Specific problem statement
+
+\subsection{Objectives}
+% List of objectives
+
+% ===================================================================
+% 2. Assumptions and Justifications
+% ===================================================================
+\section{Assumptions and Justifications}
+
+\subsection{Basic Assumptions}
+\begin{itemize}
+    \item Data provided by the problem is authentic and reliable.
+    \item \underline{\hspace{6cm}}
+    \item \underline{\hspace{6cm}}
+\end{itemize}
+
+\subsection{Notation}
+% Use three-line table for notation
+\begin{table}[htbp]
+    \centering
+    \caption{Notation and Symbols}
+    \label{tab:symbols}
+    \begin{tabular}{ccc}
+        \toprule
+        Symbol & Description & Unit \\
+        \midrule
+        $x$ & \underline{\hspace{3cm}} & \underline{\hspace{2cm}} \\
+        $y$ & \underline{\hspace{3cm}} & \underline{\hspace{2cm}} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ===================================================================
+% 3. Model Development
+% ===================================================================
+\section{Model Development}
+
+\subsection{Model 1: \underline{\hspace{3cm}}}
+% Model construction
+% Formulas (centered, numbered only when referenced)
+% Solution method
+% Results
+% Results in three-line tables (caption above)
+
+\begin{table}[htbp]
+    \centering
+    \caption{Model 1 Results}
+    \label{tab:model1}
+    \begin{tabular}{ccc}
+        \toprule
+        Metric & Value & Notes \\
+        \midrule
+        \underline{\hspace{2cm}} & \underline{\hspace{2cm}} & \underline{\hspace{2cm}} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% Example formula (numbered only when referenced)
+\begin{equation}
+    y = f(x) = ax + b
+    \label{eq:linear}
+\end{equation}
+
+\subsection{Model 2: \underline{\hspace{3cm}}}
+% Model construction, solution, results
+
+% ===================================================================
+% 4. Model Evaluation
+% ===================================================================
+\section{Model Evaluation}
+
+\subsection{Strengths}
+\subsection{Weaknesses}
+\subsection{Potential Improvements}
+
+% ===================================================================
+% 5. Sensitivity Analysis
+% ===================================================================
+\section{Sensitivity Analysis}
+
+% ===================================================================
+% 6. Conclusions
+% ===================================================================
+\section{Conclusions}
+
+% ===================================================================
+% References (5-10 entries)
+% Standard academic format
+% ===================================================================
+\begin{thebibliography}{99}
+
+\bibitem{ref1} Author A, Author B. Article Title[J]. \textit{Journal Name}, Year, Volume(Issue): Pages.
+
+\bibitem{ref2} Author C. \textit{Book Title}[M]. Publisher Location: Publisher, Year.
+
+\bibitem{ref3} Author D. \textit{Dissertation Title}[D]. University, Year.
+
+\bibitem{ref4} Author E. Document Title[EB/OL]. URL, Access Date.
+
+\bibitem{ref5} Author F, Author G. Article Title[J]. \textit{Journal Name}, Year, Volume(Issue): Pages.
+
+\end{thebibliography}
+
+% ===================================================================
+% Appendix (separate page, include all runnable code)
+% ===================================================================
+\newpage
+\appendix
+\section{Appendix A: Program Code}
+
+% ------ Example code ------
+% \begin{lstlisting}[caption={Main Program},label=lst:main]
+% import numpy as np
+% import pandas as pd
+% # ... your code here
+% \end{lstlisting}
+
+\end{document}

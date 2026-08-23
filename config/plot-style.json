@@ -1,0 +1,264 @@
+{
+  "description": "数学建模论文统一绘图风格配置",
+  "version": "1.0.0",
+  "matplotlib": {
+    "font": {
+      "sans-serif": ["SimHei", "Microsoft YaHei", "Noto Sans SC", "DejaVu Sans"],
+      "serif": ["Times New Roman", "SimSun", "DejaVu Serif"],
+      "monospace": ["Courier New", "SimHei", "DejaVu Sans Mono"],
+      "size": 11,
+      "family": "sans-serif"
+    },
+    "axes": {
+      "unicode_minus": false,
+      "linewidth": 1.0,
+      "edgecolor": "#333333",
+      "grid": true,
+      "grid.linestyle": "--",
+      "labelsize": 12,
+      "titlesize": 14,
+      "titleweight": "bold",
+      "labelweight": "bold"
+    },
+    "figure": {
+      "dpi": 600,
+      "figsize": [8, 5],
+      "facecolor": "white",
+      "edgecolor": "white",
+      "titlesize": 16,
+      "titleweight": "bold"
+    },
+    "savefig": {
+      "dpi": 600,
+      "bbox_inches": "tight",
+      "facecolor": "white",
+      "edgecolor": "white",
+      "pad_inches": 0.1
+    },
+    "legend": {
+      "fontsize": 10,
+      "frameon": true,
+      "framealpha": 0.9,
+      "edgecolor": "#cccccc",
+      "loc": "best"
+    },
+    "xtick": {
+      "labelsize": 10,
+      "direction": "out"
+    },
+    "ytick": {
+      "labelsize": 10,
+      "direction": "out"
+    },
+    "lines": {
+      "linewidth": 2.0,
+      "markersize": 6
+    },
+    "hatch": {
+      "linewidth": 0.5,
+      "color": "#333333"
+    }
+  },
+  "colors": {
+    "palette": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"],
+    "primary": "#1f77b4",
+    "secondary": "#ff7f0e",
+    "success": "#2ca02c",
+    "danger": "#d62728",
+    "info": "#9467bd",
+    "grid": "#e0e0e0",
+    "text": "#333333",
+    "background": "#ffffff"
+  },
+  "linestyles": {
+    "cycle": ["-", "--", "-.", ":"],
+    "solid": "-",
+    "dashed": "--",
+    "dashdot": "-.",
+    "dotted": ":",
+    "description": "实线/虚线/点划线/点线循环，保证黑白打印可区分"
+  },
+  "markers": {
+    "cycle": ["o", "s", "^", "D", "v", "p", "*", "h", "+", "x"],
+    "description": "标记点循环，配合线型使用"
+  },
+  "figsize_presets": {
+    "distribution": [10, 6],
+    "heatmap": [8, 7],
+    "comparison": [10, 5],
+    "sensitivity": [8, 5],
+    "workflow": [16, 4.6],
+    "single": [8, 5],
+    "wide": [12, 5],
+    "tall": [8, 8]
+  },
+  "chart_templates": {
+    "histogram": {
+      "bins": 30,
+      "edgecolor": "white",
+      "linewidth": 0.5,
+      "alpha": 0.8
+    },
+    "bar": {
+      "width": 0.6,
+      "edgecolor": "white",
+      "linewidth": 0.5
+    },
+    "line": {
+      "linewidth": 2.0,
+      "marker": "o",
+      "markersize": 5,
+      "markerfacecolor": "white",
+      "markeredgecolor": "auto",
+      "markeredgewidth": 1.5
+    },
+    "scatter": {
+      "s": 50,
+      "alpha": 0.7,
+      "edgecolors": "white",
+      "linewidths": 0.5
+    },
+    "heatmap": {
+      "cmap": "RdBu_r",
+      "center": 0,
+      "annot": true,
+      "fmt": ".2f",
+      "linewidths": 0.5,
+      "linecolor": "white"
+    },
+    "boxplot": {
+      "showfliers": true,
+      "patch_artist": true,
+      "median_linewidth": 1.5
+    },
+    "time_series": {
+      "linewidth": 1.8,
+      "marker": null,
+      "confidence_alpha": 0.18
+    },
+    "radar": {
+      "fill_alpha": 0.16,
+      "linewidth": 1.7,
+      "marker": "o"
+    },
+    "state_transition": {
+      "cmap": "Blues",
+      "annot": true,
+      "fmt": ".2f",
+      "linewidths": 0.6
+    },
+    "association": {
+      "min_lift_reference": 1.0,
+      "edge_alpha": 0.65,
+      "node_size": 520
+    },
+    "ranking": {
+      "bar_height": 0.62,
+      "annotate_top_k": 5
+    },
+    "uncertainty": {
+      "interval_alpha": 0.18,
+      "capsize": 3,
+      "linewidth": 1.8
+    }
+  },
+  "publication_profiles": {
+    "CUMCM_C": {
+      "description": "Chinese mathematical-modeling competition paper: compact, print-safe, Chinese-label friendly.",
+      "palette": ["#3C5488", "#4DBBD5", "#00A087", "#E64B35", "#8491B4", "#91D1C2", "#F39B7F", "#7E6148"],
+      "figsize": {"single_column": [5.7, 3.8], "wide": [7.6, 4.5], "workflow": [8.3, 4.8]},
+      "rc": {
+        "font.family": "sans-serif",
+        "font.size": 9.5,
+        "axes.titlesize": 11.0,
+        "axes.labelsize": 9.5,
+        "axes.titleweight": "semibold",
+        "axes.labelweight": "normal",
+        "axes.grid": false,
+        "axes.linewidth": 0.8,
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 8.5,
+        "legend.fontsize": 8.2,
+        "legend.frameon": false,
+        "lines.linewidth": 1.6,
+        "lines.markersize": 4.5,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "svg.fonttype": "none",
+        "savefig.dpi": 600
+      }
+    },
+    "MCM_C": {
+      "description": "MCM/ICM paper: dense English summary, compact journal-like figures and restrained styling.",
+      "palette": ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#000000", "#999999"],
+      "figsize": {"single_column": [5.2, 3.35], "wide": [7.2, 4.1], "workflow": [8.0, 4.5]},
+      "rc": {
+        "font.family": "serif",
+        "font.size": 9.0,
+        "axes.titlesize": 10.5,
+        "axes.labelsize": 9.0,
+        "axes.titleweight": "semibold",
+        "axes.labelweight": "normal",
+        "axes.grid": false,
+        "axes.linewidth": 0.8,
+        "xtick.labelsize": 8.0,
+        "ytick.labelsize": 8.0,
+        "legend.fontsize": 8.0,
+        "legend.frameon": false,
+        "lines.linewidth": 1.5,
+        "lines.markersize": 4.2,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "svg.fonttype": "none",
+        "savefig.dpi": 600
+      }
+    },
+    "SCI_CLEAN": {
+      "description": "General publication-ready scientific profile inspired by SciencePlots/TUEplots principles without a hard dependency.",
+      "palette": ["#3B4CC0", "#B40426", "#008176", "#F2A900", "#7A5195", "#4C78A8", "#E45756", "#72B7B2"],
+      "figsize": {"single_column": [3.55, 2.45], "wide": [7.1, 3.2], "workflow": [7.1, 4.0]},
+      "rc": {
+        "font.family": "serif",
+        "font.size": 8.0,
+        "axes.titlesize": 9.0,
+        "axes.labelsize": 8.0,
+        "axes.titleweight": "normal",
+        "axes.labelweight": "normal",
+        "axes.grid": false,
+        "axes.linewidth": 0.7,
+        "xtick.labelsize": 7.0,
+        "ytick.labelsize": 7.0,
+        "legend.fontsize": 7.0,
+        "legend.frameon": false,
+        "lines.linewidth": 1.25,
+        "lines.markersize": 3.5,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "svg.fonttype": "none",
+        "savefig.dpi": 600
+      }
+    }
+  },
+  "figure_categories": {
+    "distribution": {
+      "target_section": "data_analysis",
+      "keywords": ["分布", "distribution", "histogram", "hist", "EDA", "numeric", "categorical", "correlation", "相关性", "热力图", "heatmap"],
+      "description": "数据分布图→数据分折章节"
+    },
+    "comparison": {
+      "target_section": "results",
+      "keywords": ["比较", "comparison", "对比", "模型", "model", "CV", "cross-validation", "cross", "验证", "bar", "柱状"],
+      "description": "模型对比图→结果章节"
+    },
+    "sensitivity": {
+      "target_section": "sensitivity",
+      "keywords": ["敏感", "sensitivity", "robust", "稳健", "fraction", "比例"],
+      "description": "敏感性分析图→敏感性章节"
+    },
+    "workflow": {
+      "target_section": "overview",
+      "keywords": ["流程", "workflow", "overview", "总览", "process", "flow", "pipeline", "步骤"],
+      "description": "工作流图→概述章节"
+    }
+  }
+}

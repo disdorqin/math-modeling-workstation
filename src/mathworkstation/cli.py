@@ -79,6 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--competition", required=True)
     create.add_argument("--title", required=True)
     create.add_argument("--language", default="zh")
+    create.add_argument("--problem-type", default=None, help="problem type (e.g. a, b, c) for structured directory")
+    create.add_argument("--year", type=int, default=None, help="competition year (e.g. 2024) for structured directory")
+    create.add_argument("--version", type=int, default=1, help="version number (default: 1)")
 
     commands.add_parser("list-cases", help="list active cases").add_argument(
         "--include-archived", action="store_true"
@@ -690,7 +693,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "create-case":
-            _print(cases.create_case(args.competition, args.title, args.language))
+            _print(cases.create_case(
+                args.competition, args.title, args.language,
+                problem_type=args.problem_type, year=args.year, version=args.version,
+            ))
         elif args.command == "list-cases":
             _print(cases.list_cases(args.include_archived))
         elif args.command == "show-case":

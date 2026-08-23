@@ -13,7 +13,7 @@ import pandas as pd
 from scipy import stats
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold, StratifiedKFold, cross_validate
+from sklearn.model_selection import KFold, StratifiedKFold, TimeSeriesSplit, cross_validate
 from sklearn.pipeline import Pipeline
 
 from .artifact_registry import ArtifactRegistry
@@ -25,7 +25,10 @@ from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso
 from .model_plan import ModelPlan
 from .paths import resolve_within
+from .plot_style import apply_style, get_colors, get_line_cycle, get_figsize, save_figure
 from .tabular import read_table
+
+apply_style()
 
 
 class ModelEvaluationEngine:
@@ -124,11 +127,18 @@ class ModelEvaluationEngine:
     ) -> dict[str, Any]:
         features = frame[plan.feature_columns]
         target = frame[plan.target_column]
-        splitter = (
-            KFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
-            if plan.task_type == "regression"
-            else StratifiedKFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
-        )
+        # Use time-ordered split for temporal data to prevent leakage
+        if plan.split_strategy == "time_ordered":
+            # Sort by temporal column if specified
+            if plan.temporal_column and plan.temporal_column in frame.columns:
+                sorted_indices = frame[plan.temporal_column].argsort(kind="mergesort")
+                features = features.iloc[sorted_indices].reset_index(drop=True)
+                target = target.iloc[sorted_indices].reset_index(drop=True)
+            splitter = TimeSeriesSplit(n_splits=plan.cv_folds)
+        elif plan.task_type == "classification":
+            splitter = StratifiedKFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
+        else:
+            splitter = KFold(plan.cv_folds, shuffle=True, random_state=plan.random_seed)
         scoring = _scoring(plan.task_type)
         model_results: dict[str, Any] = {}
         fitted_pipelines: dict[str, Pipeline] = {}
@@ -282,13 +292,18 @@ def _plot_comparison(plan: ModelPlan, results: dict[str, Any], path: Path) -> No
     names = list(results)
     means = [results[name][f"{plan.primary_metric}_mean"] for name in names]
     errors = [results[name][f"{plan.primary_metric}_std"] for name in names]
-    figure, axis = plt.subplots(figsize=(max(7, len(names) * 1.5), 5))
-    axis.bar(names, means, yerr=errors, capsize=5)
-    axis.set_ylabel(plan.primary_metric)
-    axis.set_title(f"{plan.cv_folds}-Fold Cross-Validation")
+    colors = get_colors()
+    figsize = get_figsize("comparison")
+    figure, axis = plt.subplots(figsize=(max(figsize[0], len(names) * 1.5), figsize[1]))
+    bars = axis.bar(names, means, yerr=errors, capsize=5,
+                    color=[colors[i % len(colors)] for i in range(len(names))],
+                    edgecolor="white", linewidth=0.5)
+    axis.set_ylabel(plan.primary_metric, fontweight="bold")
+    axis.set_title(f"{plan.cv_folds}-Fold Cross-Validation", fontweight="bold")
     axis.tick_params(axis="x", rotation=30)
+    axis.grid(True, axis="y", alpha=0.3, linestyle="--")
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 

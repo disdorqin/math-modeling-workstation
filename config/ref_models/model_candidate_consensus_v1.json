@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-22",
+  "purpose": "Evidence-first multi-agent candidate debate for mathematical-modeling routes. Agent opinion proposes what to test; executed validation remains the only authority for model adoption.",
+  "principles": [
+    "Do not reward novelty or complexity for their own sake.",
+    "Prefer a simpler route when two routes are comparably suitable, interpretable, and testable.",
+    "A downstream question should inherit an accepted upstream model unless the new state, constraint, or objective cannot be represented by that model.",
+    "A candidate with no executable solver may remain a research direction but cannot be promoted as the accepted model.",
+    "Qualitative agent consensus determines experiment priority, never fabricated performance or final paper claims."
+  ],
+  "review_dimensions": {
+    "task_fit": 0.24,
+    "data_support": 0.22,
+    "interpretability": 0.16,
+    "constraint_fit": 0.16,
+    "robustness_plan": 0.14,
+    "computational_cost": 0.08
+  },
+  "complexity_tiebreak": {
+    "enabled": true,
+    "equivalence_band": 0.05,
+    "minimum_complexity_advantage": 0.15
+  },
+  "minimum_distinct_reviewers": 2,
+  "agent_roles": [
+    {
+      "role": "baseline_modeler",
+      "mandate": "Find the simplest defensible model that directly answers the subproblem and can be validated."
+    },
+    {
+      "role": "alternative_modeler",
+      "mandate": "Propose a materially different route only when it addresses a concrete weakness, missing constraint, or data structure."
+    },
+    {
+      "role": "critic",
+      "mandate": "Attack assumptions, leakage, unsupported complexity, identifiability, constraint omissions, and weak validation."
+    },
+    {
+      "role": "adjudicator",
+      "mandate": "Convert debate into a shortlist and falsification plan; do not claim a winner before executed comparison evidence exists."
+    }
+  ]
+}

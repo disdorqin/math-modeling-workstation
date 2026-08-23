@@ -1,0 +1,385 @@
+{
+  "schema_version": 2,
+  "description": "HMML-style hierarchical modeling method catalog. 融合AI-Skills出售版(MIT License)的数学建模方法卡片。LLM 模型方案生成时只能从这里选择受支持模型，禁止自由发挥目录之外的模型。权威支持集见 src/mathworkstation/model_plan.py。",
+  "attribution": "融合来源：数学建模全流程AI-Skills出售版 model_cards (MIT License, Copyright 2026)",
+  "task_types": {
+    "regression": {
+      "allowed_models": ["linear", "ridge", "lasso", "elastic_net", "random_forest", "gradient_boosting"],
+      "allowed_metrics": ["rmse", "mae", "r2"]
+    },
+    "classification": {
+      "allowed_models": ["logistic", "random_forest", "gradient_boosting", "svm"],
+      "allowed_metrics": ["macro_f1", "accuracy", "auc_roc"]
+    },
+    "optimization": {
+      "allowed_models": ["linear_programming", "integer_programming", "nonlinear_optimization", "dynamic_programming"],
+      "allowed_metrics": ["optimal_value", "shadow_price"]
+    },
+    "interpolation": {
+      "allowed_models": ["interpolation"],
+      "allowed_metrics": ["rmse", "mae", "max_abs_error"]
+    },
+    "stochastic_process": {
+      "allowed_models": ["markov_chain"],
+      "allowed_metrics": ["stationary_distribution", "absorbing_probability"]
+    },
+    "graph_optimization": {
+      "allowed_models": ["graph_network"],
+      "allowed_metrics": ["shortest_path_length", "max_flow", "min_cost"]
+    },
+    "differential_equation": {
+      "allowed_models": ["ode_modeling"],
+      "allowed_metrics": ["residual_error", "solution_convergence"]
+    },
+    "evaluation": {
+      "allowed_models": ["ahp", "entropy_weight", "topsis", "entropy_topsis"],
+      "allowed_metrics": ["cr", "entropy", "closeness_coefficient"]
+    },
+    "prediction": {
+      "allowed_models": ["gm11", "time_series_arima", "moving_average", "exponential_smoothing", "holt_winters"],
+      "allowed_metrics": ["mape", "rmse", "mae"]
+    },
+    "clustering": {
+      "allowed_models": ["kmeans", "dbscan"],
+      "allowed_metrics": ["silhouette", "davies_bouldin"]
+    },
+    "dimension_reduction": {
+      "allowed_models": ["pca"],
+      "allowed_metrics": ["variance_explained"]
+    },
+    "simulation": {
+      "allowed_models": ["monte_carlo"],
+      "allowed_metrics": ["convergence_error", "ci_width"]
+    },
+    "queueing": {
+      "allowed_models": ["mm1", "mmc"],
+      "allowed_metrics": ["utilization", "avg_waiting_time", "p95_waiting_time"]
+    },
+    "correlation_analysis": {
+      "allowed_models": ["grey_relation"],
+      "allowed_metrics": ["grey_relational_grade"]
+    }
+  },
+  "methods": [
+    {
+      "name": "linear",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "普通最小二乘线性回归。特征与目标近似线性时优先；简单、可解释、是默认基线。",
+      "equation": "y = wᵀx + b + ε",
+      "key_parameters": {},
+      "when_to_use": "特征少、共线性低、需要可解释系数",
+      "when_not_to_use": "特征强共线、严重离群值、特征数>样本数"
+    },
+    {
+      "name": "ridge",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "L2 正则线性回归，缓解共线性与过拟合。",
+      "equation": "min_w ||y - Xw||² + α||w||²",
+      "key_parameters": {"alpha": 1.0},
+      "when_to_use": "存在多重共线性（如强相关特征对）",
+      "when_not_to_use": "需要特征稀疏解"
+    },
+    {
+      "name": "lasso",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "L1 正则线性回归，倾向稀疏解，可做特征选择。",
+      "equation": "min_w ||y - Xw||² + α||w||₁",
+      "key_parameters": {"alpha": 1.0},
+      "when_to_use": "特征多、希望自动筛选重要特征",
+      "when_not_to_use": "特征强相关时解不稳定（选岭回归）"
+    },
+    {
+      "name": "elastic_net",
+      "family": "linear",
+      "task_types": ["regression"],
+      "description": "L1+L2 混合正则，兼具 lasso 稀疏性与 ridge 稳定性。",
+      "equation": "min_w ||y - Xw||² + α·l1_ratio·||w||₁ + α(1-l1_ratio)||w||²",
+      "key_parameters": {"alpha": 1.0, "l1_ratio": 0.5},
+      "when_to_use": "特征强相关且希望稀疏，lasso 不稳定时",
+      "when_not_to_use": "特征少且线性良好（直接用 linear）"
+    },
+    {
+      "name": "random_forest",
+      "family": "tree",
+      "task_types": ["regression", "classification"],
+      "description": "随机森林，集成决策树，可处理非线性与特征交互。",
+      "equation": "ŷ = (1/T) Σₜ fₜ(x)",
+      "key_parameters": {"n_estimators": 200, "random_state": 42},
+      "when_to_use": "非线性关系、特征交互、对可解释性要求不高",
+      "when_not_to_use": "小样本、需要精确概率校准、强线性可解释需求"
+    },
+    {
+      "name": "gradient_boosting",
+      "family": "tree",
+      "task_types": ["regression", "classification"],
+      "description": "梯度提升树，逐步拟合残差，精度通常最高但需调参。",
+      "equation": "Fₘ(x) = Fₘ₋₁(x) + η·hₘ(x)",
+      "key_parameters": {"random_state": 42},
+      "when_to_use": "数据量大、追求最高精度、有调参预算",
+      "when_not_to_use": "小样本（易过拟合）、解释性优先"
+    },
+    {
+      "name": "logistic",
+      "family": "linear",
+      "task_types": ["classification"],
+      "description": "逻辑回归，输出类别概率，线性决策边界。",
+      "equation": "P(y=1|x) = σ(wᵀx + b)",
+      "key_parameters": {"max_iter": 2000, "random_state": 42},
+      "when_to_use": "二分类、需概率输出与可解释系数、线性可分",
+      "when_not_to_use": "强非线性决策边界"
+    },
+    {
+      "name": "svm",
+      "family": "kernel",
+      "task_types": ["classification"],
+      "description": "支持向量机，通过核函数在高维空间寻找最优分类超平面，适合高维中小样本。",
+      "equation": "min (1/2)||w||² + C Σ ξᵢ, s.t. yᵢ(wᵀφ(xᵢ)+b) ≥ 1-ξᵢ",
+      "key_parameters": {"C": 1.0, "kernel": "rbf", "random_state": 42},
+      "when_to_use": "高维特征（文本/图像）、类别边界复杂、中小样本",
+      "when_not_to_use": "大样本训练慢、参数敏感需要调参"
+    },
+    {
+      "name": "linear_programming",
+      "family": "optimization",
+      "task_types": ["optimization"],
+      "description": "线性规划：目标函数和约束均线性，用于资源分配、排产、配送和调度问题。",
+      "equation": "min cᵀx  s.t. A_ub x ≤ b_ub, A_eq x = b_eq, lb ≤ x ≤ ub",
+      "key_parameters": {},
+      "when_to_use": "所有关系线性、决策变量连续、需要最优资源分配",
+      "when_not_to_use": "目标或约束含非线性项、变量必为整数"
+    },
+    {
+      "name": "integer_programming",
+      "family": "optimization",
+      "task_types": ["optimization"],
+      "description": "整数规划/0-1规划：决策变量必为整数或0-1的组合优化问题（选址、排班、任务分配、背包问题）。",
+      "equation": "min cᵀx  s.t. A x ≤ b, x ≥ 0, xᵢ ∈ ℤ (或 xᵢ ∈ {0,1})",
+      "key_parameters": {},
+      "when_to_use": "决策为离散选择（选/不选）、需要整数解的组合优化",
+      "when_not_to_use": "变量本质连续取整只是近似（用线性规划）、规模极大（NP-hard）"
+    },
+    {
+      "name": "nonlinear_optimization",
+      "family": "optimization",
+      "task_types": ["optimization"],
+      "description": "非线性规划：目标函数或约束含非线性项。需要KKT条件验证，非凸问题需多起点策略。",
+      "equation": "min f(x)  s.t. gᵢ(x) ≤ 0, hⱼ(x) = 0, lb ≤ x ≤ ub",
+      "key_parameters": {"method": "SLSQP"},
+      "when_to_use": "目标/约束含乘积、指数等非线性项",
+      "when_not_to_use": "目标和约束均线性（用线性规划更高效）"
+    },
+    {
+      "name": "ahp",
+      "family": "evaluation",
+      "task_types": ["evaluation"],
+      "description": "层次分析法：基于Saaty 1-9标度的成对比较矩阵，计算指标权重和一致性检验（CR<0.1）。",
+      "equation": "A w = λ_max w,  CI = (λ_max-n)/(n-1),  CR = CI/RI",
+      "key_parameters": {"scale": "saaty_1_9", "cr_threshold": 0.1},
+      "when_to_use": "专家主观判断驱动的多准则权重、缺乏客观数据时",
+      "when_not_to_use": "判断矩阵无可靠依据、指标数>9、已有客观数据时优先用熵权法"
+    },
+    {
+      "name": "entropy_weight",
+      "family": "evaluation",
+      "task_types": ["evaluation"],
+      "description": "熵权法：用数据离散程度客观确定指标权重，避免主观赋权偏差。常与TOPSIS组合使用。",
+      "equation": "eⱼ = -k Σ pᵢⱼ ln(pᵢⱼ),  dⱼ = 1-eⱼ,  wⱼ = dⱼ/Σ dⱼ",
+      "key_parameters": {"epsilon": 1e-12},
+      "when_to_use": "数据驱动赋权、指标间差异明显、与TOPSIS组合",
+      "when_not_to_use": "样本量<5（统计不可靠）、全等列（需人工处理）"
+    },
+    {
+      "name": "topsis",
+      "family": "evaluation",
+      "task_types": ["evaluation"],
+      "description": "TOPSIS：基于与正负理想解欧氏距离的多指标评价排序，需要已知权重（可由熵权或AHP确定）。",
+      "equation": "Cᵢ = D⁻ᵢ / (D⁺ᵢ + D⁻ᵢ),  D⁺ᵢ = sqrt(Σ(vᵢⱼ-V⁺ⱼ)²),  Cᵢ ∈ [0,1]",
+      "key_parameters": {},
+      "when_to_use": "多指标评价排序、指标有明确方向、权重已知",
+      "when_not_to_use": "指标方向不清、权重无依据、对象<3个"
+    },
+    {
+      "name": "entropy_topsis",
+      "family": "evaluation",
+      "task_types": ["evaluation"],
+      "description": "熵权-TOPSIS组合：先用熵权法自动确定权重，再用TOPSIS排序，减少主观性。",
+      "equation": "w = entropy_weight(X), C = TOPSIS(X, w)",
+      "key_parameters": {},
+      "when_to_use": "需要客观综合排名、暂无专家赋权来源",
+      "when_not_to_use": "业务上某些指标主观权重至关重要"
+    },
+    {
+      "name": "gm11",
+      "family": "prediction",
+      "task_types": ["prediction"],
+      "description": "GM(1,1)灰色预测：小样本(4-20点)、单调序列短期外推，适合年度统计/小样本消耗量预测。",
+      "equation": "X̂¹(k+1) = (x⁰(1)-b/a) exp(-a·k) + b/a,  [a,b]ᵀ = (BᵀB)⁻¹BᵀY",
+      "key_parameters": {"periods": 3},
+      "when_to_use": "样本4-20点、序列单调递增、短期趋势外推",
+      "when_not_to_use": "含负数或零、非单调波动大、数据>30点（用回归/时序）"
+    },
+    {
+      "name": "time_series_arima",
+      "family": "prediction",
+      "task_types": ["prediction"],
+      "description": "ARIMA模型：统计时序预测，需差分d次使序列平稳，通过ACF/PACF确定p,q。",
+      "equation": "φ(B) Δᵈ y(t) = θ(B) ε(t),  Δ = 差分算子",
+      "key_parameters": {"p": 1, "d": 0, "q": 0},
+      "when_to_use": "数据量≥15点、时序规律明显、需统计检验支撑",
+      "when_not_to_use": "序列极短(<6点用GM11)、非平稳且无法差分、外部突变主导"
+    },
+    {
+      "name": "exponential_smoothing",
+      "family": "prediction",
+      "task_types": ["prediction"],
+      "description": "指数平滑：α权衡近期vs历史，适合有趋势的平稳序列。",
+      "equation": "ŷ(t) = α·y(t-1) + (1-α)·ŷ(t-1),  α ∈ (0,1]",
+      "key_parameters": {"alpha": 0.3},
+      "when_to_use": "平稳序列、需要简单可调的预测",
+      "when_not_to_use": "季节性明显的序列（用Holt-Winters）"
+    },
+    {
+      "name": "holt_winters",
+      "family": "prediction",
+      "task_types": ["prediction"],
+      "description": "Holt-Winters：含趋势+季节性的三参数指数平滑。",
+      "equation": "level: ℓₜ=α(yₜ-sₜ₋ₚ)+(1-α)(ℓₜ₋₁+bₜ₋₁),  trend: bₜ=β(ℓₜ-ℓₜ₋₁)+(1-β)bₜ₋₁,  season: sₜ=γ(yₜ-ℓₜ)+(1-γ)sₜ₋ₚ",
+      "key_parameters": {"alpha": 0.2, "beta": 0.1, "gamma": 0.1, "period": 12},
+      "when_to_use": "时序含明显周期性和趋势",
+      "when_not_to_use": "无周期性或周期长度不确定"
+    },
+    {
+      "name": "moving_average",
+      "family": "prediction",
+      "task_types": ["prediction"],
+      "description": "移动平均：窗口平滑降噪，适合平稳序列的趋势提取。",
+      "equation": "ŷ(t) = (1/w) Σᵢ₌₁ʷ y(t-i)",
+      "key_parameters": {"window": 3},
+      "when_to_use": "平稳序列、快速去噪",
+      "when_not_to_use": "需要参数估计和显著性检验的场景"
+    },
+    {
+      "name": "kmeans",
+      "family": "clustering",
+      "task_types": ["clustering"],
+      "description": "K-Means聚类：最小化簇内方差，需预设k。用肘部法则或轮廓系数确定簇数。",
+      "equation": "min Σₖ Σₓ∈Cₖ ||x - μₖ||²",
+      "key_parameters": {"n_clusters": 3, "random_state": 42},
+      "when_to_use": "无标签分组、用户画像、区域划分",
+      "when_not_to_use": "已有标签（用分类）、非凸簇形状、需要自动识别噪声（用DBSCAN）"
+    },
+    {
+      "name": "dbscan",
+      "family": "clustering",
+      "task_types": ["clustering"],
+      "description": "DBSCAN：基于密度的聚类，自动识别任意形状簇和噪声点（标签=-1）。",
+      "equation": "核心点：|N_ε(x)| ≥ min_pts, 密度可达定义簇",
+      "key_parameters": {"eps": 0.5, "min_samples": 5},
+      "when_to_use": "簇形状任意、需要识别异常点/噪声",
+      "when_not_to_use": "密度差异大的簇、高维数据（距离失效）"
+    },
+    {
+      "name": "pca",
+      "family": "dimension_reduction",
+      "task_types": ["dimension_reduction", "evaluation"],
+      "description": "主成分分析：高维指标降维，消除多重共线性，计算综合得分，可视化。需先标准化，累计方差贡献率≥85%。",
+      "equation": "Σ vₖ = λₖ vₖ,  λ₁ ≥ λ₂ ≥ ... ≥ λₚ,  Z = X̃ V_r,  Score = Σ(λₖ/Σλ)·Zₖ",
+      "key_parameters": {"variance_threshold": 0.85},
+      "when_to_use": "高维降维、消除共线性、综合评价排名、为其他模型做预处理",
+      "when_not_to_use": "解释性要求极高（主成分含义不直观）、非线性结构"
+    },
+    {
+      "name": "monte_carlo",
+      "family": "simulation",
+      "task_types": ["simulation"],
+      "description": "蒙特卡洛模拟：通过大量随机采样估计输出分布和风险概率，用于利润/成本风险分析、可靠性评估、情景模拟。",
+      "equation": "(1/N) Σ f(Xᵢ) → E[f(X)],  SE = σ_f/√N",
+      "key_parameters": {"n_iterations": 10000, "random_seed": 42},
+      "when_to_use": "输入含随机性、需要估计输出分布和风险概率",
+      "when_not_to_use": "已有解析解、单次模拟极长、参数分布完全未知"
+    },
+    {
+      "name": "mm1",
+      "family": "queueing",
+      "task_types": ["queueing"],
+      "description": "M/M/1排队模型：泊松到达/指数服务/单服务台，分析等待时间和系统利用率。",
+      "equation": "ρ=λ/μ<1, L=ρ/(1-ρ), Lq=ρ²/(1-ρ), W=1/(μ-λ), Wq=ρ/(μ-λ) (Little定律)",
+      "key_parameters": {"arrival_rate": 1.0, "service_rate": 1.5},
+      "when_to_use": "泊松到达/指数服务/单服务台（窗口服务、呼叫中心）",
+      "when_not_to_use": "ρ≥1(不稳定)、非M/M/1假设、多服务台(用M/M/c)"
+    },
+    {
+      "name": "mmc",
+      "family": "queueing",
+      "task_types": ["queueing"],
+      "description": "M/M/c排队模型：多服务台排队系统，适合有多个服务通道的场景。",
+      "equation": "ρ = λ/(c·μ) < 1, Erlang C公式确定等待概率",
+      "key_parameters": {"arrival_rate": 1.0, "service_rate": 1.0, "servers": 2},
+      "when_to_use": "多服务台（多窗口、多设备并行）",
+      "when_not_to_use": "非泊松到达或非指数服务、优先级队列"
+    },
+    {
+      "name": "grey_relation",
+      "family": "correlation",
+      "task_types": ["correlation_analysis"],
+      "description": "灰色关联分析(GRA)：小样本多序列相似性量化，找出与参考序列最相关的因素。适合4-20个对象的影响因素排序。",
+      "equation": "γᵢ(k) = (Δ_min + ρΔ_max)/(Δᵢ(k) + ρΔ_max),  rᵢ = (1/n) Σ γᵢ(k)",
+      "key_parameters": {"rho": 0.5},
+      "when_to_use": "小样本影响因素排序（4-20对象）、与目标变量的趋势相似性分析",
+      "when_not_to_use": "样本量>30(用Pearson/Spearman)、把关联当因果"
+    },
+    {
+      "name": "dynamic_programming",
+      "family": "optimization",
+      "task_types": ["optimization"],
+      "description": "动态规划(DP)：多阶段决策问题的全局最优求解（Bellman最优性原理）。逆序递推，将多阶段问题化为单阶段递推求解。",
+      "equation": "f_k(s_k) = opt_{u_k ∈ D_k} { v_k(s_k, u_k) + f_{k+1}(s_{k+1}) },  终端 f_N = 0",
+      "key_parameters": {},
+      "when_to_use": "最短路线、生产计划、资源分配、背包问题等可拆成多阶段递推的问题",
+      "when_not_to_use": "状态空间维数灾难(高维DP)、最优策略不满足无后效性"
+    },
+    {
+      "name": "interpolation",
+      "family": "interpolation",
+      "task_types": ["interpolation"],
+      "description": "插值与拟合：由已知数据点构造连续曲线。插值要求曲线严格过数据点（拉格朗日/牛顿/分段线性/Hermite/三次样条），拟合按最小二乘准则逼近（多项式/指数等）。",
+      "equation": "拉格朗日: L_n(x) = Σ yᵢ lᵢ(x); 三次样条 S(x) 分段三次多项式且 C² 连续; 拟合: min Σ (y_i - φ(x_i))²",
+      "key_parameters": {"method": "cubic_spline"},
+      "when_to_use": "数据点可靠需还原连续曲线、绘图平滑、数值求导积分；噪声数据用拟合而非插值",
+      "when_not_to_use": "高次多项式插值(龙格现象)、数据噪声大、样本量足够时优先机器学习"
+    },
+    {
+      "name": "markov_chain",
+      "family": "stochastic_process",
+      "task_types": ["stochastic_process"],
+      "description": "马氏链模型：无后效性随机序列的状态转移分析。用转移概率矩阵刻画状态演化，求 n 步转移概率与稳态分布。",
+      "equation": "P(X_{n+1}=j|X_n=i,...)=P(X_{n+1}=j|X_n=i);  π^(n+1)=π^(n)P;  稳态: πP=π, Σπ=1",
+      "key_parameters": {"states": null},
+      "when_to_use": "随机过程满足无后效性：随机游走、库存、天气、销售份额、人口结构等",
+      "when_not_to_use": "状态依赖历史多步(非一阶)、转移概率时变或由外部干预决定"
+    },
+    {
+      "name": "graph_network",
+      "family": "graph_optimization",
+      "task_types": ["graph_optimization"],
+      "description": "图与网络优化：最短路(标号法/Floyd)、最小生成树、最大流/最小费用流、中国邮递员问题、TSP 等，将实际问题抽象为图/网络上的组合优化。",
+      "equation": "最短路: min Σ w(e); 最大流: max v(f) s.t. 0≤f≤c; 最小费用流: min Σ c(e)f(e)",
+      "key_parameters": {},
+      "when_to_use": "道路网络最短路、物流配送、通信网络流、布线等图结构上的决策问题",
+      "when_not_to_use": "连续决策变量为主的问题(用规划/DP)、图规模极大且无有效算法"
+    },
+    {
+      "name": "ode_modeling",
+      "family": "differential_equation",
+      "task_types": ["differential_equation"],
+      "description": "微分方程建模：用常/偏微分方程(初值问题)描述系统动态演化。建模手段含直接列方程、微元分析法、模拟近似；求解用数值方法(四阶龙格-库塔)。",
+      "equation": "dy/dt = f(t, y),  y(t₀) = y₀;  四阶RK: y_{n+1} = y_n + h/6 (k₁+2k₂+2k₃+k₄)",
+      "key_parameters": {"solver": "rk4"},
+      "when_to_use": "系统演化规律由机理决定(人口增长、传染病、战争模型、动力学、生态捕食)",
+      "when_not_to_use": "机理未知纯数据驱动(用统计/机器学习)、变量离散或需整期决策(用规划/DP)"
+    }
+  ]
+}

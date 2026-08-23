@@ -67,3 +67,38 @@ def test_outline_accepts_windows_utf8_bom(tmp_path: Path) -> None:
         FigureRegistry(cases, artifacts),
     ).validate_file(case["case_id"], source)
     assert result["outline_artifact_id"]
+
+
+def _section_ids(outline) -> list[str]:
+    return [s.section_id for s in outline.sections]
+
+
+def test_contest_letter_c_does_not_imply_timeseries_or_momentum() -> None:
+    outline = default_outline("C 题论文", "MCM-C", problem_type="c")
+    ids = _section_ids(outline)
+    assert "timeseries_analysis" not in ids
+    assert "momentum_analysis" not in ids
+
+
+def test_semantic_forecasting_adds_timeseries_without_momentum() -> None:
+    outline = default_outline(
+        "时序 C 题论文",
+        "MCM-C",
+        problem_type="c",
+        task_families=["forecasting"],
+        domain_signals=["forecast the temporal evolution of demand"],
+    )
+    ids = _section_ids(outline)
+    assert "timeseries_analysis" in ids
+    assert "momentum_analysis" not in ids
+
+
+def test_explicit_momentum_semantics_adds_momentum_section() -> None:
+    outline = default_outline(
+        "网球势头论文",
+        "MCM-C",
+        task_families=["explanatory_inference"],
+        domain_signals=["test whether momentum changes during a tennis match"],
+    )
+    ids = _section_ids(outline)
+    assert "momentum_analysis" in ids

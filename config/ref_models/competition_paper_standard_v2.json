@@ -1,0 +1,267 @@
+{
+  "schema_version": 2,
+  "updated_at": "2026-08-22",
+  "scope": "C_PROBLEM_PRIMARY",
+  "purpose": "Machine-readable separation of official hard constraints, excellent-paper soft priors, task-specific evidence rules, and human visual preferences for MCM-C and CUMCM-C paper generation.",
+  "research_refresh_policy": {
+    "required_before_each_v3_stage": true,
+    "sources": [
+      "local_excellent_c_corpus",
+      "current_official_competition_rules",
+      "mature_open_source_research_agents"
+    ],
+    "sequence": [
+      "local_prior_refresh",
+      "official_rule_refresh",
+      "github_architecture_refresh",
+      "divergence_memo",
+      "plan_adjustment",
+      "implementation",
+      "real_problem_gate"
+    ]
+  },
+  "profiles": {
+    "CUMCM_C": {
+      "competition": "CUMCM",
+      "language": "zh",
+      "official_hard_constraints": {
+        "source_name": "全国大学生数学建模竞赛论文格式规范（2026年修订稿）",
+        "source_date": "2026-03-03",
+        "paper_size": "A4",
+        "minimum_margin_cm": 2.5,
+        "abstract_max_pages": 1,
+        "abstract_includes_title_and_keywords": true,
+        "body_max_pages": 30,
+        "table_of_contents": "FORBIDDEN",
+        "appendix_page_limit": null,
+        "identity_information_forbidden": true,
+        "references_required_for_external_sources": true,
+        "electronic_formats": ["PDF", "Word"],
+        "preferred_electronic_format": "PDF",
+        "electronic_first_page": "abstract_special_page",
+        "electronic_excludes_commitment_and_number_pages": true,
+        "electronic_body_starts_after_abstract_page": true,
+        "paper_file_max_mb": 20,
+        "support_archive_max_mb": 20,
+        "runnable_source_code_required_when_used": true,
+        "officially_fixed_font": false,
+        "officially_fixed_font_size": false,
+        "officially_fixed_line_spacing": false,
+        "officially_fixed_color_scheme": false
+      },
+      "ai_use_hard_constraints": {
+        "source_name": "全国大学生数学建模竞赛人工智能工具使用规定（2026年试行）",
+        "source_date": "2026-08-03",
+        "effective_date": "2026-09-01",
+        "ai_allowed": true,
+        "core_modeling_should_be_team_led": true,
+        "manual_review_of_ai_content_required": true,
+        "declaration_before_references_required": true,
+        "supporting_ai_usage_pdf_required_if_used": true,
+        "supporting_ai_usage_filename": "Details of AI Tool Usage.pdf",
+        "required_usage_details": [
+          "tool_name_and_version",
+          "purpose_and_stage",
+          "principal_prompting_approach_and_process",
+          "adoption_manual_modification_and_verification"
+        ]
+      },
+      "soft_structural_priors": {
+        "prefer_core_model_plus_extensions": true,
+        "later_questions_should_reuse_earlier_state_when_semantically_dependent": true,
+        "new_model_requires_explicit_semantic_or_empirical_justification": true,
+        "prefer_problem_specific_representation_before_generic_algorithm": true,
+        "prefer_simple_interpretable_model_when_evidence_is_comparable": true,
+        "quantified_answers_should_appear_in_high_visibility_sections_when_supported": true,
+        "validation_must_match_claim_type": true
+      },
+      "formula_budget": {
+        "A_core": [
+          "decision_or_state_variables",
+          "core_relation_or_state_transition",
+          "objective_function",
+          "key_constraints",
+          "essential_estimation_or_solution_rule"
+        ],
+        "B_optional_standard": [
+          "common_error_metric_definition",
+          "common_normalization_formula",
+          "standard_correlation_definition",
+          "routine_textbook_formula"
+        ],
+        "C_appendix_preferred": [
+          "long_intermediate_derivation",
+          "large_matrix_expansion",
+          "routine_solver_algebra",
+          "nonessential_proof_detail"
+        ]
+      },
+      "visual_priors": {
+        "workflow_is_optional_not_quota": true,
+        "figure_role_routing_required": true,
+        "avoid_single_palette_monotony": true,
+        "avoid_bar_line_only_figure_set": true,
+        "prefer_low_saturation_academic_palette": true,
+        "multi_panel_figures_allowed_when_argument_supports_it": true,
+        "visual_reference_source": "user_provided_excellent_modeling_paper_examples_plus_local_corpus",
+        "current_local_visual_statistics_reliability": "PARTIAL_SCAN_LIMITED"
+      }
+    },
+    "MCM_C": {
+      "competition": "MCM_ICM",
+      "language": "en",
+      "official_hard_constraints": {
+        "source_name": "COMAP 2026 Contest Rules, Registration and Instructions",
+        "source_year": 2026,
+        "submission_format": "PDF",
+        "paper_language": "English",
+        "minimum_font_pt": 12,
+        "total_page_limit": 25,
+        "page_limit_includes": [
+          "Summary Sheet",
+          "Solution",
+          "Reference List",
+          "Table of Contents",
+          "Notes",
+          "Appendices",
+          "Code",
+          "problem_specific_requirements"
+        ],
+        "summary_sheet_first_page": true,
+        "identity_information_forbidden": true,
+        "pdf_max_mb": 25,
+        "outside_sources_must_be_documented": true
+      },
+      "soft_structural_priors": {
+        "summary_is_high_priority": true,
+        "prefer_core_model_plus_extensions": true,
+        "later_questions_should_reuse_earlier_state_when_semantically_dependent": true,
+        "new_model_requires_explicit_semantic_or_empirical_justification": true,
+        "prefer_problem_specific_representation_before_generic_algorithm": true,
+        "prefer_simple_interpretable_model_when_evidence_is_comparable": true,
+        "validation_must_match_claim_type": true,
+        "prompt_specific_deliverables_only": true
+      },
+      "formula_budget": {
+        "A_core": [
+          "decision_or_state_variables",
+          "core_relation_or_state_transition",
+          "objective_function",
+          "key_constraints",
+          "essential_estimation_or_solution_rule"
+        ],
+        "B_optional_standard": [
+          "common_error_metric_definition",
+          "common_normalization_formula",
+          "standard_correlation_definition",
+          "routine_textbook_formula"
+        ],
+        "C_appendix_preferred": [
+          "long_intermediate_derivation",
+          "large_matrix_expansion",
+          "routine_solver_algebra",
+          "nonessential_proof_detail"
+        ]
+      },
+      "visual_priors": {
+        "modern_local_paper_count": 217,
+        "modern_local_text_parsed": 144,
+        "modern_local_visual_only": 73,
+        "figure_purpose_prevalence": {
+          "data_distribution": 0.5218,
+          "sensitivity_or_uncertainty": 0.3687,
+          "result_comparison": 0.3152,
+          "time_series_or_trend": 0.3056,
+          "workflow_or_framework": 0.2225
+        },
+        "workflow_is_optional_not_quota": true,
+        "figure_role_routing_required": true,
+        "avoid_bar_line_only_figure_set": true,
+        "prefer_low_saturation_academic_palette": true,
+        "multi_panel_figures_allowed_when_argument_supports_it": true
+      }
+    }
+  },
+  "cross_competition_modeling_rules": {
+    "default_question_lineage": [
+      "Q1_structure_or_pattern_evidence",
+      "Q2_core_model",
+      "Q3_constraint_scenario_or_granularity_extension",
+      "Q4_decision_robustness_or_deliverable"
+    ],
+    "default_question_lineage_is_template_not_hard_rule": true,
+    "model_complexity_priority_order": [
+      "task_semantics",
+      "data_support",
+      "interpretability_and_verifiability",
+      "constraint_expressiveness",
+      "robustness",
+      "computational_cost",
+      "novelty_or_complexity"
+    ],
+    "new_model_burden_of_proof": [
+      "prior_model_empirically_fails",
+      "new_subproblem_adds_unrepresentable_state_or_constraint",
+      "new_objective_requires_different_mathematical_structure"
+    ],
+    "forbidden_default_behavior": [
+      "one_unrelated_model_per_question",
+      "algorithm_zoo_for_prestige",
+      "equation_count_as_modeling_depth",
+      "figure_count_as_visual_quality",
+      "excellent_paper_algorithm_frequency_as_solver_truth"
+    ]
+  },
+  "engineering_borrow_map": {
+    "usail-hkust/LLM-MM-Agent": [
+      "explicit_problem_model_solve_report_phases",
+      "hierarchical_modeling_method_library",
+      "problem_aware_and_solution_aware_method_retrieval",
+      "actor_critic_method_reflection"
+    ],
+    "SakanaAI/AI-Scientist": [
+      "separate_experiment_and_plot_scripts",
+      "review_reflection_loop",
+      "review_ensemble",
+      "strong_domain_template_for_bounded_tasks"
+    ],
+    "SakanaAI/AI-Scientist-v2": [
+      "experiment_manager",
+      "bounded_candidate_tree_search",
+      "separate_writeup_citation_review_plot_roles"
+    ],
+    "SamuelSchmidgall/AgentLaboratory": [
+      "literature_experiment_report_phase_separation",
+      "copilot_human_checkpoint",
+      "persistent_task_notes",
+      "checkpoint_state_saves"
+    ],
+    "Technion-Kishony-lab/data-to-paper": [
+      "backward_traceability",
+      "data_chained_manuscript",
+      "human_verification",
+      "rewind_replay",
+      "coding_guardrails"
+    ],
+    "stanford-oval/STORM": [
+      "research_before_writing",
+      "multi_perspective_questioning",
+      "outline_before_long_form_generation",
+      "user_documents_plus_web_grounding"
+    ],
+    "garrettj403/SciencePlots": [
+      "layered_plot_styles",
+      "publication_readability_defaults",
+      "colorblind_safe_cycles",
+      "black_white_printability_awareness",
+      "high_resolution_export_awareness"
+    ]
+  },
+  "evidence_hierarchy": [
+    "official_hard_constraints",
+    "task_specific_evidence",
+    "excellent_paper_soft_priors",
+    "human_visual_preferences",
+    "open_source_engineering_patterns"
+  ]
+}

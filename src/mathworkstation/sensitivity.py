@@ -23,7 +23,10 @@ from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso
 from .model_plan import ModelPlan
 from .paths import resolve_within
+from .plot_style import apply_style, get_colors, get_line_cycle, get_figsize, save_figure
 from .tabular import read_table
+
+apply_style()
 
 
 class SensitivityEngine:
@@ -62,6 +65,9 @@ class SensitivityEngine:
         source_artifact = self.artifacts.get(case_id, dataset["artifact_id"])
         frame = read_table(resolve_within(self.cases.case_root(case_id), source_artifact["path"]))
         modeling = frame[[*plan.feature_columns, plan.target_column]].dropna(subset=[plan.target_column])
+        # Sort by temporal column for time-ordered splitting
+        if plan.split_strategy == "time_ordered" and plan.temporal_column and plan.temporal_column in modeling.columns:
+            modeling = modeling.sort_values(by=plan.temporal_column, kind="mergesort").reset_index(drop=True)
         features = modeling[plan.feature_columns]
         target = modeling[plan.target_column]
         seeds = seeds or [plan.random_seed, plan.random_seed + 17, plan.random_seed + 41]
@@ -74,14 +80,22 @@ class SensitivityEngine:
                     test_size = len(modeling) - train_size
                 if test_size < 1:
                     continue
-                x_train, x_test, y_train, y_test = train_test_split(
-                    features,
-                    target,
-                    train_size=train_size,
-                    test_size=test_size,
-                    random_state=seed,
-                    stratify=_safe_stratify(target, plan.task_type, test_size),
-                )
+                # For time-ordered split, use sequential split (no shuffle)
+                if plan.split_strategy == "time_ordered":
+                    split_point = train_size
+                    x_train = features.iloc[:split_point]
+                    x_test = features.iloc[split_point:split_point + test_size]
+                    y_train = target.iloc[:split_point]
+                    y_test = target.iloc[split_point:split_point + test_size]
+                else:
+                    x_train, x_test, y_train, y_test = train_test_split(
+                        features,
+                        target,
+                        train_size=train_size,
+                        test_size=test_size,
+                        random_state=seed,
+                        stratify=_safe_stratify(target, plan.task_type, test_size),
+                    )
                 pipeline = Pipeline(
                     [
                         ("preprocessor", _preprocessor(features)),
@@ -202,16 +216,25 @@ def _summarize(plan: ModelPlan, best_model: str, rows: list[dict[str, Any]]) -> 
 
 def _plot_sensitivity(plan: ModelPlan, rows: list[dict[str, Any]], path: Path) -> None:
     frame = pd.DataFrame(rows)
-    figure, axis = plt.subplots(figsize=(7.5, 5))
-    for seed, group in frame.groupby("seed"):
+    colors = get_colors()
+    line_cycle = get_line_cycle()
+    figsize = get_figsize("sensitivity")
+    figure, axis = plt.subplots(figsize=figsize)
+    for idx, (seed, group) in enumerate(frame.groupby("seed")):
         ordered = group.sort_values("fraction")
-        axis.plot(ordered["fraction"], ordered[plan.primary_metric], marker="o", label=f"seed={seed}")
-    axis.set_xlabel("Data Fraction")
-    axis.set_ylabel(plan.primary_metric)
-    axis.set_title("Sensitivity Analysis")
-    axis.legend()
+        linestyle, marker = line_cycle[idx % len(line_cycle)]
+        color = colors[idx % len(colors)]
+        axis.plot(ordered["fraction"], ordered[plan.primary_metric],
+                  linestyle=linestyle, marker=marker, label=f"seed={seed}",
+                  color=color, linewidth=2.0, markersize=6,
+                  markerfacecolor="white", markeredgecolor=color, markeredgewidth=1.5)
+    axis.set_xlabel("Data Fraction", fontweight="bold")
+    axis.set_ylabel(plan.primary_metric, fontweight="bold")
+    axis.set_title("Sensitivity Analysis", fontweight="bold")
+    axis.legend(frameon=True, framealpha=0.9, edgecolor="#cccccc")
+    axis.grid(True, alpha=0.3, linestyle="--")
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：评价模型"
+  short_description: "构建 TOPSIS、熵权、AHP、灰关联系统。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-evaluation-models 帮我建立多指标综合评价模型。"
+policy:
+  allow_implicit_invocation: true

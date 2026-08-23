@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "description": "数学建模论文格式规范包 - CUMCM 中文 + MCM 英文两套",
+  "competitions": {
+    "CUMCM": {
+      "language": "zh-CN",
+      "display_name": "全国大学生数学建模竞赛",
+      "abstract": {
+        "separate_page": true,
+        "max_pages": 1,
+        "required_elements": ["model_category", "modeling_ideas", "algorithm_ideas", "model_features", "main_results"],
+        "element_display": {
+          "model_category": "模型归类",
+          "modeling_ideas": "建模思想",
+          "algorithm_ideas": "算法思想",
+          "model_features": "模型特色",
+          "main_results": "主要结果"
+        },
+        "keywords_min": 3,
+        "keywords_max": 5,
+        "forbidden_items": ["formula", "table", "figure"],
+        "forbidden_descriptions": {
+          "formula": "摘要中不得出现公式或数学表达式",
+          "table": "摘要中不得出现表格",
+          "figure": "摘要中不得出现图片或图表"
+        },
+        "font": {
+          "title": {"family": "SimHei", "size": "三号", "weight": "bold"},
+          "body": {"family": "SimSun", "size": "小四"},
+          "keywords_label": {"family": "SimHei", "size": "小四", "weight": "bold"}
+        }
+      },
+      "three_line_table": {
+        "top_line": {"weight": "1.5磅", "pt": 1.5},
+        "column_line": {"weight": "1.5磅", "pt": 1.5},
+        "bottom_line": {"weight": "1.5磅", "pt": 1.5},
+        "no_vertical_lines": true,
+        "caption_above_table": true,
+        "caption_format": "表{序号} {标题}",
+        "table_numbering": "sequential",
+        "number_prefix": "表"
+      },
+      "figure": {
+        "caption_below_figure": true,
+        "caption_format": "图{序号} {标题}",
+        "figure_numbering": "sequential",
+        "number_prefix": "图",
+        "dpi": 600,
+        "format": "png",
+        "color_mode": "grayscale_distinguishable",
+        "color_mode_note": "黑白可区分（使用线型+图例区分，非颜色）",
+        "reference_requirement": "all_figures_cited"
+      },
+      "formula": {
+        "alignment": "centered",
+        "numbering": "right_aligned",
+        "numbering_condition": "only_when_referenced",
+        "format": "({章节}-{序号}) 或 ({序号})"
+      },
+      "references": {
+        "min_count": 5,
+        "max_count": 10,
+        "allowed_types": ["[J]", "[M]", "[D]", "[EB/OL]"],
+        "type_meanings": {
+          "[J]": "期刊文章",
+          "[M]": "专著",
+          "[D]": "学位论文",
+          "[EB/OL]": "电子文献"
+        },
+        "punctuation": "英文标点+空格",
+        "format_note": "参考文献使用英文标点，标点后加空格"
+      },
+      "appendix": {
+        "separate_page": true,
+        "include_code": true,
+        "code_note": "附录需包含全部可运行代码"
+      },
+      "page": {
+        "margin": {"unit": "cm", "value": 2.5},
+        "body_max_pages": 20,
+        "total_max_pages_including_abstract": 21
+      },
+      "font": {
+        "chinese": {
+          "title": {"family": "SimHei", "alternative": "黑体"},
+          "heading": {"family": "SimHei", "alternative": "黑体"},
+          "body": {"family": "SimSun", "alternative": "宋体"}
+        },
+        "english_math": {
+          "family": "Times New Roman",
+          "preserve_in_math_mode": true
+        },
+        "code": {
+          "family": "Courier New"
+        }
+      }
+    },
+    "MCM": {
+      "language": "en-US",
+      "display_name": "Mathematical Contest in Modeling / ICM",
+      "abstract": {
+        "separate_page": true,
+        "max_pages": 1,
+        "label": "Summary",
+        "forbidden_items": ["formula", "table", "figure"],
+        "forbidden_descriptions": {
+          "formula": "Do not include formulas or mathematical expressions in the summary",
+          "table": "Do not include tables in the summary",
+          "figure": "Do not include figures or charts in the summary"
+        },
+        "elements": ["restatement", "approach", "model", "results", "conclusions"],
+        "element_display": {
+          "restatement": "Restatement of the Problem",
+          "approach": "Approach/Methods Used",
+          "model": "Model Description",
+          "results": "Key Results",
+          "conclusions": "Conclusions"
+        },
+        "keywords_min": 3,
+        "keywords_max": 5,
+        "font": {
+          "title": {"family": "Times New Roman", "size": "12pt", "weight": "bold"},
+          "body": {"family": "Times New Roman", "size": "12pt"}
+        }
+      },
+      "three_line_table": {
+        "top_line": {"weight": "1.5pt", "pt": 1.5},
+        "column_line": {"weight": "1.5pt", "pt": 1.5},
+        "bottom_line": {"weight": "1.5pt", "pt": 1.5},
+        "no_vertical_lines": true,
+        "caption_above_table": true,
+        "caption_format": "Table {number}: {title}",
+        "table_numbering": "sequential",
+        "number_prefix": "Table"
+      },
+      "figure": {
+        "caption_below_figure": true,
+        "caption_format": "Figure {number}: {title}",
+        "figure_numbering": "sequential",
+        "number_prefix": "Figure",
+        "dpi": 600,
+        "format": "png",
+        "color_mode": "grayscale_distinguishable",
+        "color_mode_note": "Black-and-white distinguishable (use line styles + legends, not color)",
+        "reference_requirement": "all_figures_cited"
+      },
+      "formula": {
+        "alignment": "centered",
+        "numbering": "right_aligned",
+        "numbering_condition": "only_when_referenced",
+        "format": "({number})"
+      },
+      "references": {
+        "min_count": 5,
+        "max_count": 10,
+        "format": "standard_academic",
+        "format_note": "Standard academic reference format (APA/MLA style)",
+        "punctuation": "English punctuation + space"
+      },
+      "appendix": {
+        "separate_page": true,
+        "include_code": true,
+        "code_note": "Include all runnable code in appendix"
+      },
+      "page": {
+        "margin": {"unit": "cm", "value": 2.5},
+        "body_max_pages": 20,
+        "total_max_pages_including_summary": 21
+      },
+      "font": {
+        "title": {"family": "Times New Roman", "size": "16pt", "weight": "bold"},
+        "heading": {"family": "Times New Roman", "size": "14pt", "weight": "bold"},
+        "body": {"family": "Times New Roman", "size": "12pt"},
+        "code": {"family": "Courier New", "size": "10pt"},
+        "math": {"family": "Times New Roman"}
+      }
+    }
+  },
+  "shared_rules": {
+    "three_line_table_booktabs": {
+      "description": "使用 LaTeX booktabs 宏包实现三线表",
+      "toprule": "\\toprule",
+      "midrule": "\\midrule",
+      "bottomrule": "\\bottomrule",
+      "no_vertical_rules": true
+    }
+  }
+}

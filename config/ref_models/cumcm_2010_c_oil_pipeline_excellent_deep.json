@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "corpus_id": "cumcm-2010-c-oil-pipeline-excellent-deep-v1",
+  "competition": "CUMCM",
+  "year": 2010,
+  "problem": "CUMCM-2010-C-Oil-Pipeline",
+  "paper_count": 3,
+  "source_policy": "Derived signals only; raw excellent-paper PDFs stay in the external local knowledge base.",
+  "text_extraction": {
+    "backend": "pymupdf/pypdf non-OCR",
+    "usable_papers": [
+      "2010C：输油管布置问题的优化模型.pdf",
+      "2010C：输油管的布置.pdf",
+      "2010C：输油管的布置（2）.pdf"
+    ],
+    "excluded_from_text_benchmark": {
+      "2010C：输油管的布置模型.pdf": "PDF_UNICODE_TEXT_LAYER_UNAVAILABLE"
+    }
+  },
+  "paper_signatures": [
+    {
+      "paper_id": "2010C-1",
+      "model_sequence": ["Fermat point/geometric construction"],
+      "model_selection_rationales": ["constraint_structure"],
+      "model_transition_patterns": ["scenario_branching", "coarse_to_fine"],
+      "validation_types": ["model_comparison"],
+      "innovation_patterns": ["algorithmic_improvement", "constraint_aware_optimization"]
+    },
+    {
+      "paper_id": "2010C-2",
+      "model_sequence": ["Fermat point/geometric construction"],
+      "model_selection_rationales": ["constraint_structure", "robustness_or_uncertainty"],
+      "model_transition_patterns": ["scenario_branching"],
+      "validation_types": ["sensitivity_or_robustness", "model_comparison"]
+    },
+    {
+      "paper_id": "2010C-4",
+      "model_sequence": ["Shortest path"],
+      "model_selection_rationales": ["physical_or_domain_mechanism", "constraint_structure"],
+      "model_transition_patterns": ["hybrid_or_combined_model", "scenario_branching"],
+      "innovation_patterns": ["algorithmic_improvement", "constraint_aware_optimization"]
+    }
+  ],
+  "recurring_capabilities": {
+    "question_types.optimization": 1.0,
+    "question_types.decision_strategy": 1.0,
+    "question_types.spatial_or_layout_design": 0.666667,
+    "model_selection_rationales.constraint_structure": 1.0,
+    "model_transition_patterns.scenario_branching": 1.0,
+    "validation_types.model_comparison": 0.666667,
+    "innovation_patterns.algorithmic_improvement": 0.666667,
+    "innovation_patterns.constraint_aware_optimization": 0.666667,
+    "abstract_structure.has_quantified_results": 1.0,
+    "abstract_structure.has_concluding_language": 0.666667
+  },
+  "benchmark_note": "The recurring signal is geometry/constraint-driven scenario modeling, not one mandatory solver. One scan-only excellent paper is reserved for later visual review."
+}

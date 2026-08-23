@@ -40,3 +40,38 @@ def test_research_audit_excludes_identifier_and_records_temporal_review(tmp_path
         "IDENTIFIER_LIKE_FEATURE", "TEMPORAL_SPLIT_REVIEW"
     }
     assert artifacts.get(case["case_id"], result["artifact_id"])["artifact_type"] == "research_audit"
+
+
+def test_temporal_column_excluded_as_identifier_still_drives_split(tmp_path: Path) -> None:
+    """Date-like column excluded as identifier should still trigger time_ordered split."""
+    cases = CaseManager(tmp_path / "output")
+    case = cases.create_case("SM", "Temporal identifier test")
+    artifacts = ArtifactRegistry(cases)
+    datasets = DatasetRegistry(cases, artifacts)
+    workflow = WorkflowService(cases, RunManager(cases), CheckpointManager(cases), MemoryManager(cases, artifacts))
+    data = DataService(artifacts, datasets, TabularProfiler(cases, artifacts, datasets), workflow)
+    source = tmp_path / "wordle.csv"
+    # Simulate Wordle-like data: Date is unique (identifier) but is a temporal column
+    dates = pd.date_range("2023-01-01", periods=25, freq="D")
+    pd.DataFrame({
+        "Date": dates,
+        "Contest number": range(1, 26),
+        "tries_1": [float(i % 3) for i in range(25)],
+        "tries_2": [float(i % 4) for i in range(25)],
+        "target": [float(i) for i in range(25)],
+    }).to_csv(source, index=False)
+    registered = data.register_uploaded(
+        case["case_id"], source, "观测数据", DatasetKind.OBSERVED, "human"
+    )
+    result = ResearchAuditService(cases, artifacts, datasets).audit(
+        case["case_id"], registered["dataset"]["dataset_id"], "target",
+        ["Date", "Contest number", "tries_1", "tries_2"], "human"
+    )
+    # Date excluded as identifier but still drives time_ordered split
+    assert "Date" in result["report"]["excluded_identifier_like_columns"]
+    assert result["report"]["split_recommendation"] == "time_ordered"
+    assert result["report"]["temporal_columns"] == ["Date"]
+    # Date is excluded from features, so TEMPORAL_SPLIT_REVIEW should NOT appear
+    # (it only reports temporal columns that are in selected features)
+    issue_codes = {issue["code"] for issue in result["report"]["issues"]}
+    assert "IDENTIFIER_LIKE_FEATURE" in issue_codes

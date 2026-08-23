@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：论文审稿"
+  short_description: "审查建模论文逻辑、模型、结果和诚信风险。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-paper-reviewer 审查下面的数学建模论文草稿。"
+policy:
+  allow_implicit_invocation: true

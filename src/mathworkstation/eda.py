@@ -17,7 +17,10 @@ from .datasets import DatasetRegistry
 from .figure_registry import FigureRegistry
 from .io_utils import atomic_write_json, atomic_write_text, now_iso
 from .paths import resolve_within
+from .plot_style import apply_style, get_colors, get_figsize, save_figure
 from .tabular import read_table
+
+apply_style()
 
 
 class EDAEngine:
@@ -165,34 +168,41 @@ def _categorical_summary(frame: pd.DataFrame) -> dict[str, Any]:
 def _plot_numeric_distributions(frame: pd.DataFrame, path) -> None:
     columns = list(frame.columns)
     rows = int(np.ceil(len(columns) / 3))
-    figure, axes = plt.subplots(rows, 3, figsize=(12, max(3.5, rows * 3.2)))
+    colors = get_colors()
+    figsize = get_figsize("distribution")
+    figure, axes = plt.subplots(rows, 3, figsize=(figsize[0], max(3.5, rows * 3.2)))
     axes_array = np.atleast_1d(axes).ravel()
-    for axis, column in zip(axes_array, columns):
-        sns.histplot(frame[column].dropna(), kde=True, ax=axis)
-        axis.set_title(str(column))
+    for idx, (axis, column) in enumerate(zip(axes_array, columns)):
+        color = colors[idx % len(colors)]
+        sns.histplot(frame[column].dropna(), kde=True, ax=axis, color=color, alpha=0.7)
+        axis.set_title(str(column), fontweight="bold")
     for axis in axes_array[len(columns):]:
         axis.set_visible(False)
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 
 def _plot_correlation(frame: pd.DataFrame, path) -> None:
     correlation = frame.corr(numeric_only=True)
-    figure, axis = plt.subplots(figsize=(max(6, len(correlation) * 0.8), max(5, len(correlation) * 0.7)))
-    sns.heatmap(correlation, annot=len(correlation) <= 10, cmap="vlag", center=0, ax=axis)
-    axis.set_title("Correlation Matrix")
+    figsize = get_figsize("heatmap")
+    figure, axis = plt.subplots(figsize=(max(figsize[0], len(correlation) * 0.8), max(figsize[1], len(correlation) * 0.7)))
+    sns.heatmap(correlation, annot=len(correlation) <= 10, cmap="RdBu_r", center=0, ax=axis,
+                linewidths=0.5, linecolor="white", fmt=".2f")
+    axis.set_title("Correlation Matrix", fontweight="bold")
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 
 def _plot_target(series: pd.Series, path) -> None:
-    figure, axis = plt.subplots(figsize=(7, 4.5))
-    sns.histplot(series.dropna(), kde=True, ax=axis)
-    axis.set_title(f"Target Distribution: {series.name}")
+    colors = get_colors()
+    figsize = get_figsize("single")
+    figure, axis = plt.subplots(figsize=figsize)
+    sns.histplot(series.dropna(), kde=True, ax=axis, color=colors[0], alpha=0.7)
+    axis.set_title(f"Target Distribution: {series.name}", fontweight="bold")
     figure.tight_layout()
-    figure.savefig(path, dpi=180, bbox_inches="tight")
+    save_figure(figure, path)
     plt.close(figure)
 
 

@@ -62,13 +62,17 @@ class ResearchAuditService:
                 "severity": "REVIEW",
                 "message": "观测数据缺少可核验来源 URI，论文不得将其描述为公开可复核来源。",
             })
-        temporal_columns = [column for column in temporal_columns if column in selected]
-        split_recommendation = "time_ordered" if temporal_columns else "random"
-        if temporal_columns:
+        # Keep temporal columns for split recommendation even if excluded as identifier-like
+        # (e.g., "Date" column is excluded from features but should still drive time_ordered split)
+        all_proposed = [column for column in proposed_features if column in frame.columns]
+        temporal_columns_for_split = [column for column in temporal_columns if column in all_proposed]
+        split_recommendation = "time_ordered" if temporal_columns_for_split else "random"
+        temporal_columns_in_features = [column for column in temporal_columns if column in selected]
+        if temporal_columns_in_features:
             issues.append({
                 "code": "TEMPORAL_SPLIT_REVIEW",
                 "severity": "REVIEW",
-                "columns": temporal_columns,
+                "columns": temporal_columns_in_features,
                 "message": "检测到时间语义字段，优先考虑按时间顺序切分而非随机切分。",
             })
         severities = {issue["severity"] for issue in issues}
@@ -81,7 +85,7 @@ class ResearchAuditService:
             "proposed_feature_columns": proposed_features,
             "recommended_feature_columns": selected,
             "excluded_identifier_like_columns": excluded,
-            "temporal_columns": temporal_columns,
+            "temporal_columns": temporal_columns_for_split,
             "split_recommendation": split_recommendation,
             "provenance": {
                 "kind": dataset["kind"],

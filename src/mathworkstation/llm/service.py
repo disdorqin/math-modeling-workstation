@@ -24,7 +24,7 @@ class CaseLLMService:
         checkpoints: CheckpointManager,
         router: LLMRouter,
         max_calls_per_session: int = 50,
-        max_tokens_per_session: int = 100000,
+        max_tokens_per_session: int = 300000,
     ) -> None:
         self.cases = cases
         self.artifacts = artifacts

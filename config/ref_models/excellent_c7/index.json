@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "description": "优秀 C 题论文对照库(提炼稿)。每个条目对应 config/ref_models/excellent_c7/<file>.md。泛化问题判定基于 stages_strong_points 跨年份统计:某维度强点在 ≥2 个不同年份的提炼稿中同时出现,而当前论文缺失,则视为该维度泛化问题。",
+  "created_at": "2026-08-06",
+  "papers": [
+    {"year": 2010, "file": "2010-oil-pipeline.md", "topic": "输油管布置问题", "type": "优化", "models": ["总费用最小化", "几何约束规划"]},
+    {"year": 2011, "file": "2011-pension.md", "topic": "企业退休职工养老金", "type": "回归预测", "models": ["Logistic", "替代率模型", "敏感性分析"]},
+    {"year": 2015, "file": "2015-moon.md", "topic": "月上柳梢头,人约黄昏后", "type": "机理", "models": ["太阳/月亮运动模型", "球面三角"]},
+    {"year": 2016, "file": "2016-battery.md", "topic": "电池剩余放电时间预测", "type": "回归预测", "models": ["多项式拟合", "系数外推", "MRE"]},
+    {"year": 2017, "file": "2017-color.md", "topic": "颜色与物质浓度辨识", "type": "回归预测", "models": ["多元线性回归", "非线性回归", "评价准则"]},
+    {"year": 2018, "file": "2018-membership.md", "topic": "大型百货商场会员画像", "type": "数据挖掘", "models": ["K-means", "生命周期划分"]},
+    {"year": 2020, "file": "2020-credit.md", "topic": "银行信贷决策", "type": "评价决策", "models": ["集成学习", "XGBoost", "多目标规划"]},
+    {"year": 2022, "file": "2022-glass.md", "topic": "古代玻璃成分分析与鉴别", "type": "机理分类", "models": ["CLR变换", "卡方检验", "决策树"]},
+    {"year": 2023, "file": "2023-vegetable.md", "topic": "蔬菜定价与补货决策", "type": "时序优化", "models": ["K-means++", "时序预测", "模拟退火", "灰色关联"]},
+    {"year": 2024, "file": "2024-crop.md", "topic": "农作物最优种植", "type": "优化决策", "models": ["多约束规划", "LINGO", "灵敏度分析"]},
+    {"year": 2025, "file": "2025-nipt.md", "topic": "NIPT检测时点优化", "type": "机理优化", "models": ["线性混合效应", "动态规划", "似然比检验"]}
+  ],
+  "type_coverage": {
+    "回归预测": ["2011", "2016", "2017"],
+    "机理": ["2015", "2022", "2025"],
+    "评价决策": ["2018", "2020"],
+    "优化决策": ["2010", "2023", "2024"]
+  }
+}

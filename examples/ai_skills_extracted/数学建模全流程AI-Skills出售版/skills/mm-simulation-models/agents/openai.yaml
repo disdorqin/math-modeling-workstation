@@ -1,0 +1,7 @@
+interface:
+  display_name: "数学建模：仿真模拟"
+  short_description: "设计蒙特卡洛、排队和情景仿真流程。"
+  brand_color: "#2563EB"
+  default_prompt: "请使用 $mm-simulation-models 帮我设计仿真模拟和敏感性分析方案。"
+policy:
+  allow_implicit_invocation: true

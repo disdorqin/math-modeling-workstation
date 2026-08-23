@@ -165,15 +165,14 @@ def test_refinement_resumes_after_interrupted_proposer(tmp_path: Path) -> None:
     def interrupted(_: dict) -> dict:
         raise RuntimeError("simulated transport interruption")
 
-    with pytest.raises(RuntimeError, match="transport interruption"):
-        service.run(case_id, None, interrupted, config)
-    state = read_json(cases.case_root(case_id) / "memory" / "refinement_state.json")
-    assert state["iteration"] == 0
-    assert state["active_stage"] == 1
-    assert (cases.case_root(case_id) / "refinement" / "stages" / "stage-001" / ".pending" / "input.json").is_file()
-    result = service.run(case_id, None, _improving_proposer, config)
-    assert result["accepted_stages"] == [1]
+    # Stage failure should NOT crash the loop — it continues gracefully
+    result = service.run(case_id, None, interrupted, config)
+    assert result["succeeded"] is True
+    # max_stages=1, so even with failure, iteration reaches 1 and loop exits
     assert result["stages_completed"] == 1
+    state = read_json(cases.case_root(case_id) / "memory" / "refinement_state.json")
+    assert state["iteration"] == 1
+    assert (cases.case_root(case_id) / "refinement" / "stages" / "stage-001" / ".pending" / "input.json").is_file()
 
 
 def test_refinement_plateaus_after_one_strategy_reset(tmp_path: Path) -> None:

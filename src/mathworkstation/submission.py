@@ -21,6 +21,17 @@ class SubmissionProfile:
     required_sections: tuple[str, ...] = ()
 
 
+# Language aliases for required section names.
+# When a Chinese-language paper is submitted under an English-named profile (MCM/ICM),
+# the preflight check should also recognise Chinese section headings.
+_SECTION_CN_ALIASES: dict[str, str] = {
+    "Abstract": "摘要",
+    "Model": "模型建立",
+    "Results": "结果分析",
+    "Conclusion": "结论",
+}
+
+
 PROFILES = {
     "SM": SubmissionProfile("SM", paper_title="数学建模论文", required_sections=("摘要", "模型建立", "结果分析", "结论")),
     "CUMCM": SubmissionProfile("CUMCM", paper_title="数学建模论文", required_sections=("摘要", "模型建立", "结果分析", "结论")),
@@ -38,7 +49,13 @@ class SubmissionService:
 
     def prepare(self, case_id: str, profile_name: str = "SM", compile_pdf: bool = False) -> dict[str, Any]:
         root = self.cases.case_root(case_id)
-        profile = PROFILES.get(profile_name.upper())
+        # Accept C-type competition spellings (MCM-C / MCM_C) by falling back
+        # to the base family profile when the exact name is not registered.
+        normalized = profile_name.upper()
+        profile = PROFILES.get(normalized)
+        if profile is None:
+            base = normalized.removesuffix("-C").removesuffix("_C").removesuffix("C")
+            profile = PROFILES.get(base)
         if profile is None:
             raise ValueError(f"unsupported submission profile: {profile_name}")
         paper_path = root / "paper" / "final.md"
@@ -67,7 +84,9 @@ class SubmissionService:
         findings: list[dict[str, str]] = []
         for section in profile.required_sections:
             if section not in markdown:
-                findings.append({"code": "REQUIRED_SECTION_MISSING", "severity": "P1", "message": section})
+                cn_alias = _SECTION_CN_ALIASES.get(section)
+                if cn_alias is None or cn_alias not in markdown:
+                    findings.append({"code": "REQUIRED_SECTION_MISSING", "severity": "P1", "message": section})
         if re.search(r"\[(?:CLAIM|FIGURE|ARTIFACT|RESULT)[-_][A-Za-z0-9]+\]", markdown, re.I):
             findings.append({"code": "INTERNAL_REFERENCE_LEAK", "severity": "P1", "message": "internal evidence marker remains in final paper"})
         if "[SECTION_DRAFT_PENDING]" in markdown or "[NEEDS_EVIDENCE]" in markdown:
@@ -147,6 +166,7 @@ def markdown_to_latex(markdown: str, profile: SubmissionProfile) -> str:
 
 def sanitize_submission_markdown(markdown: str) -> str:
     """Remove internal evidence anchors from the user-facing manuscript copy."""
+    cleaned = re.sub(r"<!-- data-figure-id=\"[^\"]*\" -->", "", markdown)
     cleaned = re.sub(r"\[(?:claim|figure|artifact|result|table|answer-subproblem)-[A-Za-z0-9_-]+\]", "", markdown, flags=re.I)
     cleaned = re.sub(r"\[数学建模研究工作流总览\]|\[数值变量分布\]|\[数值变量相关性热力图\]|\[目标变量[^]]*\]|\[候选模型[^]]*\]|\[Baseline[^]]*\]|\[模型样本比例[^]]*\]", "", cleaned)
     return re.sub(r"[ \t]{2,}", " ", cleaned)

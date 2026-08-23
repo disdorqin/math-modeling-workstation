@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-20",
+  "source_root": "D:\\作业\\竞赛\\大学生数学建模\\美赛\\备赛\\资料",
+  "scope": {
+    "primary_problem_type": "C",
+    "profiles": ["MCM_C", "CUMCM_C"],
+    "other_problem_types": "archive_only_not_primary_benchmark"
+  },
+  "policies": {
+    "raw_assets_copied_into_repo": false,
+    "runtime_uses_derived_profiles": true,
+    "skills_are_advisory_not_solver_truth": true,
+    "excellent_paper_algorithm_imitation_forbidden": true,
+    "preferred_pdf_text_backends": ["pymupdf", "pypdf", "pdftotext_fallback", "ocr_last_resort"],
+    "human_review_required_for_external_validation": true
+  },
+  "inventory_snapshot": {
+    "mcmthesis-master": {"directories": 2, "files": 17, "size_mb": 0.8},
+    "杂项": {"directories": 0, "files": 2, "size_mb": 38.3},
+    "论文": {"directories": 180, "files": 867, "size_mb": 9124.3},
+    "课程课件": {"directories": 24, "files": 209, "size_mb": 476.4}
+  },
+  "assets": [
+    {
+      "asset_id": "mcm_latex_template",
+      "path": "mcmthesis-master",
+      "kind": "submission_template",
+      "competition": "MCM_ICM",
+      "c_problem_priority": "MEDIUM",
+      "tags": ["latex", "paper", "submission"]
+    },
+    {
+      "asset_id": "full_ai_skills_zip",
+      "path": "论文\\skill\\数学建模全流程AI-Skills出售版.zip",
+      "kind": "skill_pack",
+      "competition": "GENERIC",
+      "c_problem_priority": "HIGH",
+      "tags": ["orchestrator", "decomposition", "model_selection", "eda", "evaluation", "prediction", "classification", "optimization", "simulation", "paper_review"]
+    },
+    {
+      "asset_id": "qingfeng_modeling_materials",
+      "path": "论文\\数学建模\\【000】清风数学建模",
+      "kind": "methodology_course_reference",
+      "competition": "GENERIC",
+      "c_problem_priority": "HIGH",
+      "tags": ["model_map", "learning_route", "methodology", "database", "examples"]
+    },
+    {
+      "asset_id": "mcm_problem_archive_primary",
+      "path": "课程课件\\美赛历年题目\\16-24年美赛题目合集",
+      "kind": "problem_archive",
+      "competition": "MCM_ICM",
+      "c_problem_priority": "CRITICAL",
+      "tags": ["C_problem", "official_problem", "attachments", "2016_2024"]
+    },
+    {
+      "asset_id": "mcm_problem_archive_secondary",
+      "path": "论文\\网盘资料\\美赛O奖真题+优秀论文\\2000-2024年美赛赛题汇总【公众号：数模加油站】",
+      "kind": "problem_archive",
+      "competition": "MCM_ICM",
+      "c_problem_priority": "HIGH",
+      "tags": ["C_problem", "problem_pdf", "attachments"]
+    },
+    {
+      "asset_id": "mcm_oaward_fulltext",
+      "path": "论文\\网盘资料\\美赛O奖真题+优秀论文\\2006-2025年美赛优秀论文汇总【公众号：数模加油站】",
+      "kind": "excellent_paper_corpus",
+      "competition": "MCM_ICM",
+      "c_problem_priority": "CRITICAL",
+      "tags": ["C_problem", "O_award", "full_text", "same_problem_benchmark"]
+    },
+    {
+      "asset_id": "mcm_oaward_fulltext_complete_2013_2025",
+      "path": "论文\\美赛论文\\美赛真题1998-2025等\\美赛优秀O奖论文2013-2025",
+      "kind": "excellent_paper_corpus",
+      "competition": "MCM_ICM",
+      "c_problem_priority": "CRITICAL",
+      "tags": ["C_problem", "O_award", "full_text", "complete_local_corpus", "visual_style", "recent_weighted"]
+    },
+    {
+      "asset_id": "cumcm_common_models",
+      "path": "论文\\高教社论文\\I953高教社杯全国大学生数学建模竞赛题目及优秀论文\\各类常用数学模型",
+      "kind": "model_reference_library",
+      "competition": "CUMCM",
+      "c_problem_priority": "HIGH",
+      "tags": ["optimization", "statistics", "time_series", "grey_system", "differential_equation", "multivariate_analysis"]
+    },
+    {
+      "asset_id": "cumcm_excellent_papers",
+      "path": "论文\\高教社论文\\I953高教社杯全国大学生数学建模竞赛题目及优秀论文\\高教社杯全国大学生数学建模竞赛优秀论文",
+      "kind": "excellent_paper_corpus",
+      "competition": "CUMCM",
+      "c_problem_priority": "CRITICAL",
+      "tags": ["C_problem", "excellent_paper", "full_text", "same_problem_benchmark"]
+    },
+    {
+      "asset_id": "cumcm_problem_archive",
+      "path": "论文\\高教社论文\\I953高教社杯全国大学生数学建模竞赛题目及优秀论文\\高教社杯全国大学生数学建模竞赛往届题目",
+      "kind": "problem_archive",
+      "competition": "CUMCM",
+      "c_problem_priority": "CRITICAL",
+      "tags": ["C_problem", "official_problem", "attachments", "excel_data"]
+    },
+    {
+      "asset_id": "course_materials",
+      "path": "课程课件",
+      "kind": "course_library",
+      "competition": "GENERIC_MCM_HEAVY",
+      "c_problem_priority": "HIGH",
+      "tags": ["writing", "visualization", "evaluation", "statistics", "feature_engineering", "forecasting", "classification", "optimization", "graph", "bayesian_optimization", "differential_equation"]
+    },
+    {
+      "asset_id": "reference_prompts",
+      "path": "参考提示词.docx",
+      "kind": "prompt_prior",
+      "competition": "GENERIC",
+      "c_problem_priority": "MEDIUM",
+      "tags": ["problem_typing", "progressive_modeling", "validation", "writing", "figure_prompt"],
+      "truth_status": "ADVISORY_ONLY"
+    }
+  ],
+  "known_c_problem_corpora": {
+    "MCM": {
+      "real_gates": ["2018_C_Energy_Compact", "2023_C_Wordle"],
+      "confirmed_oaward_counts": {"2018": 5, "2022": 10, "2023": 12, "2024": 11, "2025": 18}
+    },
+    "CUMCM": {
+      "confirmed_excellent_counts_from_filename_index": {"2010": 4, "2018": 3, "2019": 3, "2020": 4, "2021": 4, "2022": 1, "2023": 4, "2024": 3, "2025": 2}
+    }
+  },
+  "ignore_or_deprioritize": [
+    "论文\\.workbuddy",
+    "**\\__MACOSX",
+    "**\\.DS_Store",
+    "**\\*.downloading",
+    "duplicate_zip_when_extracted_directory_exists",
+    "non_C_excellent_papers_for_primary_benchmark"
+  ]
+}
