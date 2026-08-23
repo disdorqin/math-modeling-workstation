@@ -57,6 +57,7 @@ class JudgeVote:
     decision: Decision
     confidence: float = 0.0
     rationale: str = ""
+    blind_verified: bool = False
 
     def __post_init__(self) -> None:
         if not 0.0 <= float(self.confidence) <= 1.0:
@@ -80,15 +81,20 @@ def anonymize_paper_text(text: str) -> str:
         r"\bO\s*[- ]?Award\b",
         r"\bAMS\s+Award\b",
         r"\bVilfredo\s+Pareto\s+Award\b",
-        r"\b国(?:家)?(?:一|二|三)等奖\b",
-        r"\b国一\b",
+        r"国(?:家)?(?:一|二|三)等奖",
+        r"(?:全国大学生数学建模竞赛)?(?:一|二|三)等奖",
+        r"优秀论文",
+        r"国[一二三]",
     )
     for pattern in award_patterns:
         value = re.sub(pattern, "[AWARD REDACTED]", value, flags=re.IGNORECASE)
 
     identity_patterns = (
-        r"(?im)^\s*(?:Team\s*#?|Control\s*Number|Team\s*Control\s*Number)\s*[:#-]?\s*[A-Za-z0-9_-]{4,}\s*$",
+        r"(?im)^\s*(?:Team\s*#|Team\s*Number|Control\s*Number|Team\s*Control\s*Number)\s*[:#-]?\s*[A-Za-z0-9_-]{4,}\s*$",
+        r"(?i)\bTeam\s*#\s*(?:\[IDENTITY REDACTED\]|[A-Za-z0-9_-]{4,})\b",
+        r"(?i)\b(?:Team\s*Control\s*Number|Control\s*Number)\s*[:#-]?\s*(?:\[IDENTITY REDACTED\]|[A-Za-z0-9_-]{4,})\b",
         r"(?im)^\s*(?:Author|Authors|School|University|Institution)\s*[:：].*$",
+        r"(?m)^\s*(?:参赛队号|队号|学校|作者|单位|指导教师)\s*[:：].*$",
     )
     for pattern in identity_patterns:
         value = re.sub(pattern, "[IDENTITY REDACTED]", value)
@@ -244,14 +250,18 @@ def aggregate_judge_validity(
         }
 
     human_vote_count = sum(item.judge_kind == "HUMAN" for item in vote_list)
+    blind_human_vote_count = sum(
+        item.judge_kind == "HUMAN" and bool(item.blind_verified) for item in vote_list
+    )
     independent_vote_count = sum(item.judge_kind == "INDEPENDENT_MODEL" for item in vote_list)
     internal_vote_count = sum(item.judge_kind == "INTERNAL" for item in vote_list)
 
-    # V6 requires a human anchor.  Non-blind user preferences and known award labels
-    # are retained as priors, not silently promoted into JudgeEval ground truth.
+    # V6 requires a genuinely blind human anchor.  Non-blind user preferences and
+    # known award labels are retained as priors, not silently promoted into
+    # JudgeEval ground truth.
     hypothesis: HypothesisStatus = "INCONCLUSIVE"
     verdict_reason = "blind human anchor is still missing"
-    if human_vote_count > 0:
+    if blind_human_vote_count > 0:
         internal_rows = [
             row
             for jid, row in discrimination.items()
@@ -285,6 +295,7 @@ def aggregate_judge_validity(
         "pair_count": len(pair_list),
         "vote_count": len(vote_list),
         "human_vote_count": human_vote_count,
+        "blind_human_vote_count": blind_human_vote_count,
         "independent_model_vote_count": independent_vote_count,
         "internal_vote_count": internal_vote_count,
         "position_swap_consistency": (
@@ -307,7 +318,12 @@ def paper_manifest_rows(papers: Iterable[CalibrationPaper]) -> list[dict[str, ob
 
 
 def blind_pair_rows(pairs: Iterable[PairSpec]) -> list[dict[str, object]]:
-    """Return only fields safe to expose to a blind judge."""
+    """Return only fields safe to expose to a blind judge.
+
+    ``kind`` is deliberately private provenance.  Labels such as
+    ``REAL_VS_CURRENT`` would reveal the comparison class and must never enter a
+    blind judge payload.
+    """
 
     return [
         {
@@ -315,7 +331,31 @@ def blind_pair_rows(pairs: Iterable[PairSpec]) -> list[dict[str, object]]:
             "swap_group": item.swap_group,
             "left_id": item.left_id,
             "right_id": item.right_id,
-            "kind": item.kind,
         }
         for item in pairs
     ]
+
+
+def identity_leakage_findings(text: str, *, forbidden_literals: Iterable[str] = ()) -> list[str]:
+    """Return obvious identity/provenance leakage signals in anonymized text."""
+
+    findings: list[str] = []
+    patterns = {
+        "award_label": r"\b(?:outstanding|finalist|meritorious|honorable\s+mention|o\s*[- ]?award|ams\s+award|vilfredo\s+pareto\s+award)\b",
+        "award_label_zh": r"(?:全国大学生数学建模竞赛)?(?:一|二|三)等奖|国[一二三]|优秀论文",
+        "team_control_label": r"\b(?:team\s*#|team\s+number|control\s+number|team\s+control\s+number)\b",
+        "team_control_label_zh": r"参赛队号|队号",
+        "institution_label": r"(?im)^\s*(?:author|authors|school|university|institution)\s*[:：]",
+        "institution_label_zh": r"(?m)^\s*(?:学校|作者|单位|指导教师)\s*[:：]",
+        "workstation_identity": r"\b(?:mathworkstation|workstation[_ -]?current|workstation[_ -]?older|generated[_ -]?sample|showcase)\b",
+        "case_id": r"\b20\d{6}-(?:MCM|CUMCM)-\d{4}-[A-Z0-9]{4}\b",
+    }
+    for name, pattern in patterns.items():
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            findings.append(name)
+    lowered = text.lower()
+    for literal in forbidden_literals:
+        value = str(literal).strip()
+        if value and value.lower() in lowered:
+            findings.append(f"forbidden_literal:{value}")
+    return sorted(set(findings))

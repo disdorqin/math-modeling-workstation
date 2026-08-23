@@ -56,7 +56,9 @@ def main() -> int:
             votes.append(JudgeVote(**payload))
 
     aggregate = aggregate_judge_validity(papers, pairs, votes)
-    print(json.dumps(aggregate, ensure_ascii=False, indent=2))
+    serialized = json.dumps(aggregate, ensure_ascii=False, indent=2)
+    (root / "aggregate.json").write_text(serialized + "\n", encoding="utf-8")
+    print(serialized)
     return 0
 
 
