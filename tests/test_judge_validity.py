@@ -134,7 +134,7 @@ def test_no_blind_human_anchor_forces_inconclusive_h1() -> None:
     assert aggregate["human_vote_count"] == 0
 
 
-def test_blind_human_anchor_can_support_h1_when_internal_judge_reverses_real_pair() -> None:
+def test_one_blind_human_logical_pair_is_not_enough_to_decide_h1() -> None:
     papers = _papers()
     ab, ba = make_swapped_pair(
         swap_group="mcm24-real-current",
@@ -154,6 +154,40 @@ def test_blind_human_anchor_can_support_h1_when_internal_judge_reverses_real_pai
     assert aggregate["position_swap_consistency"] == 1.0
     assert aggregate["cross_judge_agreement"] == 0.0
     assert aggregate["blind_human_vote_count"] == 2
+    assert aggregate["blind_human_anchor_group_count"] == 1
+    assert aggregate["h1_judge_validity_bottleneck"] == "INCONCLUSIVE"
+
+
+def test_two_blind_human_logical_pairs_can_support_h1_from_actual_human_agreement() -> None:
+    papers = _papers()
+    real_ab, real_ba = make_swapped_pair(
+        swap_group="mcm24-real-current",
+        left_id="paper-a",
+        right_id="paper-b",
+        kind="REAL_VS_CURRENT",
+    )
+    old_ab, old_ba = make_swapped_pair(
+        swap_group="mcm24-current-old",
+        left_id="paper-b",
+        right_id="paper-c",
+        kind="CURRENT_VS_OLDER",
+    )
+    votes = [
+        JudgeVote("internal-auditor", "INTERNAL", real_ab.pair_id, "RIGHT", 0.8),
+        JudgeVote("internal-auditor", "INTERNAL", real_ba.pair_id, "LEFT", 0.8),
+        JudgeVote("internal-auditor", "INTERNAL", old_ab.pair_id, "LEFT", 0.8),
+        JudgeVote("internal-auditor", "INTERNAL", old_ba.pair_id, "RIGHT", 0.8),
+        JudgeVote("human-1", "HUMAN", real_ab.pair_id, "LEFT", 0.9, blind_verified=True),
+        JudgeVote("human-1", "HUMAN", real_ba.pair_id, "RIGHT", 0.9, blind_verified=True),
+        JudgeVote("human-1", "HUMAN", old_ab.pair_id, "LEFT", 0.9, blind_verified=True),
+        JudgeVote("human-1", "HUMAN", old_ba.pair_id, "RIGHT", 0.9, blind_verified=True),
+    ]
+
+    aggregate = aggregate_judge_validity(papers, [real_ab, real_ba, old_ab, old_ba], votes)
+
+    assert aggregate["blind_human_anchor_group_count"] == 2
+    assert aggregate["internal_checked_vs_blind_human"] == 2
+    assert aggregate["internal_accuracy_vs_blind_human"] == 0.5
     assert aggregate["h1_judge_validity_bottleneck"] == "SUPPORTED"
 
 

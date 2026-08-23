@@ -250,43 +250,113 @@ def aggregate_judge_validity(
         }
 
     human_vote_count = sum(item.judge_kind == "HUMAN" for item in vote_list)
-    blind_human_vote_count = sum(
-        item.judge_kind == "HUMAN" and bool(item.blind_verified) for item in vote_list
-    )
+    blind_human_votes = [
+        item for item in vote_list if item.judge_kind == "HUMAN" and bool(item.blind_verified)
+    ]
+    blind_human_vote_count = len(blind_human_votes)
     independent_vote_count = sum(item.judge_kind == "INDEPENDENT_MODEL" for item in vote_list)
     internal_vote_count = sum(item.judge_kind == "INTERNAL" for item in vote_list)
 
-    # V6 requires a genuinely blind human anchor.  Non-blind user preferences and
-    # known award labels are retained as priors, not silently promoted into
-    # JudgeEval ground truth.
-    hypothesis: HypothesisStatus = "INCONCLUSIVE"
-    verdict_reason = "blind human anchor is still missing"
-    if blind_human_vote_count > 0:
-        internal_rows = [
-            row
-            for jid, row in discrimination.items()
-            if judge_kind.get(jid) == "INTERNAL" and row["accuracy_vs_provenance_prior"] is not None
+    # Build a consensus blind-human anchor per logical swap group.  A group is
+    # usable only when every blind human preference available for that group
+    # resolves to the same paper identity.  Provenance labels are never used here.
+    blind_human_preferred: dict[tuple[str, str], str | None] = {}
+    for vote in blind_human_votes:
+        pair = pair_by_id[vote.pair_id]
+        blind_human_preferred[(vote.judge_id, vote.pair_id)] = preferred_blind_id(vote, pair)
+
+    blind_human_logical: dict[tuple[str, str], str] = {}
+    blind_human_ids = sorted({item.judge_id for item in blind_human_votes})
+    for judge_id in blind_human_ids:
+        for swap_group, group_pairs in by_swap.items():
+            choices = [
+                blind_human_preferred.get((judge_id, pair.pair_id))
+                for pair in group_pairs
+                if blind_human_preferred.get((judge_id, pair.pair_id)) is not None
+            ]
+            if choices and len(set(choices)) == 1:
+                blind_human_logical[(judge_id, swap_group)] = choices[0]
+
+    blind_anchor_by_group: dict[str, str] = {}
+    blind_anchor_disagreement_groups: list[str] = []
+    for swap_group in by_swap:
+        choices = [
+            blind_human_logical[(judge_id, swap_group)]
+            for judge_id in blind_human_ids
+            if (judge_id, swap_group) in blind_human_logical
         ]
-        internal_accuracy = (
-            sum(float(row["accuracy_vs_provenance_prior"]) for row in internal_rows) / len(internal_rows)
-            if internal_rows
-            else None
+        if not choices:
+            continue
+        if len(set(choices)) == 1:
+            blind_anchor_by_group[swap_group] = choices[0]
+        else:
+            blind_anchor_disagreement_groups.append(swap_group)
+
+    for jid, row in discrimination.items():
+        anchor_total = 0
+        anchor_correct = 0
+        for swap_group, expected in blind_anchor_by_group.items():
+            choice = logical_choices.get((jid, swap_group))
+            if choice is None:
+                continue
+            anchor_total += 1
+            anchor_correct += int(choice == expected)
+        row["checked_vs_blind_human"] = anchor_total
+        row["correct_vs_blind_human"] = anchor_correct
+        row["accuracy_vs_blind_human"] = (
+            round(anchor_correct / anchor_total, 6) if anchor_total else None
+        )
+
+    # H1 is decided only from actual blind-human preference agreement.  Provenance
+    # accuracy remains a diagnostic prior but cannot unlock the hypothesis verdict.
+    hypothesis: HypothesisStatus = "INCONCLUSIVE"
+    blind_anchor_group_count = len(blind_anchor_by_group)
+    internal_anchor_accuracy: float | None = None
+    internal_anchor_total = 0
+    independent_anchor_accuracy: float | None = None
+    independent_anchor_total = 0
+    verdict_reason = "blind human anchor is still missing"
+    if blind_anchor_group_count == 1:
+        verdict_reason = "only one blind-human logical pair is anchored; at least two are required"
+    elif blind_anchor_group_count >= 2:
+        internal_anchor_hits = 0
+        internal_anchor_total = 0
+        for jid, row in discrimination.items():
+            if judge_kind.get(jid) != "INTERNAL":
+                continue
+            internal_anchor_hits += int(row["correct_vs_blind_human"] or 0)
+            internal_anchor_total += int(row["checked_vs_blind_human"] or 0)
+        internal_anchor_accuracy = (
+            internal_anchor_hits / internal_anchor_total if internal_anchor_total else None
+        )
+        independent_anchor_hits = 0
+        independent_anchor_total = 0
+        for jid, row in discrimination.items():
+            if judge_kind.get(jid) != "INDEPENDENT_MODEL":
+                continue
+            independent_anchor_hits += int(row["correct_vs_blind_human"] or 0)
+            independent_anchor_total += int(row["checked_vs_blind_human"] or 0)
+        independent_anchor_accuracy = (
+            independent_anchor_hits / independent_anchor_total if independent_anchor_total else None
         )
         pos = position_consistent / position_checked if position_checked else None
-        if internal_accuracy is not None and internal_accuracy < 0.75:
+        if internal_anchor_accuracy is not None and internal_anchor_total >= 2 and internal_anchor_accuracy < 0.75:
             hypothesis = "SUPPORTED"
-            verdict_reason = "internal judge disagrees materially with the blind human/provenance ordering"
+            verdict_reason = "internal judge disagrees materially with blind-human preferences across multiple logical pairs"
         elif (
-            internal_accuracy is not None
-            and internal_accuracy >= 0.85
+            internal_anchor_accuracy is not None
+            and internal_anchor_total >= 3
+            and internal_anchor_accuracy >= 0.85
+            and independent_anchor_accuracy is not None
+            and independent_anchor_total >= 2
+            and independent_anchor_accuracy >= 0.80
             and pos is not None
             and pos >= 0.95
-            and independent_vote_count > 0
         ):
             hypothesis = "REJECTED"
-            verdict_reason = "internal judge is aligned with blind human anchor and position-stable"
+            verdict_reason = "internal judge aligns with multi-pair blind-human and independent-model anchors"
         else:
-            verdict_reason = "available human evidence is insufficient for a decisive H1 verdict"
+            verdict_reason = "available blind-human evidence is not yet decisive for H1"
 
     return {
         "schema_version": 1,
@@ -296,6 +366,16 @@ def aggregate_judge_validity(
         "vote_count": len(vote_list),
         "human_vote_count": human_vote_count,
         "blind_human_vote_count": blind_human_vote_count,
+        "blind_human_anchor_group_count": blind_anchor_group_count,
+        "blind_human_anchor_disagreement_groups": sorted(blind_anchor_disagreement_groups),
+        "internal_checked_vs_blind_human": internal_anchor_total,
+        "internal_accuracy_vs_blind_human": (
+            round(internal_anchor_accuracy, 6) if internal_anchor_accuracy is not None else None
+        ),
+        "independent_checked_vs_blind_human": independent_anchor_total,
+        "independent_accuracy_vs_blind_human": (
+            round(independent_anchor_accuracy, 6) if independent_anchor_accuracy is not None else None
+        ),
         "independent_model_vote_count": independent_vote_count,
         "internal_vote_count": internal_vote_count,
         "position_swap_consistency": (

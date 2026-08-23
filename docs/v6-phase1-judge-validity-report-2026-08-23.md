@@ -387,15 +387,21 @@ paper-quality-benchmark-raw:
 
 最重要的 guard：
 
-> **没有 blind HUMAN vote 时，H1 永远不能自动变成 SUPPORTED/REJECTED。**
+> **H1 只允许由真实 blind-human preference 校准，不再允许 provenance label 参与正式判决；且至少需要 2 个不同 logical pair 的 blind-human anchor。**
 
-因为 known award label、用户非盲反馈、internal score 都不等价于 JudgeEval human anchor。
+因此：
+
+- known award label 只能做 provenance diagnostic；
+- 用户看过来源后的非盲反馈只能做 prior；
+- 只有 1 个 blind logical pair 时仍强制 `INCONCLUSIVE`；
+- `SUPPORTED` 必须来自多个 pair 上 internal Judge 与 blind-human preference 的实际低一致率；
+- `REJECTED` 还额外要求独立模型与 blind human 同向，避免只靠同一套内部 Judge 自证。
 
 测试：
 
 ```text
 PYTHONPATH=src python -m pytest -q tests/test_judge_validity.py
-9 passed
+10 passed
 ```
 
 ---
@@ -625,11 +631,14 @@ scripts/build_v6_human_review_html.py
 scripts/record_v6_human_vote.py
 ```
 
-当前最高价值 same-problem pair 的本地匿名审阅页：
+当前用于形成最小跨赛制 blind-human anchor 的两份本地匿名审阅页：
 
 ```text
 artifacts/meta_benchmark/judge_v1/human_review/G-A91F-1.html
+artifacts/meta_benchmark/judge_v1/human_review/G-H31M-1.html
 ```
+
+两者属于不同 logical pair；同一个 AB/BA swap group 的两页不能冒充两个独立 human anchors。
 
 该页面：
 
@@ -640,7 +649,9 @@ artifacts/meta_benchmark/judge_v1/human_review/G-A91F-1.html
 - 可导出 vote JSON；
 - `record_v6_human_vote.py` 只接受真实 human reviewer ID，拒绝 AI/model 占位身份；
 - 页面必须勾选 `content_only_before_provenance_reveal` blind-review attestation 才能导出有效票；
-- `JudgeVote` 新增 `blind_verified`，只有 blind-verified HUMAN vote 才能改变 H1，普通非盲人工反馈只能作为 prior。
+- `JudgeVote` 新增 `blind_verified`，只有 blind-verified HUMAN vote 才会进入 human anchor；
+- aggregate 直接计算每个 internal Judge 的 `accuracy_vs_blind_human`，正式 H1 不再使用 `accuracy_vs_provenance_prior`；
+- 至少需要两个不同 logical pair 的一致 blind-human anchor 才允许 `SUPPORTED/REJECTED`，普通非盲人工反馈只能作为 prior。
 
 针对该 HTML 再执行泄露扫描，未发现：
 
@@ -696,7 +707,7 @@ AB/BA package generation = READY
 automatic identity leakage scan = PASS
 human blind review UI = READY
 human vote = PENDING
-blind-verified human vote = PENDING
+blind-verified human anchor groups = 0 / minimum 2
 independent-model runner = READY
 independent-model valid vote = BLOCKED_BY_EXTERNAL_PROVIDER
 PDF/page visual blind review = UNVERIFIED
@@ -707,4 +718,4 @@ H1 = INCONCLUSIVE (strong preliminary evidence toward SUPPORTED)
 
 > **禁止进入 Phase 2。**
 
-下一项真正能改变 H1 状态的证据，不是继续写 evaluator，而是一张有效的 blind human vote 或一个成功返回的独立模型 blind vote。
+下一项真正能改变 H1 状态的证据，不是继续写 evaluator，而是**至少两个不同 logical pair 的有效 blind-human preference**；成功返回的独立模型 blind vote 会进一步增强 calibration，并且是未来 `REJECTED` Judge-bottleneck 假设所要求的独立证据。
